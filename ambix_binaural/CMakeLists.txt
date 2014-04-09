@@ -1,0 +1,5 @@
+ADD_SUBDIRECTORY ( ambix_binaural )
+
+IF (BUILD_STANDALONE)
+	ADD_SUBDIRECTORY ( ambix_binaural_standalone )
+ENDIF (BUILD_STANDALONE)

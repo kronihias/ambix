@@ -1,0 +1,15 @@
+H0e000a.wav
+H0e015a.wav
+H0e030a.wav
+H0e045a.wav
+H0e060a.wav
+H0e075a.wav
+H0e090a.wav
+H0e105a.wav
+H0e120a.wav
+H0e135a.wav
+H0e150a.wav
+H0e165a.wav
+H0e180a.wav
+dir.txt
+ring24-3h0v.config

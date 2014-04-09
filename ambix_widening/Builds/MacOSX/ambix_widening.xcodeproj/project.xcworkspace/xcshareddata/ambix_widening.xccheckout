@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>12BB383F-3262-419F-84AF-E59B8878D1AB</string>
+	<key>IDESourceControlProjectName</key>
+	<string>ambix_widening</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>05A4E074-4EA3-4116-80D7-23D63D38AA3E</key>
+		<string>https://bitbucket.org/kronihias/ambix.git</string>
+		<key>846259AB-8973-4F6A-9C4F-060AB2973D34</key>
+		<string>git://github.com/julianstorer/JUCE.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>ambix_widening/Builds/MacOSX/ambix_widening.xcodeproj/project.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>05A4E074-4EA3-4116-80D7-23D63D38AA3E</key>
+		<string>../../../../..</string>
+		<key>846259AB-8973-4F6A-9C4F-060AB2973D34</key>
+		<string>../../../../../../SDKs/JUCE</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://bitbucket.org/kronihias/ambix.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>110</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>05A4E074-4EA3-4116-80D7-23D63D38AA3E</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>05A4E074-4EA3-4116-80D7-23D63D38AA3E</string>
+			<key>IDESourceControlWCCName</key>
+			<string>ambix</string>
+		</dict>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>846259AB-8973-4F6A-9C4F-060AB2973D34</string>
+			<key>IDESourceControlWCCName</key>
+			<string>JUCE</string>
+		</dict>
+	</array>
+</dict>
+</plist>

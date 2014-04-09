@@ -1,0 +1,148 @@
+/*
+  ==============================================================================
+
+   This file is part of the ambix Ambisonic plug-in suite.
+   Copyright (c) 2013/2014 - Matthias Kronlachner
+   www.matthiaskronlachner.com
+   
+   Permission is granted to use this software under the terms of:
+   the GPL v2 (or any later version)
+
+   Details of these licenses can be found at: www.gnu.org/licenses
+
+   ambix is distributed in the hope that it will be useful, but WITHOUT ANY
+   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+  ==============================================================================
+*/
+
+// define condon shortley mapping -> acn channel sequence!!
+// (-1)^m
+// no?? (-1)^m if m>0, 1 otherwise ???
+// until 10th order 3d
+
+const signed int acn_cs_phase [121] =
+{
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1	,
+    -1	,
+    1
+};

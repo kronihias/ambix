@@ -1,0 +1,37 @@
+Conversion Schemes:
+
+ambix plugins:
+
+ACN
+SN3D
+
+.amb
+FuMa
+FuMa
+
+
+iem_ambi:
+
+SID
+SN3D
+
+
+Universal Ambisonics:
+Gerzon/Daniel sequence - SID! For each degree, we have the cos (m>=0) and sine (m<0) components of decreasing |m|
+N3D
+
+
+Wigware:
+FuMa
+FuMa
+
+
+Daniel Courville
+FuMa
+FuMa
+
+
+ICST:
+variable but standard setting is:
+ACN
+FuMa

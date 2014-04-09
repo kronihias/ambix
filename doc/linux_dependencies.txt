@@ -1,0 +1,5 @@
+sudo apt-get install libasound-dev libfreetype6-dev libgl-dev libx11-dev libxext-dev libxinerama-dev 
+
+// there are multiple gl libs.... use mesa:
+
+sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libeigen3-dev libfftw3-dev liblo-dev

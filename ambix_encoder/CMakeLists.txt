@@ -1,0 +1,5 @@
+ADD_SUBDIRECTORY ( ambix_encoder )
+ADD_SUBDIRECTORY ( ambix_encoder_i2 )
+ADD_SUBDIRECTORY ( ambix_encoder_i4 )
+ADD_SUBDIRECTORY ( ambix_encoder_i6 )
+ADD_SUBDIRECTORY ( ambix_encoder_i8 )

@@ -1,0 +1,5 @@
+ADD_SUBDIRECTORY ( ambix_decoder )
+
+IF (BUILD_STANDALONE)
+	ADD_SUBDIRECTORY ( ambix_decoder_standalone )
+ENDIF (BUILD_STANDALONE)

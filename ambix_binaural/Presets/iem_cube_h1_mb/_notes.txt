@@ -1,0 +1,39 @@
+these are the impulse responses recorded with the b+k dummy head.
+dummy head height: 1370mm above floor level
+floor is damped
+
+recordings done by Martin Rumori 2008-04-03
+http://lac.linuxaudio.org/2013/papers/60.pdf
+
+ear channel/headphone correction (HD600) and stereo file merging applied by Matthias Kronlachner, April 2013
+
+
+h1: ear channel 1370mm above floor level
+
+h2: ear channel 1630mm above floor level
+
+
+
+HRRIR measurement cube IEM graz
+2008-04-03 rumori
+
+samplerate: 44100
+systemlatenz: 1126.441 samples = 25.54 ms roundtrip (lt. jdelay)
+sweep: 10s (21.484Hz-22kHz = 1 Oct/sec)
+
+zwei hoehen:
+- h1: 0-grad-level (ohrkanal 1370mm ueber boden)
+- h2: ca. stehend-level (ohrkanal 1630 mm ueber boden,
+			bzw. 1210 mm ueber boden bei dn)
+
+mikrophone:
+
+- b+k kunstkopf intern: kk
+
+b+k kunstkopf
+- 2 hoehen ohrkanal:
+  - horizont = 1370 (mitte)
+  - leichte elevation: 1630 (ueberkopf: 1110)
+
+
+mit bodenbedaempfung/baffeln:

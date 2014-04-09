@@ -1,0 +1,1 @@
+INCLUDE(${SRC_DIR}/CMakeLists_subprojects.txt.inc)

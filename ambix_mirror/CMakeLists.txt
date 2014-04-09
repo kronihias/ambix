@@ -1,0 +1,5 @@
+ADD_SUBDIRECTORY ( ambix_mirror )
+
+IF (BUILD_STANDALONE)
+	ADD_SUBDIRECTORY ( ambix_mirror_standalone )
+ENDIF (BUILD_STANDALONE)

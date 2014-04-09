@@ -1,0 +1,57 @@
+--- /Users/matthias/SDKs/JUCE/modules/juce_gui_basics/widgets/juce_Slider.cpp	2014-01-07 09:11:53.000000000 +0200
++++ JUCE/modules/juce_gui_basics/widgets/juce_Slider.cpp	2014-01-09 14:09:38.000000000 +0200
+@@ -54,6 +54,7 @@
+         menuEnabled (false),
+         useDragEvents (false),
+         scrollWheelEnabled (true),
++        scrollWheelEndless(false),
+         snapsToMousePos (true),
+         parentForPopupDisplay (nullptr)
+     {
+@@ -987,8 +988,28 @@
+                 const double proportionDelta = (wheel.deltaX != 0 ? -wheel.deltaX : wheel.deltaY)
+                                                    * (wheel.isReversed ? -0.15f : 0.15f);
+                 const double currentPos = owner.valueToProportionOfLength (value);
+-                const double newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, currentPos + proportionDelta));
+-
++                
++                //////
++                // modified by Matthias Kronlachner
++                double newValue = 0.f;
++                
++                if (!scrollWheelEndless)
++                {
++                    newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, currentPos + proportionDelta));
++                } else {
++                    // behavior to wrap slider around with wheel
++                    double changeValue = currentPos + proportionDelta;
++                    
++                    if (changeValue > 1.f)
++                        changeValue -= 1.f;
++                    
++                    if (changeValue < 0.f)
++                        changeValue += 1.f;
++                    
++                    newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, changeValue));
++                }
++                ////
++                
+                 double delta = (newValue != value) ? jmax (std::abs (newValue - value), interval) : 0;
+                 if (value > newValue)
+                     delta = -delta;
+@@ -1248,6 +1269,7 @@
+     bool useDragEvents;
+     bool incDecDragged;
+     bool scrollWheelEnabled;
++    bool scrollWheelEndless;
+     bool snapsToMousePos;
+ 
+     ScopedPointer<Label> valueBox;
+@@ -1551,6 +1573,7 @@
+ //==============================================================================
+ void Slider::setPopupMenuEnabled (const bool menuEnabled)   { pimpl->menuEnabled = menuEnabled; }
+ void Slider::setScrollWheelEnabled (const bool enabled)     { pimpl->scrollWheelEnabled = enabled; }
++void Slider::setScrollWheelEndless (const bool enabled)     { pimpl->scrollWheelEndless = enabled; }
+ 
+ bool Slider::isHorizontal() const noexcept   { return pimpl->isHorizontal(); }
+ bool Slider::isVertical() const noexcept     { return pimpl->isVertical(); }

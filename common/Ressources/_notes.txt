@@ -1,0 +1,10 @@
+Spherical Designs
+R. H. Hardin and N. J. A. Sloane
+http://neilsloane.com/sphdesigns/dim3/
+
+t >= 2N+1
+
+therefore the used 21-design (des.3.240.21.txt) should work until order N=10 (2N+1 = 21)
+
+
+Matthias Kronlachner
