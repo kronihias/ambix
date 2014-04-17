@@ -32,11 +32,25 @@
 
 
 #define Plugin_Name                   ambix_converter_o
+#define Plugin_Code                   ACo
 
 
 #define QU(x) #x
 #define QUH(x) QU(x)
 #define JucePlugin_Name                   QUH(Plugin_Name) QUH(AMBI_ORDER)
+
+// get single quotes around our identifier - ugly, but is there another way?
+#define APOS           '
+#define CHAR2(a,b,c)   a##b##c
+#define CHAR1(a,b,c)   CHAR2(a,b,c)
+#define CHAR(x)        CHAR1(APOS,x,APOS)
+
+#define PASTER(x,y) x ## y
+#define EVALUATOR(x,y)  PASTER(x,y)
+#define ADDORDER(fun) EVALUATOR(fun, AMBI_ORDER)
+
+#define PluginCode                        ADDORDER(Plugin_Code)
+#define JucePlugin_PluginCode             CHAR(PluginCode)
 
 //////////////////////////////////////////////
 
