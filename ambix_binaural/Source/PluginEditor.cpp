@@ -315,7 +315,7 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
     for (int i=0; i < ourProcessor->_presetFiles.size(); i++) {
         
         // add separator for new subfolder
-        String subdir = ourProcessor->_presetFiles.getUnchecked(i).getParentDirectory().getFileNameWithoutExtension();
+        String subdir = ourProcessor->_presetFiles.getUnchecked(i).getParentDirectory().getFileName();
         
         if (!lastSubdir.equalsIgnoreCase(subdir)) {
             
