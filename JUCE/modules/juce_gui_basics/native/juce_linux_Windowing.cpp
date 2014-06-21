@@ -971,14 +971,14 @@ public:
 
     Rectangle<int> getBounds() const override          { return bounds; }
 
-    Point<int> localToGlobal (Point<int> relativePosition) override
+    Point<float> localToGlobal (Point<float> relativePosition) override
     {
-        return relativePosition + bounds.getPosition();
+        return relativePosition + bounds.getPosition().toFloat();
     }
 
-    Point<int> globalToLocal (Point<int> screenPosition) override
+    Point<float> globalToLocal (Point<float> screenPosition) override
     {
-        return screenPosition - bounds.getPosition();
+        return screenPosition - bounds.getPosition().toFloat();
     }
 
     void setAlpha (float /* newAlpha */) override
@@ -1217,7 +1217,7 @@ public:
         }
     }
 
-    void textInputRequired (const Point<int>&) override {}
+    void textInputRequired (Point<int>, TextInputTarget&) override {}
 
     void repaint (const Rectangle<int>& area) override
     {
@@ -1327,6 +1327,7 @@ public:
 
             default:
                #if JUCE_USE_XSHM
+                if (XSHMHelpers::isShmAvailable())
                 {
                     ScopedXLock xlock;
                     if (event.xany.type == XShmGetEventBase (display))
@@ -1490,9 +1491,9 @@ public:
     }
 
     template <typename EventType>
-    static Point<int> getMousePos (const EventType& e) noexcept
+    static Point<float> getMousePos (const EventType& e) noexcept
     {
-        return Point<int> (e.x, e.y);
+        return Point<float> ((float) e.x, (float) e.y);
     }
 
     void handleWheelEvent (const XButtonPressedEvent& buttonPressEvent, const float amount)
@@ -1902,7 +1903,8 @@ private:
                 for (const Rectangle<int>* i = originalRepaintRegion.begin(), * const e = originalRepaintRegion.end(); i != e; ++i)
                 {
                    #if JUCE_USE_XSHM
-                    ++shmPaintsPending;
+                    if (XSHMHelpers::isShmAvailable())
+                        ++shmPaintsPending;
                    #endif
 
                     static_cast<XBitmapImage*> (image.getPixelData())
@@ -3045,7 +3047,7 @@ void Desktop::Displays::findDisplays (float masterScale)
                                                                        screens[j].height) * masterScale;
                             d.isMain = (index == 0);
                             d.scale = masterScale;
-                            d.dpi = getDisplayDPI (index);
+                            d.dpi = getDisplayDPI (0); // (all screens share the same DPI)
 
                             displays.add (d);
                         }
@@ -3121,7 +3123,7 @@ bool Desktop::canUseSemiTransparentWindows() noexcept
              && (matchedDepth == desiredDepth);
 }
 
-Point<int> MouseInputSource::getCurrentRawMousePosition()
+Point<float> MouseInputSource::getCurrentRawMousePosition()
 {
     Window root, child;
     int x, y, winx, winy;
@@ -3138,14 +3140,14 @@ Point<int> MouseInputSource::getCurrentRawMousePosition()
         x = y = -1;
     }
 
-    return Point<int> (x, y);
+    return Point<float> ((float) x, (float) y);
 }
 
-void MouseInputSource::setRawMousePosition (Point<int> newPosition)
+void MouseInputSource::setRawMousePosition (Point<float> newPosition)
 {
     ScopedXLock xlock;
     Window root = RootWindow (display, DefaultScreen (display));
-    XWarpPointer (display, None, root, 0, 0, 0, 0, newPosition.getX(), newPosition.getY());
+    XWarpPointer (display, None, root, 0, 0, 0, 0, roundToInt (newPosition.getX()), roundToInt (newPosition.getY()));
 }
 
 double Desktop::getDefaultMasterScale()

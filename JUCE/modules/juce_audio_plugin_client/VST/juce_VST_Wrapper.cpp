@@ -281,6 +281,10 @@ public:
         setInitialDelay (filter->getLatencySamples());
         programsAreChunks (true);
 
+        // NB: For reasons best known to themselves, some hosts fail to load/save plugin
+        // state correctly if the plugin doesn't report that it has at least 1 program.
+        jassert (af->getNumPrograms() > 0);
+
         activePlugins.add (this);
     }
 
@@ -1051,7 +1055,8 @@ public:
                 Timer::callPendingTimersSynchronously();
 
                 for (int i = ComponentPeer::getNumPeers(); --i >= 0;)
-                    ComponentPeer::getPeer (i)->performAnyPendingRepaintsNow();
+                    if (ComponentPeer* p = ComponentPeer::getPeer(i))
+                        p->performAnyPendingRepaintsNow();
 
                 recursionCheck = false;
             }
@@ -1160,10 +1165,8 @@ public:
                 editorComp->addToDesktop (0, ptr);
                 hostWindow = (HWND) ptr;
               #elif JUCE_LINUX
-                editorComp->addToDesktop (0);
+                editorComp->addToDesktop (0, ptr);
                 hostWindow = (Window) ptr;
-                Window editorWnd = (Window) editorComp->getWindowHandle();
-                XReparentWindow (display, editorWnd, hostWindow, 0, 0);
               #else
                 hostWindow = attachComponentToWindowRef (editorComp, ptr, useNSView);
               #endif
