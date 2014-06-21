@@ -540,7 +540,7 @@ void Ambix_vmicAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
                 {
                     output_buffer.addFrom(out, 0, buffer, in, 0, NumSamples, (float)Sh_transf(out, in));
                 } else {
-                    output_buffer.addFromWithRamp(out, 0, buffer.getSampleData(in), NumSamples, (float)_Sh_transf(out, in), (float)Sh_transf(out, in));
+                    output_buffer.addFromWithRamp(out, 0, buffer.getReadPointer(in), NumSamples, (float)_Sh_transf(out, in), (float)Sh_transf(out, in));
                 }
                 
             }

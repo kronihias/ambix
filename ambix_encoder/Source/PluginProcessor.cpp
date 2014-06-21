@@ -344,7 +344,7 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     for (int in_ch=0; in_ch < std::min(getNumInputChannels(), INPUT_CHANNELS); in_ch++) {
 				
 				// String debug_output = "Gains: ";
-				const float* in_channel_data = InputBuffer.getSampleData(in_ch);
+				const float* in_channel_data = InputBuffer.getReadPointer(in_ch);
 		
         for (int out_ch = 0; out_ch < getNumOutputChannels(); out_ch++)
         {
@@ -370,7 +370,7 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
 #if WITH_OSC
     // level of W channel for OSC output
     
-    _my_meter_dsp.calc(buffer.getSampleData(0), NumSamples);
+    _my_meter_dsp.calc((float*)buffer.getReadPointer(0), NumSamples);
     
     dpk = _my_meter_dsp.getPeak();
     rms = _my_meter_dsp.getRMS();

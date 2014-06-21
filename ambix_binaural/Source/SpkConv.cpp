@@ -135,15 +135,15 @@ bool SpkConv::loadIr(const File& audioFile, double sampleRate, int BufferLength,
         soxr_error_t error;
         
         error = soxr_oneshot(irate, orate, 1, /* Rates and # of chans. */
-                                          HrirBuffer.getSampleData(0), ir_length, NULL,         /* Input. */
-                                          ResampledBuffer.getSampleData(0), newsize, &odone,    /* Output. */
+                                          HrirBuffer.getReadPointer(0), ir_length, NULL,         /* Input. */
+                                          ResampledBuffer.getWritePointer(0), newsize, &odone,    /* Output. */
                                           NULL, // soxr_io_spec_t
                                           &q_spec, // soxr_quality_spec_t
                                           NULL); // soxr_runtime_spec_t
         
         error = soxr_oneshot(irate, orate, 1, /* Rates and # of chans. */
-                             HrirBuffer.getSampleData(1), ir_length, NULL,         /* Input. */
-                             ResampledBuffer.getSampleData(1), newsize, &odone,    /* Output. */
+                             HrirBuffer.getReadPointer(1), ir_length, NULL,         /* Input. */
+                             ResampledBuffer.getWritePointer(1), newsize, &odone,    /* Output. */
                              NULL, // soxr_io_spec_t
                              &q_spec, // soxr_quality_spec_t
                              NULL); // soxr_runtime_spec_t
@@ -194,10 +194,10 @@ bool SpkConv::loadIr(const File& audioFile, double sampleRate, int BufferLength,
     
 
     // send hrir to zita-convolver
-    conv.impdata_create(0, 0, 1, HrirBuffer.getSampleData(ch_l),
+    conv.impdata_create(0, 0, 1, HrirBuffer.getReadPointer(ch_l),
                          delay_samples, ir_length+delay_samples);
     
-    conv.impdata_create(0, 1, 1, HrirBuffer.getSampleData(ch_r),
+    conv.impdata_create(0, 1, 1, HrirBuffer.getReadPointer(ch_r),
                          delay_samples, ir_length+delay_samples);
     
     
@@ -213,8 +213,8 @@ bool SpkConv::loadIr(const File& audioFile, double sampleRate, int BufferLength,
 
 	int headBlockSize = block_length;
 	int tailBlockSize = std::max(4096, nextPowerOfTwo(ir_length+delay_samples));
-	conv_win_l.init(headBlockSize, tailBlockSize, HrirBufferDelay.getSampleData(ch_l), ir_length+delay_samples);
-	conv_win_r.init(headBlockSize, tailBlockSize, HrirBufferDelay.getSampleData(ch_r), ir_length+delay_samples);
+	conv_win_l.init(headBlockSize, tailBlockSize, HrirBufferDelay.getReadPointer(ch_l), ir_length+delay_samples);
+	conv_win_r.init(headBlockSize, tailBlockSize, HrirBufferDelay.getReadPointer(ch_r), ir_length+delay_samples);
     
 #endif
     // delete the audio file reader
@@ -253,7 +253,7 @@ void SpkConv::process(AudioSampleBuffer& InputBuffer, AudioSampleBuffer& OutputB
         
         
         // processor samples
-        float* in_buffer = InputBuffer.getSampleData(InCh);
+        float* in_buffer = (float*)InputBuffer.getReadPointer(InCh);
         
         unsigned int bcp = bufconv_pos;
         
@@ -279,13 +279,13 @@ void SpkConv::process(AudioSampleBuffer& InputBuffer, AudioSampleBuffer& OutputB
 		out_buffer.setSize(2,NumSamples,false,false,true);
 		out_buffer.clear();
 
-		conv_win_l.process(InputBuffer.getSampleData(InCh), out_buffer.getSampleData(0), NumSamples);
-		conv_win_r.process(InputBuffer.getSampleData(InCh), out_buffer.getSampleData(1), NumSamples);
+		conv_win_l.process(InputBuffer.getReadPointer(InCh), out_buffer.getWritePointer(0), NumSamples);
+		conv_win_r.process(InputBuffer.getReadPointer(InCh), out_buffer.getWritePointer(1), NumSamples);
 
 		
         // copy buffer to output
-        OutputBuffer.addFrom(0, 0, out_buffer.getSampleData(0), NumSamples);
-        OutputBuffer.addFrom(1, 0, out_buffer.getSampleData(1), NumSamples);
+        OutputBuffer.addFrom(0, 0, out_buffer.getReadPointer(0), NumSamples);
+        OutputBuffer.addFrom(1, 0, out_buffer.getReadPointer(1), NumSamples);
 #endif
         
     }

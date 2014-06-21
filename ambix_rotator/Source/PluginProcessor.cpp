@@ -418,7 +418,7 @@ void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
                 {
                     output_buffer.addFrom(out, 0, buffer, in, 0, NumSamples, (float)Sh_transf(in, out));
                 } else {
-                    output_buffer.addFromWithRamp(out, 0, buffer.getSampleData(in), NumSamples, (float)_Sh_transf(in, out), (float)Sh_transf(in, out));
+                    output_buffer.addFromWithRamp(out, 0, buffer.getReadPointer(in), NumSamples, (float)_Sh_transf(in, out), (float)Sh_transf(in, out));
                 }
                 
             }

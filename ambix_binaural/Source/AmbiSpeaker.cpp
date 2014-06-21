@@ -73,7 +73,7 @@ void AmbiSpeaker::process(AudioSampleBuffer& InputBuffer)
     
     // compute and store peak value
     
-    _my_meter_dsp.calc(OutputBuffer.getSampleData(0), NumSamples);
+    _my_meter_dsp.calc((float*)OutputBuffer.getReadPointer(0), NumSamples);
     
 }
 

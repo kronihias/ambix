@@ -364,19 +364,19 @@ void Ambix_rotator_zAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
                 }
                 else  if (m_in < 0 && m_out < 0)
                 {
-                    output_buffer.addFromWithRamp(acn_out, 0, buffer.getSampleData(acn_in), NumSamples, _cos_z[-m_out], cos_z[-m_out]); // interpolation with ramp done by juce
+                    output_buffer.addFromWithRamp(acn_out, 0, buffer.getReadPointer(acn_in), NumSamples, _cos_z[-m_out], cos_z[-m_out]); // interpolation with ramp done by juce
                 }
                 else  if (m_in < 0 && m_out > 0)
                 {
-                    output_buffer.addFromWithRamp(acn_out, 0, buffer.getSampleData(acn_in), NumSamples, -_sin_z[m_out], -sin_z[m_out]);
+                    output_buffer.addFromWithRamp(acn_out, 0, buffer.getReadPointer(acn_in), NumSamples, -_sin_z[m_out], -sin_z[m_out]);
                 }
                 else  if (m_in > 0 && m_out > 0)
                 {
-                    output_buffer.addFromWithRamp(acn_out, 0, buffer.getSampleData(acn_in), NumSamples, _cos_z[m_out], cos_z[m_out]);
+                    output_buffer.addFromWithRamp(acn_out, 0, buffer.getReadPointer(acn_in), NumSamples, _cos_z[m_out], cos_z[m_out]);
                 }
                 else  if (m_in > 0 && m_out < 0)
                 {
-                    output_buffer.addFromWithRamp(acn_out, 0, buffer.getSampleData(acn_in), NumSamples, _sin_z[m_in], sin_z[m_in]);
+                    output_buffer.addFromWithRamp(acn_out, 0, buffer.getReadPointer(acn_in), NumSamples, _sin_z[m_in], sin_z[m_in]);
                 }
                 
             }

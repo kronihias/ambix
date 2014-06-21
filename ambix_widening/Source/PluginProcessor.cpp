@@ -466,7 +466,7 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                             if (_buf_read_pos[i] + buffer.getNumSamples() < _buf_size)
                             {
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getSampleData(acn_in, _buf_read_pos[i]), buffer.getNumSamples(), _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getReadPointer(acn_in, _buf_read_pos[i]), buffer.getNumSamples(), _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, 0, ring_buffer, acn_in, _buf_read_pos[i], buffer.getNumSamples(), coeff);
 
@@ -477,14 +477,14 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                                 
                                 // copy until end
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getSampleData(acn_in, _buf_read_pos[i]), samples_to_read1, _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getReadPointer(acn_in, _buf_read_pos[i]), samples_to_read1, _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, 0, ring_buffer, acn_in, _buf_read_pos[i], samples_to_read1, coeff);
 
                                 
                                 // start copy from front
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, samples_to_read1, ring_buffer.getSampleData(acn_in, 0), samples_to_read2, _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, samples_to_read1, ring_buffer.getReadPointer(acn_in, 0), samples_to_read2, _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, samples_to_read1, ring_buffer, acn_in, 0, samples_to_read2, coeff);
 
@@ -513,7 +513,7 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                             if (_buf_read_pos[i] + buffer.getNumSamples() < _buf_size)
                             {
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getSampleData(acn_in, _buf_read_pos[i]), buffer.getNumSamples(), _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getReadPointer(acn_in, _buf_read_pos[i]), buffer.getNumSamples(), _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, 0, ring_buffer, acn_in, _buf_read_pos[i], buffer.getNumSamples(), coeff);
                                 
@@ -524,14 +524,14 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                                 
                                 // copy until end
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getSampleData(acn_in, _buf_read_pos[i]), samples_to_read1, _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getReadPointer(acn_in, _buf_read_pos[i]), samples_to_read1, _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, 0, ring_buffer, acn_in, _buf_read_pos[i], samples_to_read1, coeff);
                                 
                                 
                                 // start copy from front
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, samples_to_read1, ring_buffer.getSampleData(acn_in, 0), samples_to_read2, _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, samples_to_read1, ring_buffer.getReadPointer(acn_in, 0), samples_to_read2, _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, samples_to_read1, ring_buffer, acn_in, 0, samples_to_read2, coeff);
                                 
@@ -560,7 +560,7 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                             if (_buf_read_pos[i] + buffer.getNumSamples() < _buf_size)
                             {
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getSampleData(acn_in, _buf_read_pos[i]), buffer.getNumSamples(), _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getReadPointer(acn_in, _buf_read_pos[i]), buffer.getNumSamples(), _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, 0, ring_buffer, acn_in, _buf_read_pos[i], buffer.getNumSamples(), coeff);
                                 
@@ -571,14 +571,14 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                                 
                                 // copy until end
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getSampleData(acn_in, _buf_read_pos[i]), samples_to_read1, _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getReadPointer(acn_in, _buf_read_pos[i]), samples_to_read1, _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, 0, ring_buffer, acn_in, _buf_read_pos[i], samples_to_read1, coeff);
                                 
                                 
                                 // start copy from front
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, samples_to_read1, ring_buffer.getSampleData(acn_in, 0), samples_to_read2, _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, samples_to_read1, ring_buffer.getReadPointer(acn_in, 0), samples_to_read2, _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, samples_to_read1, ring_buffer, acn_in, 0, samples_to_read2, coeff);
                                 
@@ -607,7 +607,7 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                             if (_buf_read_pos[i] + buffer.getNumSamples() < _buf_size)
                             {
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getSampleData(acn_in, _buf_read_pos[i]), buffer.getNumSamples(), _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getReadPointer(acn_in, _buf_read_pos[i]), buffer.getNumSamples(), _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, 0, ring_buffer, acn_in, _buf_read_pos[i], buffer.getNumSamples(), coeff);
                                 
@@ -618,14 +618,14 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                                 
                                 // copy until end
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getSampleData(acn_in, _buf_read_pos[i]), samples_to_read1, _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, 0, ring_buffer.getReadPointer(acn_in, _buf_read_pos[i]), samples_to_read1, _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, 0, ring_buffer, acn_in, _buf_read_pos[i], samples_to_read1, coeff);
                                 
                                 
                                 // start copy from front
                                 if (_coeff != coeff) // interpolate?
-                                    buffer.addFromWithRamp(acn_out, samples_to_read1, ring_buffer.getSampleData(acn_in, 0), samples_to_read2, _coeff, coeff);
+                                    buffer.addFromWithRamp(acn_out, samples_to_read1, ring_buffer.getReadPointer(acn_in, 0), samples_to_read2, _coeff, coeff);
                                 else
                                     buffer.addFrom(acn_out, samples_to_read1, ring_buffer, acn_in, 0, samples_to_read2, coeff);
                                 
