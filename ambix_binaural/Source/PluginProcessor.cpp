@@ -757,6 +757,10 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
         
     } // end iterate over configuration file lines
     configLoaded = true;
+
+#if BINAURAL_DECODER
+    setLatencySamples(BufferSize);
+#endif
     
     sendChangeMessage(); // notify editor
     
