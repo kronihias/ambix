@@ -31,25 +31,16 @@
 #endif
 
 #define Plugin_Name                   ambix_widening_o
-#define Plugin_Code                   AWi
+#define Plugin_Code                   1096247600 // AWi0
 
 // generate plugin name with ambi order
 #define QU(x) #x
 #define QUH(x) QU(x)
 #define JucePlugin_Name                   QUH(Plugin_Name) QUH(AMBI_ORDER)
 
-// get single quotes around our identifier - ugly, but is there another way?
-#define APOS           '
-#define CHAR2(a,b,c)   a##b##c
-#define CHAR1(a,b,c)   CHAR2(a,b,c)
-#define CHAR(x)        CHAR1(APOS,x,APOS)
+#define ADD(x, y) ((x) + (y))
 
-#define PASTER(x,y) x ## y
-#define EVALUATOR(x,y)  PASTER(x,y)
-#define ADDORDER(fun) EVALUATOR(fun, AMBI_ORDER)
-
-#define PluginCode                        ADDORDER(Plugin_Code)
-#define JucePlugin_PluginCode             CHAR(PluginCode)
+#define JucePlugin_PluginCode             ADD(Plugin_Code,AMBI_ORDER)
 
 //////////////////////////////////////////////
 
@@ -275,7 +266,7 @@
  #define JucePlugin_MaxNumOutputChannels   AMBI_CHANNELS
 #endif
 #ifndef  JucePlugin_PreferredChannelConfigurations
- #define JucePlugin_PreferredChannelConfigurations  {16, 16}, {AMBI_CHANNELS, AMBI_CHANNELS}
+ #define JucePlugin_PreferredChannelConfigurations  {AMBI_CHANNELS, AMBI_CHANNELS}
 #endif
 #ifndef  JucePlugin_IsSynth
  #define JucePlugin_IsSynth                0

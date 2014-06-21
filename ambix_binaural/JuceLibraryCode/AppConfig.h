@@ -40,39 +40,21 @@
 #define QU(x) #x
 #define QUH(x) QU(x)
 
-// get single quotes around our identifier - ugly, but is there another way?
-#define APOS           '
-#define CHAR2(a,b,c)   a##b##c
-#define CHAR1(a,b,c)   CHAR2(a,b,c)
-#define CHAR(x)        CHAR1(APOS,x,APOS)
-
-#define PASTER(x,y) x ## y
-#define EVALUATOR(x,y)  PASTER(x,y)
-#define NAME(fun) EVALUATOR(fun, AMBI_ORDER)
-
 // generate plugin name with ambi order
 #if BINAURAL_DECODER
     #define Plugin_Name                   ambix_binaural_o
-    #define PluginCode         NAME(ABi)
+    #define Plugin_Code                    1094871344 // ABi0
 #else
     #define Plugin_Name                   ambix_decoder_o
-    #define PluginCode         NAME(ADe)
+    #define Plugin_Code                    1095001392 // ADe0
 #endif
 
 
 #define JucePlugin_Name                   QUH(Plugin_Name) QUH(AMBI_ORDER)
 
-#define JucePlugin_PluginCode             CHAR(PluginCode)
+#define ADD(x, y) ((x) + (y))
 
-/* definition to expand macro then apply to pragma message */
-#define VALUE_TO_STRING(x) #x
-#define VALUE(x) VALUE_TO_STRING(x)
-#define VAR_NAME_VALUE(var) #var "="  VALUE(var)
-
-// debugging
-//#pragma message(VAR_NAME_VALUE(BINAURAL_DECODER))
-//#pragma message(VAR_NAME_VALUE(JucePlugin_Name))
-//#pragma message(VAR_NAME_VALUE(JucePlugin_PluginCode))
+#define JucePlugin_PluginCode             ADD(Plugin_Code,AMBI_ORDER)
 
 //////////////////////////////////////////////
 
