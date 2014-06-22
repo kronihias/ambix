@@ -1,0 +1,2 @@
+This is an encoder matrix for converting the 32 signals of an mh acoustic Eigenmike to 4th order Ambisonics in ambiX convention.
+Note that you need to apply a radial filter afterwards to get good results!
