@@ -143,6 +143,8 @@ http://iaem.at/Members/zotter/publications/2014_KronlachnerZotter_AmbiTransforma
 
 changelog
 -----------
+* v0.2.2 (2014-08-18) encoder: flickering fix, osc settings, right mouse click for relative source movement, press shift to freeze elevation while moving and ctrl to freeze azimuth
+
 * v0.2.1 (2014-04-17) fixed vst identifier for Plogue Bidule compatibility
 
 * v0.2.0 (2014-03-30) added ambix_widening, JUCE update, encoder GUI panning fix

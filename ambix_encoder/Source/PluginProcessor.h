@@ -129,17 +129,22 @@ public:
     bool oscOut(bool arg); // activate osc out
     bool oscIn(bool arg); // activate osc in
     
+    void changeTimer(int time);
+    
     // osc stuff
     bool osc_in;
 	bool osc_out;
+    int osc_interval;
     
 	String osc_error;
     
 	String osc_in_port, osc_out_ip, osc_out_port;
     
     lo_server_thread st;
-	lo_address addr;
+	Array<lo_address> addresses;
 #endif
+    
+    ApplicationProperties myProperties;
     
 private:
     OwnedArray<AmbixEncoder> AmbiEnc;

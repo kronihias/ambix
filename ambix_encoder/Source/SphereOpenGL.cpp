@@ -31,7 +31,8 @@ double constrainAngle(double x){
 
 SphereOpenGL::SphereOpenGL() :
 sphere(0.9f, 12, 24),
-sphere_source(0.1f, 12, 24)
+sphere_source(0.1f, 12, 24),
+_first_run(true)
 {
     
     openGLContext.setRenderer (this);
@@ -56,7 +57,16 @@ void SphereOpenGL::renderOpenGL()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     //gluOrtho2D(-1.0, 1.0, -1.0, 1.0);
-    glOrtho(-1.f, 1.f, -1.f, 1.f, -1.f, 1.f);
+    // glOrtho(-1.f, 1.f, -1.f, 1.f, -1.f, 1.f);
+    
+    const float desktopScale = (float) openGLContext.getRenderingScale();
+    
+    glViewport (0, 0, roundToInt (desktopScale * getWidth()), roundToInt (desktopScale * getHeight()));
+    
+	// glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-1.f, 1.f, -1.f, 1.f, -1.f, 1.f);
+	// glMatrixMode(GL_MODELVIEW);
     
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable( GL_BLEND );
@@ -142,6 +152,14 @@ void SphereOpenGL::setSource(float azimuth, float elevation)
 {
     mPhi = azimuth * (float)DEG2RAD;
     mTheta = elevation * (float)DEG2RAD;
+    
+    if (_first_run)
+    {
+        _mPhi = mPhi;
+        _mTheta = mTheta;
+        
+        _first_run = false;
+    }
 }
 
 void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
@@ -151,29 +169,53 @@ void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
 
 void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
 {
-    float x = (float)e.getPosition().x - (float)this->getWidth() / 2.f;
-    float y = (float)e.getPosition().y - (float)this->getHeight() / 2.f;
     
-    //std::cout << x << " " << y << std::endl;
-    
-    float r = sqrtf(x*x + y*y)/105.f;
-    float phi = atan2f(y, x);
-    
-
-    mPhi = (float)constrainAngle(phi + M_PI_2);
-    
-    r = jmin(2.f, r);
-    
-    
-    float mult = 1.f; // move on upper hemisphere
-    
-    if (_mTheta < 0.f)
-        mult = -1.f; // move on lower hemisphere
+    if (e.mods.isRightButtonDown())
+    {
+        // Relative Mouse Mode
         
-        if (r < 1.f)
-            mTheta = mult*(float)constrainAngle(acosf(r));
-        else
-            mTheta = mult*(float)constrainAngle(-acosf(2.f-r));
+        // Azimuth
+        if (!e.mods.isCtrlDown()) {
+            mPhi = constrainAngle(_mPhi + (float) e.getDistanceFromDragStartX()/180.f);
+        }
+        
+        // Elevation
+        if (!e.mods.isShiftDown()) {
+            mTheta = (float)constrainAngle(_mTheta + (float) e.getDistanceFromDragStartY()/200.f);
+        }
+    
+    } else {
+        // Absolute Mouse Mode
+        
+        float x = (float)e.getPosition().x - (float)this->getWidth() / 2.f;
+        float y = (float)e.getPosition().y - (float)this->getHeight() / 2.f;
+        
+        //std::cout << x << " " << y << std::endl;
+        
+        float r = sqrtf(x*x + y*y)/105.f;
+        float phi = atan2f(y, x);
+        
+        // Azimuth
+        if (!e.mods.isCtrlDown()) {
+            mPhi = (float)constrainAngle(phi + M_PI_2);
+        }
+        
+        // Elevation
+        if (!e.mods.isShiftDown()) {
+            r = jmin(2.f, r);
+            
+            float mult = 1.f; // move on upper hemisphere
+            
+            if (_mTheta < 0.f)
+                mult = -1.f; // move on lower hemisphere
+            
+            if (r < 1.f)
+                mTheta = mult*(float)constrainAngle(acosf(r));
+            else
+                mTheta = mult*(float)constrainAngle(-acosf(2.f-r));
+        }
+        
+    }
     
     // notify host
     if (processor)
@@ -186,4 +228,5 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
 void SphereOpenGL::mouseUp(const juce::MouseEvent &e)
 {
     _mTheta = mTheta;
+    _mPhi = mPhi;
 }

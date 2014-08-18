@@ -24,6 +24,7 @@
 #include "JuceHeader.h"
 #include "PluginProcessor.h"
 #include "SphereOpenGL.h"
+#include "Settings.h"
 //[/Headers]
 
 
@@ -38,7 +39,8 @@
 */
 class Ambix_encoderAudioProcessorEditor  : public AudioProcessorEditor,
                                            public SliderListener,
-                                           public ChangeListener
+                                           public ChangeListener,
+                                           public ButtonListener
 {
 public:
     //==============================================================================
@@ -52,9 +54,16 @@ public:
     void paint (Graphics& g);
     void resized();
     void sliderValueChanged (Slider* sliderThatWasMoved);
-
+    void buttonClicked (Button* buttonThatWasClicked);
+    
     void changeListenerCallback (ChangeBroadcaster *source);
-
+    
+    // Binary resources:
+    static const char* settings_png;
+    static const int settings_pngSize;
+    static const char* settings_white_png;
+    static const int settings_white_pngSize;
+    
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     //[/UserVariables]
@@ -72,8 +81,11 @@ private:
     ScopedPointer<TextEditor> txt_az_move;
     ScopedPointer<TextEditor> txt_el_move;
     ScopedPointer<Label> lbl_id;
+    ScopedPointer<ImageButton> btn_settings;
   
     ScopedPointer<SphereOpenGL> sphere_opengl;
+    
+    juce::Component::SafePointer<juce::DialogWindow> _settingsDialogWindow;
     
     Ambix_encoderAudioProcessor* getProcessor() const
     {

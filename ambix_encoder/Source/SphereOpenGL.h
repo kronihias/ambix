@@ -138,7 +138,9 @@ private:
     float mTheta;
     
     float _mTheta; // old
+    float _mPhi;
     
+    bool _first_run;
 };
 
 

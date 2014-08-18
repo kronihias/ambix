@@ -21,6 +21,7 @@
 
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
+#include "Graphics.h"
 //[/MiscUserDefs]
 
 //==============================================================================
@@ -135,7 +136,7 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     
     addAndMakeVisible (sphere_opengl = new SphereOpenGL());
     sphere_opengl->setName ("new OpenGl");
-    sphere_opengl->setBounds(10, 30, 240, 240);
+    // sphere_opengl->setBounds(10, 30, 240, 240);
     sphere_opengl->processor = ownerFilter;
     
     sld_az->setDoubleClickReturnValue(true, 0);
@@ -169,7 +170,17 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     sld_width->setPopupDisplayEnabled(true, this);
     sld_width->setDoubleClickReturnValue(true, 45);
 #endif
-
+    
+    addAndMakeVisible (btn_settings = new ImageButton ("new button"));
+    btn_settings->setTooltip (TRANS("OSC settings"));
+    btn_settings->setButtonText (TRANS("settings"));
+    btn_settings->addListener (this);
+    
+    btn_settings->setImages (false, true, true,
+                             ImageCache::getFromMemory (settings_png, settings_pngSize), 1.000f, Colour (0x00000000),
+                             ImageCache::getFromMemory (settings_white_png, settings_white_pngSize), 1.000f, Colour (0x00000000),
+                             ImageCache::getFromMemory (settings_png, settings_pngSize), 1.000f, Colour (0x00000000));
+    
     //[UserPreSize]
     //[/UserPreSize]
 #if INPUT_CHANNELS > 1
@@ -210,6 +221,8 @@ Ambix_encoderAudioProcessorEditor::~Ambix_encoderAudioProcessorEditor()
 #if INPUT_CHANNELS > 1
     sld_width = nullptr;
 #endif
+    
+    btn_settings = nullptr;
 
     //[Destructor]. You can add your own custom destruction code here..
     //[/Destructor]
@@ -295,6 +308,8 @@ void Ambix_encoderAudioProcessorEditor::paint (Graphics& g)
 
 void Ambix_encoderAudioProcessorEditor::resized()
 {
+    sphere_opengl->setBounds (23, 32, 240, 240);
+    
     sld_el->setBounds (270, 38, 40, 232);
     sld_az->setBounds (27, 270, 282, 40);
     sld_size->setBounds (32, 355, 29, 29);
@@ -307,6 +322,8 @@ void Ambix_encoderAudioProcessorEditor::resized()
   
     lbl_id->setBounds (271, 0, 57, 24);
   
+    btn_settings->setBounds (3, 3, 26, 25);
+    
 #if INPUT_CHANNELS > 1
     sld_width->setBounds (93, 355, 29, 29);
 #endif
@@ -410,3 +427,26 @@ void Ambix_encoderAudioProcessorEditor::changeListenerCallback (ChangeBroadcaste
     
     txt_el_move->setText(el_mv);
 }
+
+void Ambix_encoderAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
+{
+    Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
+    
+    if (buttonThatWasClicked == btn_settings)
+    {
+        if (!_settingsDialogWindow)
+        {
+            juce::DialogWindow::LaunchOptions launchOptions;
+            launchOptions.dialogTitle = juce::String("Settings");
+            launchOptions.content.setOwned(new Settings(*ourProcessor));
+            launchOptions.componentToCentreAround = this;
+            launchOptions.escapeKeyTriggersCloseButton = true;
+            launchOptions.useNativeTitleBar = true;
+            launchOptions.resizable = false;
+            launchOptions.useBottomRightCornerResizer = false;
+            _settingsDialogWindow = launchOptions.launchAsync();
+        }
+    }
+    
+}
+

@@ -43,7 +43,8 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
                         elevation_mv_param(0.5f),
                         InputBuffer(INPUT_CHANNELS, 512),
                         rms(0.0f),
-                        dpk(0.0f)
+                        dpk(0.0f),
+                        myProperties()
 {
     // create encoders
     for (int i =0; i < INPUT_CHANNELS; i++) {
@@ -72,21 +73,38 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
     Ambix_encoderAudioProcessor::s_ID++;
     m_id = Ambix_encoderAudioProcessor::s_ID;
     
+    
+    PropertiesFile::Options prop_options;
+    prop_options.applicationName = "settings";
+    prop_options.commonToAllUsers = false;
+    prop_options.filenameSuffix = "xml";
+    prop_options.folderName = "ambix/settings";
+    prop_options.storageFormat = PropertiesFile::storeAsXML;
+    // options.storageFormat = PropertiesFile::storeAsBinary;
+    prop_options.ignoreCaseOfKeyNames = true;
+    prop_options.osxLibrarySubFolder = "Application Support";
+    
+    myProperties.setStorageParameters(prop_options);
+    
 #if WITH_OSC
     osc_in = false;
 	osc_out = false;
 	
 	osc_in_port = "7120";
 	
-	osc_out_ip = "127.0.0.1";
-	osc_out_port = "7130";
+	osc_out_ip = myProperties.getUserSettings()->getValue("osc_out_ip", "localhost");
+	osc_out_port = myProperties.getUserSettings()->getValue("osc_out_port", "7130");
+    
+    osc_interval = myProperties.getUserSettings()->getIntValue("osc_out_interval", 50);
     
     osc_error = "OSC: not receiving";
     
-    osc_out = oscOut(true);
-    osc_in = oscIn(true);
+    osc_out = myProperties.getUserSettings()->getBoolValue("osc_out", true);
+    osc_in = myProperties.getUserSettings()->getBoolValue("osc_in", true);
     
-    startTimer(50); // osc send rate
+    oscOut(osc_out);
+    oscIn(osc_in);
+
 #endif
     
 }
@@ -99,6 +117,8 @@ Ambix_encoderAudioProcessor::~Ambix_encoderAudioProcessor()
     oscIn(false);
     oscOut(false);
 #endif
+    
+    myProperties.closeFiles();
 }
 
 #if WITH_OSC
@@ -126,9 +146,14 @@ void Ambix_encoderAudioProcessor::sendOSC() // send osc data
     {
         if(osc_in)
         {
-            lo_send(addr,"/ambi_enc", "fsffffffi", (float)m_id, "test", 2.0f, 360.f*(azimuth_param-0.5f), 360.f*(elevation_param-0.5f), size_param, dpk, rms, osc_in_port.getIntValue());
+            for (int i = 0; i < addresses.size(); i++) {
+                lo_send(addresses.getReference(i),"/ambi_enc", "fsffffffi", (float)m_id, "test", 2.0f, 360.f*(azimuth_param-0.5f), 360.f*(elevation_param-0.5f), size_param, dpk, rms, osc_in_port.getIntValue());
+            }
+            
         } else {
-            lo_send(addr,"/ambi_enc", "fsffffff", (float)m_id, "test", 2.0f, 360.f*(azimuth_param-0.5f), 360.f*(elevation_param-0.5f), size_param, dpk, rms);
+            for (int i = 0; i < addresses.size(); i++) {
+                lo_send(addresses.getReference(i),"/ambi_enc", "fsffffff", (float)m_id, "test", 2.0f, 360.f*(azimuth_param-0.5f), 360.f*(elevation_param-0.5f), size_param, dpk, rms);
+            }
         }
         
         _azimuth_param = azimuth_param; // change buffers
@@ -160,12 +185,53 @@ void error(int num, const char *msg, const char *path)
 
 bool Ambix_encoderAudioProcessor::oscOut(bool arg)
 {
-	if (arg) {
-		addr = lo_address_new(osc_out_ip.toUTF8(), osc_out_port.toUTF8());
-		arg = true;
-	} else { // turn off osc out
-		arg = false;
+	if (osc_out) {
+        stopTimer();
+        
+        // free
+        for (int i=0; i < addresses.size(); i++) {
+            lo_address_free(addresses.getReference(i));
+            // free(addresses.getReference(i));
+            addresses.remove(i);
+        }
+        osc_out = false;
+    }
+    
+    if (arg)
+    {
+        
+        String tmp_out_ips = osc_out_ip.trim();
+        String tmp_out_ports = osc_out_port.trim();
+        
+        String tmp_ip;
+        String tmp_port;
+        
+        while (tmp_out_ips.length() > 0 || tmp_out_ports.length() > 0) {
+            
+            if (tmp_out_ips.length() > 0)
+                tmp_ip = tmp_out_ips.upToFirstOccurrenceOf(";", false, false);
+            
+            if (tmp_out_ports.length() > 0)
+                tmp_port = tmp_out_ports.upToFirstOccurrenceOf(";", false, false);
+            
+            addresses.add((lo_address*) malloc(sizeof(lo_address)));
+            
+            
+            addresses.getReference(addresses.size()-1) = lo_address_new(tmp_ip.toUTF8(), tmp_port.toUTF8());
+            
+            
+            tmp_out_ips = tmp_out_ips.fromFirstOccurrenceOf(";", false, false).trim();
+            
+            tmp_out_ports = tmp_out_ports.fromFirstOccurrenceOf(";", false, false).trim();
+            
+        }
+        
+        osc_out = true;
+        
+        startTimer(osc_interval); // osc send rate
+        
 	}
+    
 	return arg;
 }
 
@@ -203,6 +269,17 @@ bool Ambix_encoderAudioProcessor::oscIn(bool arg)
         osc_error = "OSC: not receiving";
 	}
 	return arg;
+}
+
+void Ambix_encoderAudioProcessor::changeTimer(int time)
+{
+    if (osc_out)
+    {
+        stopTimer();
+        osc_interval = time;
+        startTimer(time);
+    }
+    
 }
 #endif
 
