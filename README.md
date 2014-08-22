@@ -128,14 +128,17 @@ known problems
 -----------
 * documentation missing - for now you can check this: 
 http://lac.linuxaudio.org/2013/papers/51.pdf
+
 http://iaem.at/Members/zotter/publications/2014_KronlachnerZotter_AmbiTransformationEnhancement_ICSA.pdf
+
+http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/Kronlachner_Master_Spatial_Transformations_Mobile.pdf
+
+http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_studentdesigncompetition_2014.pdf
 
 
 * GUI less plug-ins can not be used as standalone - therefore GUI for some more of the plug-ins would be nice...
 
 * Linux: LV2 plug-ins don't show the GUI, VST plug-ins GUI might crash - better just stick to the hosts' GUI or help me fix that. you can use the standalone version in any case and connect via Jack
-
-* flickering of the encoder sphere display: you can also call it feature - brings back the analog feeling. if you don't like it - help me to fix it (opengl double buffering lightening problem).
 
 * different orders require different plug-in instances: maybe VST 3 can fix that with it's dynamic input/output ports. but we'll have to wait for it beeing implemented in appropriate hosts.
 
@@ -143,7 +146,7 @@ http://iaem.at/Members/zotter/publications/2014_KronlachnerZotter_AmbiTransforma
 
 changelog
 -----------
-* v0.2.2 (2014-08-18) encoder: flickering fix, osc settings, right mouse click for relative source movement, press shift to freeze elevation while moving and ctrl to freeze azimuth
+* v0.2.2 (2014-08-18) encoder flickering fix, added osc settings, new control modes for encoder display: right mouse click for relative source movement, press shift to freeze elevation while moving and ctrl to freeze azimuth
 
 * v0.2.1 (2014-04-17) fixed vst identifier for Plogue Bidule compatibility
 
