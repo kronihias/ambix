@@ -58,6 +58,8 @@ public:
     
     void changeListenerCallback (ChangeBroadcaster *source);
     
+    void modifierKeysChanged (const ModifierKeys &modifiers );
+    
     // Binary resources:
     static const char* settings_png;
     static const int settings_pngSize;

@@ -428,6 +428,36 @@ void Ambix_encoderAudioProcessorEditor::changeListenerCallback (ChangeBroadcaste
     txt_el_move->setText(el_mv);
 }
 
+
+void Ambix_encoderAudioProcessorEditor::modifierKeysChanged(const ModifierKeys &modifiers)
+{
+    
+    if (modifiers.isShiftDown())
+    {
+        sld_el->setColour (Slider::thumbColourId, Colours::black);
+        sld_el->setEnabled(false);
+    }
+    else
+    {
+        sld_el->setColour (Slider::thumbColourId, Colours::grey);
+        sld_el->setEnabled(true);
+    }
+    
+    
+    if (modifiers.isCtrlDown())
+    {
+        sld_az->setColour (Slider::thumbColourId, Colours::black);
+        sld_az->setEnabled(false);
+    }
+    else
+    {
+        sld_az->setColour (Slider::thumbColourId, Colours::grey);
+        sld_az->setEnabled(true);
+    }
+    
+}
+
+
 void Ambix_encoderAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 {
     Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
