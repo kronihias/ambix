@@ -519,6 +519,10 @@ public:
         return AUBase::SetParameter (inID, inScope, inElement, inValue, inBufferOffsetInFrames);
     }
 
+    // No idea what this method actually does or what it should return. Current Apple docs say nothing about it.
+    // (Note that this isn't marked 'override' in case older versions of the SDK don't include it)
+    bool CanScheduleParameters() const                   { return false; }
+
     //==============================================================================
     ComponentResult Version() override                   { return JucePlugin_VersionCode; }
     bool SupportsTail() override                         { return true; }
@@ -554,11 +558,8 @@ public:
     {
         info.timeSigNumerator = 0;
         info.timeSigDenominator = 0;
-        info.timeInSamples = 0;
-        info.timeInSeconds = 0;
         info.editOriginTime = 0;
         info.ppqPositionOfLastBarStart = 0;
-        info.isPlaying = false;
         info.isRecording = false;
         info.isLooping = false;
         info.ppqLoopStart = 0;
@@ -597,19 +598,22 @@ public:
         }
 
         double outCurrentSampleInTimeLine, outCycleStartBeat, outCycleEndBeat;
-        Boolean playing, playchanged, looping;
+        Boolean playing = false, playchanged, looping;
 
         if (CallHostTransportState (&playing,
                                     &playchanged,
                                     &outCurrentSampleInTimeLine,
                                     &looping,
                                     &outCycleStartBeat,
-                                    &outCycleEndBeat) == noErr)
+                                    &outCycleEndBeat) != noErr)
         {
-            info.isPlaying = playing;
-            info.timeInSamples = (int64) outCurrentSampleInTimeLine;
-            info.timeInSeconds = outCurrentSampleInTimeLine / getSampleRate();
+            // If the host doesn't support this callback, use the sample time from lastTimeStamp:
+            outCurrentSampleInTimeLine = lastTimeStamp.mSampleTime;
         }
+
+        info.isPlaying = playing;
+        info.timeInSamples = (int64) (outCurrentSampleInTimeLine + 0.5);
+        info.timeInSeconds = info.timeInSamples / getSampleRate();
 
         return true;
     }
@@ -1180,17 +1184,20 @@ public:
 
         static void shutdown (id self)
         {
-            // there's some kind of component currently modal, but the host
-            // is trying to delete our plugin..
-            jassert (Component::getCurrentlyModalComponent() == nullptr);
-
             [[NSNotificationCenter defaultCenter] removeObserver: self];
             deleteEditor (self);
 
             jassert (activeUIs.contains (self));
             activeUIs.removeFirstMatchingValue (self);
+
             if (activePlugins.size() + activeUIs.size() == 0)
+            {
+                // there's some kind of component currently modal, but the host
+                // is trying to delete our plugin..
+                jassert (Component::getCurrentlyModalComponent() == nullptr);
+
                 shutdownJuce_GUI();
+            }
         }
 
         static void viewDidMoveToWindow (id self, SEL)

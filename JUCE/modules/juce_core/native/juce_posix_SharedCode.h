@@ -223,6 +223,12 @@ namespace
         return statfs (f.getFullPathName().toUTF8(), &result) == 0;
     }
 
+   #if (JUCE_MAC && MAC_OS_X_VERSION_MIN_REQUIRED > MAC_OS_X_VERSION_10_5) || JUCE_IOS
+    static int64 getCreationTime (const juce_statStruct& s) noexcept     { return (int64) s.st_birthtime; }
+   #else
+    static int64 getCreationTime (const juce_statStruct& s) noexcept     { return (int64) s.st_ctime; }
+   #endif
+
     void updateStatInfoForFile (const String& path, bool* const isDir, int64* const fileSize,
                                 Time* const modTime, Time* const creationTime, bool* const isReadOnly)
     {
@@ -232,9 +238,9 @@ namespace
             const bool statOk = juce_stat (path, info);
 
             if (isDir != nullptr)         *isDir        = statOk && ((info.st_mode & S_IFDIR) != 0);
-            if (fileSize != nullptr)      *fileSize     = statOk ? info.st_size : 0;
-            if (modTime != nullptr)       *modTime      = Time (statOk ? (int64) info.st_mtime * 1000 : 0);
-            if (creationTime != nullptr)  *creationTime = Time (statOk ? (int64) info.st_ctime * 1000 : 0);
+            if (fileSize != nullptr)      *fileSize     = statOk ? (int64) info.st_size : 0;
+            if (modTime != nullptr)       *modTime      = Time (statOk ? (int64) info.st_mtime  * 1000 : 0);
+            if (creationTime != nullptr)  *creationTime = Time (statOk ? getCreationTime (info) * 1000 : 0);
         }
 
         if (isReadOnly != nullptr)
@@ -664,6 +670,7 @@ int File::getVolumeSerialNumber() const
 }
 
 //==============================================================================
+#if ! JUCE_IOS
 void juce_runSystemCommand (const String&);
 void juce_runSystemCommand (const String& command)
 {
@@ -684,7 +691,7 @@ String juce_getOutputFromCommand (const String& command)
     tempFile.deleteFile();
     return result;
 }
-
+#endif
 
 //==============================================================================
 #if JUCE_IOS
@@ -837,12 +844,6 @@ extern "C" void* threadEntryProc (void* userData)
     JUCE_AUTORELEASEPOOL
     {
        #if JUCE_ANDROID
-        struct AndroidThreadScope
-        {
-            AndroidThreadScope()   { threadLocalJNIEnvHolder.attach(); }
-            ~AndroidThreadScope()  { threadLocalJNIEnvHolder.detach(); }
-        };
-
         const AndroidThreadScope androidEnv;
        #endif
 
@@ -1150,16 +1151,25 @@ struct HighResolutionTimer::Pimpl
 
     void start (int newPeriod)
     {
-        periodMs = newPeriod;
-
-        if (thread == 0)
+        if (periodMs != newPeriod)
         {
-            shouldStop = false;
+            if (thread != pthread_self())
+            {
+                stop();
 
-            if (pthread_create (&thread, nullptr, timerThread, this) == 0)
-                setThreadToRealtime (thread, (uint64) newPeriod);
+                periodMs = newPeriod;
+                shouldStop = false;
+
+                if (pthread_create (&thread, nullptr, timerThread, this) == 0)
+                    setThreadToRealtime (thread, (uint64) newPeriod);
+                else
+                    jassertfalse;
+            }
             else
-                jassertfalse;
+            {
+                periodMs = newPeriod;
+                shouldStop = false;
+            }
         }
     }
 
@@ -1183,7 +1193,9 @@ private:
 
     static void* timerThread (void* param)
     {
-       #if ! JUCE_ANDROID
+       #if JUCE_ANDROID
+        const AndroidThreadScope androidEnv;
+       #else
         int dummy;
         pthread_setcancelstate (PTHREAD_CANCEL_ENABLE, &dummy);
        #endif
@@ -1194,12 +1206,19 @@ private:
 
     void timerThread()
     {
-        Clock clock (periodMs);
+        int lastPeriod = periodMs;
+        Clock clock (lastPeriod);
 
         while (! shouldStop)
         {
             clock.wait();
             owner.hiResTimerCallback();
+
+            if (lastPeriod != periodMs)
+            {
+                lastPeriod = periodMs;
+                clock = Clock (lastPeriod);
+            }
         }
 
         periodMs = 0;

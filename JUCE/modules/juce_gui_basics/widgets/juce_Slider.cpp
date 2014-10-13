@@ -54,7 +54,6 @@ public:
         menuEnabled (false),
         useDragEvents (false),
         scrollWheelEnabled (true),
-        scrollWheelEndless(false),
         snapsToMousePos (true),
         parentForPopupDisplay (nullptr)
     {
@@ -321,12 +320,12 @@ public:
     {
         if (notification != dontSendNotification)
         {
+            owner.valueChanged();
+
             if (notification == sendNotificationSync)
                 handleAsyncUpdate();
             else
                 triggerAsyncUpdate();
-
-            owner.valueChanged();
         }
     }
 
@@ -465,9 +464,9 @@ public:
                               const bool stopAtEnd)
     {
         // make sure the values are sensible..
-        jassert (rotaryStart >= 0 && rotaryEnd >= 0);
-        jassert (rotaryStart < float_Pi * 4.0f && rotaryEnd < float_Pi * 4.0f);
-        jassert (rotaryStart < rotaryEnd);
+        jassert (startAngleRadians >= 0 && endAngleRadians >= 0);
+        jassert (startAngleRadians < float_Pi * 4.0f && endAngleRadians < float_Pi * 4.0f);
+        jassert (startAngleRadians < endAngleRadians);
 
         rotaryStart = startAngleRadians;
         rotaryEnd = endAngleRadians;
@@ -567,6 +566,7 @@ public:
 
             valueBox->setWantsKeyboardFocus (false);
             valueBox->setText (previousTextBoxContent, dontSendNotification);
+            valueBox->setTooltip (owner.getTooltip());
 
             if (valueBox->isEditable() != editableText) // (avoid overriding the single/double click flags unless we have to)
                 valueBox->setEditable (editableText && owner.isEnabled());
@@ -577,10 +577,6 @@ public:
             {
                 valueBox->addMouseListener (&owner, false);
                 valueBox->setMouseCursor (MouseCursor::ParentCursor);
-            }
-            else
-            {
-                valueBox->setTooltip (owner.getTooltip());
             }
         }
         else
@@ -668,7 +664,7 @@ public:
 
         if (isTwoValue || isThreeValue)
         {
-            const float mousePos = (float) (isVertical() ? e.y : e.x);
+            const float mousePos = isVertical() ? e.position.y : e.position.x;
 
             const float normalPosDistance = std::abs (getLinearSliderPos (currentValue.getValue()) - mousePos);
             const float minPosDistance    = std::abs (getLinearSliderPos (valueMin.getValue()) - 0.1f - mousePos);
@@ -690,10 +686,10 @@ public:
     //==============================================================================
     void handleRotaryDrag (const MouseEvent& e)
     {
-        const int dx = e.x - sliderRect.getCentreX();
-        const int dy = e.y - sliderRect.getCentreY();
+        const float dx = e.position.x - sliderRect.getCentreX();
+        const float dy = e.position.y - sliderRect.getCentreY();
 
-        if (dx * dx + dy * dy > 25)
+        if (dx * dx + dy * dy > 25.0f)
         {
             double angle = std::atan2 ((double) dx, (double) -dy);
             while (angle < 0.0)
@@ -737,7 +733,7 @@ public:
 
     void handleAbsoluteDrag (const MouseEvent& e)
     {
-        const int mousePos = (isHorizontal() || style == RotaryHorizontalDrag) ? e.x : e.y;
+        const float mousePos = (isHorizontal() || style == RotaryHorizontalDrag) ? e.position.x : e.position.y;
         double newPos = (mousePos - sliderRegionStart) / (double) sliderRegionSize;
 
         if (style == RotaryHorizontalDrag
@@ -782,7 +778,7 @@ public:
     void handleVelocityDrag (const MouseEvent& e)
     {
         const float mouseDiff = style == RotaryHorizontalVerticalDrag
-                                   ? (e.x - mousePosWhenLastDragged.x) + (mousePosWhenLastDragged.y - e.y)
+                                   ? (e.position.x - mousePosWhenLastDragged.x) + (mousePosWhenLastDragged.y - e.position.y)
                                    : (isHorizontal()
                                        || style == RotaryHorizontalDrag
                                        || (style == IncDecButtons && incDecDragDirectionIsHorizontal()))
@@ -790,7 +786,7 @@ public:
                                          : e.position.y - mousePosWhenLastDragged.y;
 
         const double maxSpeed = jmax (200, sliderRegionSize);
-        double speed = jlimit (0.0, maxSpeed, (double) abs (mouseDiff));
+        double speed = jlimit (0.0, maxSpeed, (double) std::abs (mouseDiff));
 
         if (speed != 0)
         {
@@ -982,49 +978,45 @@ public:
         }
     }
 
+    double getMouseWheelDelta (double value, double wheelAmount)
+    {
+        if (style == IncDecButtons)
+            return interval * wheelAmount;
+
+        const double proportionDelta = wheelAmount * 0.15f;
+        const double currentPos = owner.valueToProportionOfLength (value);
+        return owner.proportionOfLengthToValue (jlimit (0.0, 1.0, currentPos + proportionDelta)) - value;
+    }
+
     bool mouseWheelMove (const MouseEvent& e, const MouseWheelDetails& wheel)
     {
         if (scrollWheelEnabled
              && style != TwoValueHorizontal
              && style != TwoValueVertical)
         {
-            if (maximum > minimum && ! e.mods.isAnyMouseButtonDown())
+            // sometimes duplicate wheel events seem to be sent, so since we're going to
+            // bump the value by a minimum of the interval, avoid doing this twice..
+            if (e.eventTime != lastMouseWheelTime)
             {
-                if (valueBox != nullptr)
-                    valueBox->hideEditor (false);
+                lastMouseWheelTime = e.eventTime;
 
-                const double value = (double) currentValue.getValue();
-                const double proportionDelta = (wheel.deltaX != 0 ? -wheel.deltaX : wheel.deltaY)
-                                                   * (wheel.isReversed ? -0.15f : 0.15f);
-                const double currentPos = owner.valueToProportionOfLength (value);
-                
-                //////
-                // modified by Matthias Kronlachner
-                double newValue = 0.f;
-                
-                if (!scrollWheelEndless)
+                if (maximum > minimum && ! e.mods.isAnyMouseButtonDown())
                 {
-                    newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, currentPos + proportionDelta));
-                } else {
-                    // behavior to wrap slider around with wheel
-                    double changeValue = currentPos + proportionDelta;
-                    
-                    if (changeValue > 1.f)
-                        changeValue -= 1.f;
-                    
-                    if (changeValue < 0.f)
-                        changeValue += 1.f;
-                    
-                    newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, changeValue));
-                }
-                ////
-                
-                double delta = (newValue != value) ? jmax (std::abs (newValue - value), interval) : 0;
-                if (value > newValue)
-                    delta = -delta;
+                    if (valueBox != nullptr)
+                        valueBox->hideEditor (false);
 
-                DragInProgress drag (*this);
-                setValue (owner.snapValue (value + delta, notDragging), sendNotificationSync);
+                    const double value = (double) currentValue.getValue();
+                    const double delta = getMouseWheelDelta (value, (std::abs (wheel.deltaX) > std::abs (wheel.deltaY)
+                                                                        ? -wheel.deltaX : wheel.deltaY)
+                                                                      * (wheel.isReversed ? -1.0f : 1.0f));
+                    if (delta != 0)
+                    {
+                        const double newValue = value + jmax (interval, std::abs (delta)) * (delta < 0 ? -1.0 : 1.0);
+
+                        DragInProgress drag (*this);
+                        setValue (owner.snapValue (newValue, notDragging), sendNotificationSync);
+                    }
+                }
             }
 
             return true;
@@ -1257,6 +1249,7 @@ public:
     int sliderRegionStart, sliderRegionSize;
     int sliderBeingDragged;
     int pixelsForFullDragExtent;
+    Time lastMouseWheelTime;
     Rectangle<int> sliderRect;
     ScopedPointer<DragInProgress> currentDrag;
 
@@ -1278,7 +1271,6 @@ public:
     bool useDragEvents;
     bool incDecDragged;
     bool scrollWheelEnabled;
-    bool scrollWheelEndless;
     bool snapsToMousePos;
 
     ScopedPointer<Label> valueBox;
@@ -1295,6 +1287,7 @@ public:
         {
             setAlwaysOnTop (true);
             setAllowedPlacement (owner.getLookAndFeel().getSliderPopupPlacement (s));
+            setLookAndFeel (&s.getLookAndFeel());
         }
 
         void paintContent (Graphics& g, int w, int h)
@@ -1582,7 +1575,6 @@ void Slider::valueChanged() {}
 //==============================================================================
 void Slider::setPopupMenuEnabled (const bool menuEnabled)   { pimpl->menuEnabled = menuEnabled; }
 void Slider::setScrollWheelEnabled (const bool enabled)     { pimpl->scrollWheelEnabled = enabled; }
-void Slider::setScrollWheelEndless (const bool enabled)     { pimpl->scrollWheelEndless = enabled; }
 
 bool Slider::isHorizontal() const noexcept   { return pimpl->isHorizontal(); }
 bool Slider::isVertical() const noexcept     { return pimpl->isVertical(); }
