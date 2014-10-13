@@ -624,12 +624,6 @@ public:
     */
     void setScrollWheelEnabled (bool enabled);
 
-    /** Set the slider Wheel to endless encoder type.
-     
-     By default it's disabled.
-     */
-    void setScrollWheelEndless (bool enabled);
-    
     /** Returns a number to indicate which thumb is currently being dragged by the mouse.
 
         This will return 0 for the main thumb, 1 for the minimum-value thumb, 2 for

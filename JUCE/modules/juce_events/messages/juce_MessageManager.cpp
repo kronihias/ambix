@@ -66,12 +66,17 @@ void MessageManager::deleteInstance()
 }
 
 //==============================================================================
-void MessageManager::MessageBase::post()
+bool MessageManager::MessageBase::post()
 {
     MessageManager* const mm = MessageManager::instance;
 
     if (mm == nullptr || mm->quitMessagePosted || ! postMessageToSystemQueue (this))
+    {
         Ptr deleter (this); // (this will delete messages that were just created with a 0 ref count)
+        return false;
+    }
+
+    return true;
 }
 
 //==============================================================================
@@ -126,6 +131,25 @@ void MessageManager::stopDispatchLoop()
 #endif
 
 //==============================================================================
+#if JUCE_COMPILER_SUPPORTS_LAMBDAS
+struct AsyncFunction  : private MessageManager::MessageBase
+{
+    AsyncFunction (std::function<void(void)> f)  : fn (f)  { post(); }
+
+private:
+    std::function<void(void)> fn;
+    void messageCallback() override    { fn(); }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AsyncFunction)
+};
+
+void MessageManager::callAsync (std::function<void(void)> f)
+{
+    new AsyncFunction (f);
+}
+#endif
+
+//==============================================================================
 class AsyncFunctionCallback   : public MessageManager::MessageBase
 {
 public:
@@ -158,9 +182,15 @@ void* MessageManager::callFunctionOnMessageThread (MessageCallbackFunction* cons
     jassert (! currentThreadHasLockedMessageManager());
 
     const ReferenceCountedObjectPtr<AsyncFunctionCallback> message (new AsyncFunctionCallback (func, parameter));
-    message->post();
-    message->finished.wait();
-    return message->result;
+
+    if (message->post())
+    {
+        message->finished.wait();
+        return message->result;
+    }
+
+    jassertfalse; // the OS message queue failed to send the message!
+    return nullptr;
 }
 
 //==============================================================================
@@ -275,7 +305,12 @@ bool MessageManagerLock::attemptLock (Thread* const threadToCheck, ThreadPoolJob
     }
 
     blockingMessage = new BlockingMessage();
-    blockingMessage->post();
+
+    if (! blockingMessage->post())
+    {
+        blockingMessage = nullptr;
+        return false;
+    }
 
     while (! blockingMessage->lockedEvent.wait (20))
     {

@@ -289,9 +289,9 @@ public:
         filter will return an empty buffer, but won't block the audio thread like it would
         do if you use the getCallbackLock() critical section to synchronise access.
 
-        If you're going to use this, your processBlock() method must call isSuspended() and
-        check whether it's suspended or not. If it is, then it should skip doing any real
-        processing, either emitting silence or passing the input through unchanged.
+        Any code that calls processBlock() should call isSuspended() before doing so, and
+        if the processor is suspended, it should avoid the call and emit silence or
+        whatever is appropriate.
 
         @see getCallbackLock
     */
@@ -325,7 +325,7 @@ public:
     /** Called by the host to tell this processor whether it's being used in a non-realtime
         capacity for offline rendering or bouncing.
     */
-    void setNonRealtime (bool isNonRealtime) noexcept;
+    virtual void setNonRealtime (bool isNonRealtime) noexcept;
 
     //==============================================================================
     /** Creates the filter's UI.
@@ -414,11 +414,17 @@ public:
     virtual String getParameterText (int parameterIndex, int maximumStringLength);
 
     /** Returns the number of discrete steps that this parameter can represent.
-        The default return value if you don't implement this method is 0x7fffffff.
+        The default return value if you don't implement this method is
+        AudioProcessor::getDefaultNumParameterSteps().
         If your parameter is boolean, then you may want to make this return 2.
         The value that is returned may or may not be used, depending on the host.
     */
     virtual int getParameterNumSteps (int parameterIndex);
+
+    /** Returns the default number of steps for a parameter.
+        @see getParameterNumSteps
+    */
+    static int getDefaultNumParameterSteps() noexcept;
 
     /** Returns the default value for the parameter.
         By default, this just returns 0.

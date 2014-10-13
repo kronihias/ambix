@@ -367,6 +367,7 @@ ListBox::ListBox (const String& name, ListBoxModel* const m)
       outlineThickness (0),
       lastRowSelected (-1),
       multipleSelection (false),
+      alwaysFlipSelection (false),
       hasDoneInitialUpdate (false)
 {
     addAndMakeVisible (viewport = new ListViewport (*this));
@@ -391,9 +392,14 @@ void ListBox::setModel (ListBoxModel* const newModel)
     }
 }
 
-void ListBox::setMultipleSelectionEnabled (bool b)
+void ListBox::setMultipleSelectionEnabled (bool b) noexcept
 {
     multipleSelection = b;
+}
+
+void ListBox::setClickingTogglesRowSelection (bool b) noexcept
+{
+    alwaysFlipSelection = b;
 }
 
 void ListBox::setMouseMoveSelectsRows (bool b)
@@ -457,7 +463,7 @@ void ListBox::updateContent()
 
     if (selected.size() > 0 && selected [selected.size() - 1] >= totalItems)
     {
-        selected.removeRange (Range <int> (totalItems, std::numeric_limits<int>::max()));
+        selected.removeRange (Range<int> (totalItems, std::numeric_limits<int>::max()));
         lastRowSelected = getSelectedRow (0);
         selectionChanged = true;
     }
@@ -470,9 +476,7 @@ void ListBox::updateContent()
 }
 
 //==============================================================================
-void ListBox::selectRow (const int row,
-                         bool dontScroll,
-                         bool deselectOthersFirst)
+void ListBox::selectRow (int row, bool dontScroll, bool deselectOthersFirst)
 {
     selectRowInternal (row, dontScroll, deselectOthersFirst, false);
 }
@@ -516,7 +520,7 @@ void ListBox::deselectRow (const int row)
 {
     if (selected.contains (row))
     {
-        selected.removeRange (Range <int> (row, row + 1));
+        selected.removeRange (Range<int> (row, row + 1));
 
         if (row == lastRowSelected)
             lastRowSelected = getSelectedRow (0);
@@ -530,7 +534,7 @@ void ListBox::setSelectedRows (const SparseSet<int>& setOfRowsToBeSelected,
                                const NotificationType sendNotificationEventToModel)
 {
     selected = setOfRowsToBeSelected;
-    selected.removeRange (Range <int> (totalItems, std::numeric_limits<int>::max()));
+    selected.removeRange (Range<int> (totalItems, std::numeric_limits<int>::max()));
 
     if (! isRowSelected (lastRowSelected))
         lastRowSelected = getSelectedRow (0);
@@ -554,10 +558,10 @@ void ListBox::selectRangeOfRows (int firstRow, int lastRow)
         firstRow = jlimit (0, jmax (0, numRows), firstRow);
         lastRow  = jlimit (0, jmax (0, numRows), lastRow);
 
-        selected.addRange (Range <int> (jmin (firstRow, lastRow),
-                                        jmax (firstRow, lastRow) + 1));
+        selected.addRange (Range<int> (jmin (firstRow, lastRow),
+                                       jmax (firstRow, lastRow) + 1));
 
-        selected.removeRange (Range <int> (lastRow, lastRow + 1));
+        selected.removeRange (Range<int> (lastRow, lastRow + 1));
     }
 
     selectRowInternal (lastRow, false, false, true);
@@ -589,7 +593,7 @@ void ListBox::selectRowsBasedOnModifierKeys (const int row,
                                              ModifierKeys mods,
                                              const bool isMouseUpEvent)
 {
-    if (multipleSelection && mods.isCommandDown())
+    if (multipleSelection && (mods.isCommandDown() || alwaysFlipSelection))
     {
         flipRowSelection (row);
     }
@@ -652,7 +656,7 @@ int ListBox::getInsertionIndexForPosition (const int x, const int y) const noexc
 Component* ListBox::getComponentForRowNumber (const int row) const noexcept
 {
     if (RowComponent* const listRowComp = viewport->getComponentForRowIfOnscreen (row))
-        return static_cast <Component*> (listRowComp->customComponent);
+        return static_cast<Component*> (listRowComp->customComponent);
 
     return nullptr;
 }
@@ -851,6 +855,11 @@ void ListBox::colourChanged()
     setOpaque (findColour (backgroundColourId).isOpaque());
     viewport->setOpaque (isOpaque());
     repaint();
+}
+
+void ListBox::parentHierarchyChanged()
+{
+    colourChanged();
 }
 
 void ListBox::setOutlineThickness (const int newThickness)

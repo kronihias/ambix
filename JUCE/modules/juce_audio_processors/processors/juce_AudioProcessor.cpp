@@ -128,7 +128,8 @@ String AudioProcessor::getParameterText (int parameterIndex, int maximumStringLe
     return getParameterText (parameterIndex).substring (0, maximumStringLength);
 }
 
-int AudioProcessor::getParameterNumSteps (int /*parameterIndex*/)        { return 0x7fffffff; }
+int AudioProcessor::getDefaultNumParameterSteps() noexcept               { return 0x7fffffff; }
+int AudioProcessor::getParameterNumSteps (int /*parameterIndex*/)        { return getDefaultNumParameterSteps(); }
 float AudioProcessor::getParameterDefaultValue (int /*parameterIndex*/)  { return 0.0f; }
 
 AudioProcessorListener* AudioProcessor::getListenerLocked (const int index) const noexcept
@@ -231,9 +232,6 @@ AudioProcessorEditor* AudioProcessor::createEditorIfNeeded()
 
     AudioProcessorEditor* const ed = createEditor();
 
-    // You must make your hasEditor() method return a consistent result!
-    jassert (hasEditor() == (ed != nullptr));
-
     if (ed != nullptr)
     {
         // you must give your editor comp a size before returning it..
@@ -242,6 +240,9 @@ AudioProcessorEditor* AudioProcessor::createEditorIfNeeded()
         const ScopedLock sl (callbackLock);
         activeEditor = ed;
     }
+
+    // You must make your hasEditor() method return a consistent result!
+    jassert (hasEditor() == (ed != nullptr));
 
     return ed;
 }

@@ -101,10 +101,13 @@ public:
     */
     enum ColourIds
     {
-        backgroundColourId     = 0x1000280, /**< The background colour to fill the label with. */
-        textColourId           = 0x1000281, /**< The colour for the text. */
-        outlineColourId        = 0x1000282  /**< An optional colour to use to draw a border around the label.
-                                                 Leave this transparent to not have an outline. */
+        backgroundColourId             = 0x1000280, /**< The background colour to fill the label with. */
+        textColourId                   = 0x1000281, /**< The colour for the text. */
+        outlineColourId                = 0x1000282, /**< An optional colour to use to draw a border around the label.
+                                                         Leave this transparent to not have an outline. */
+        backgroundWhenEditingColourId  = 0x1000283, /**< The background colour when the label is being edited. */
+        textWhenEditingColourId        = 0x1000284, /**< The colour for the text when the label is being edited. */
+        outlineWhenEditingColourId     = 0x1000285  /**< An optional border colour when the label is being edited. */
     };
 
     //==============================================================================
@@ -181,7 +184,7 @@ public:
         virtual void labelTextChanged (Label* labelThatHasChanged) = 0;
 
         /** Called when a Label goes into editing mode and displays a TextEditor. */
-        virtual void editorShown (Label*, TextEditor& textEditorShown);
+        virtual void editorShown (Label*, TextEditor&) {}
     };
 
     /** Registers a listener that will be called when the label's text changes. */

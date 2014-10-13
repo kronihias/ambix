@@ -763,7 +763,7 @@ public:
                     ShowWindow (hwnd, SW_SHOWNORMAL);
 
                 if (! boundsCopy.isEmpty())
-                    setBounds (boundsCopy, false);
+                    setBounds (ScalingHelpers::scaledScreenPosToUnscaled (component, boundsCopy), false);
             }
             else
             {
@@ -845,7 +845,7 @@ public:
 
     void toBehind (ComponentPeer* other) override
     {
-        if (HWNDComponentPeer* const otherPeer = dynamic_cast <HWNDComponentPeer*> (other))
+        if (HWNDComponentPeer* const otherPeer = dynamic_cast<HWNDComponentPeer*> (other))
         {
             setMinimised (false);
 
@@ -960,7 +960,7 @@ public:
     static ModifierKeys modifiersAtLastCallback;
 
     //==============================================================================
-    class JuceDropTarget    : public ComBaseClassHelper <IDropTarget>
+    class JuceDropTarget    : public ComBaseClassHelper<IDropTarget>
     {
     public:
         JuceDropTarget (HWNDComponentPeer& p)   : ownerInfo (new OwnerInfo (p)) {}
@@ -1099,13 +1099,13 @@ public:
 
                 if (SUCCEEDED (fileData.error))
                 {
-                    const LPDROPFILES dropFiles = static_cast <const LPDROPFILES> (fileData.data);
+                    const LPDROPFILES dropFiles = static_cast<const LPDROPFILES> (fileData.data);
                     const void* const names = addBytesToPointer (dropFiles, sizeof (DROPFILES));
 
                     if (dropFiles->fWide)
-                        ownerInfo->parseFileList (static_cast <const WCHAR*> (names), fileData.dataSize);
+                        ownerInfo->parseFileList (static_cast<const WCHAR*> (names), fileData.dataSize);
                     else
-                        ownerInfo->parseFileList (static_cast <const char*>  (names), fileData.dataSize);
+                        ownerInfo->parseFileList (static_cast<const char*>  (names), fileData.dataSize);
                 }
                 else
                 {
@@ -1300,7 +1300,7 @@ private:
     //==============================================================================
     static void* createWindowCallback (void* userData)
     {
-        static_cast <HWNDComponentPeer*> (userData)->createWindow();
+        static_cast<HWNDComponentPeer*> (userData)->createWindow();
         return nullptr;
     }
 
@@ -1528,10 +1528,14 @@ private:
         // if something in a paint handler calls, e.g. a message box, this can become reentrant and
         // corrupt the image it's using to paint into, so do a check here.
         static bool reentrant = false;
-        if (! (reentrant || dontRepaint))
+        if (! reentrant)
         {
             const ScopedValueSetter<bool> setter (reentrant, true, false);
-            performPaint (dc, rgn, regionType, paintStruct);
+
+            if (dontRepaint)
+                component.handleCommandMessage (0); // (this triggers a repaint in the openGL context)
+            else
+                performPaint (dc, rgn, regionType, paintStruct);
         }
 
         DeleteObject (rgn);
@@ -1639,7 +1643,7 @@ private:
                     handlePaint (*context);
                 }
 
-                static_cast <WindowsBitmapImage*> (offscreenImage.getPixelData())
+                static_cast<WindowsBitmapImage*> (offscreenImage.getPixelData())
                     ->blitToWindow (hwnd, dc, transparent, x, y, updateLayeredWindowAlpha);
             }
 
@@ -2209,6 +2213,22 @@ private:
         return 0;
     }
 
+    bool handlePositionChanged()
+    {
+        const Point<float> pos (getCurrentMousePos());
+
+        if (contains (pos.roundToInt(), false))
+        {
+            doMouseEvent (pos);
+
+            if (! isValidPeer (this))
+                return true;
+        }
+
+        handleMovedOrResized();
+        return ! dontRepaint; // to allow non-accelerated openGL windows to draw themselves correctly..
+    }
+
     void handleAppActivation (const WPARAM wParam)
     {
         modifiersAtLastCallback = -1;
@@ -2219,7 +2239,7 @@ private:
             component.repaint();
             handleMovedOrResized();
 
-            if (! ComponentPeer::isValidPeer (this))
+            if (! isValidPeer (this))
                 return;
         }
 
@@ -2238,6 +2258,24 @@ private:
         else
         {
             handleBroughtToFront();
+        }
+    }
+
+    void handlePowerBroadcast (WPARAM wParam)
+    {
+        if (JUCEApplicationBase* const app = JUCEApplicationBase::getInstance())
+        {
+            switch (wParam)
+            {
+                case PBT_APMSUSPEND:                app->suspended(); break;
+
+                case PBT_APMQUERYSUSPENDFAILED:
+                case PBT_APMRESUMECRITICAL:
+                case PBT_APMRESUMESUSPEND:
+                case PBT_APMRESUMEAUTOMATIC:        app->resumed(); break;
+
+                default: break;
+            }
         }
     }
 
@@ -2289,7 +2327,7 @@ private:
     {
         Desktop& desktop = Desktop::getInstance();
 
-        const_cast <Desktop::Displays&> (desktop.getDisplays()).refresh();
+        const_cast<Desktop::Displays&> (desktop.getDisplays()).refresh();
 
         if (fullScreen && ! isMinimised())
         {
@@ -2418,18 +2456,10 @@ private:
             case WM_WINDOWPOSCHANGING:     return handlePositionChanging (*(WINDOWPOS*) lParam);
 
             case WM_WINDOWPOSCHANGED:
-                {
-                    const Point<float> pos (getCurrentMousePos());
-                    if (contains (pos.roundToInt(), false))
-                        doMouseEvent (pos);
-                }
+                if (handlePositionChanged())
+                    return 0;
 
-                handleMovedOrResized();
-
-                if (dontRepaint)
-                    break;  // needed for non-accelerated openGL windows to draw themselves correctly..
-
-                return 0;
+                break;
 
             //==============================================================================
             case WM_KEYDOWN:
@@ -2537,6 +2567,10 @@ private:
                     return MessageManager::getInstance()->hasStopMessageBeenSent();
                 }
                 return TRUE;
+
+            case WM_POWERBROADCAST:
+                handlePowerBroadcast (wParam);
+                break;
 
             case WM_SYNCPAINT:
                 return 0;
@@ -2867,7 +2901,7 @@ private:
 
         void moveCandidateWindowToLeftAlignWithSelection (HIMC hImc, ComponentPeer& peer, TextInputTarget* target) const
         {
-            if (Component* const targetComp = dynamic_cast <Component*> (target))
+            if (Component* const targetComp = dynamic_cast<Component*> (target))
             {
                 const Rectangle<int> area (peer.getComponent().getLocalArea (targetComp, target->getCaretRectangle()));
 
@@ -2888,18 +2922,15 @@ private:
 ModifierKeys HWNDComponentPeer::currentModifiers;
 ModifierKeys HWNDComponentPeer::modifiersAtLastCallback;
 
-ComponentPeer* Component::createNewPeer (int styleFlags, void* nativeWindowToAttachTo)
+ComponentPeer* Component::createNewPeer (int styleFlags, void* parentHWND)
 {
-    return new HWNDComponentPeer (*this, styleFlags,
-                                  (HWND) nativeWindowToAttachTo, false);
+    return new HWNDComponentPeer (*this, styleFlags, (HWND) parentHWND, false);
 }
 
-ComponentPeer* createNonRepaintingEmbeddedWindowsPeer (Component* component, void* parent)
+ComponentPeer* createNonRepaintingEmbeddedWindowsPeer (Component& component, void* parentHWND)
 {
-    jassert (component != nullptr);
-
-    return new HWNDComponentPeer (*component, ComponentPeer::windowIgnoresMouseClicks,
-                                  (HWND) parent, true);
+    return new HWNDComponentPeer (component, ComponentPeer::windowIgnoresMouseClicks,
+                                  (HWND) parentHWND, true);
 }
 
 
@@ -2972,7 +3003,7 @@ bool JUCE_CALLTYPE Process::isForegroundProcess()
     fg = GetAncestor (fg, GA_ROOT);
 
     for (int i = ComponentPeer::getNumPeers(); --i >= 0;)
-        if (HWNDComponentPeer* const wp = dynamic_cast <HWNDComponentPeer*> (ComponentPeer::getPeer (i)))
+        if (HWNDComponentPeer* const wp = dynamic_cast<HWNDComponentPeer*> (ComponentPeer::getPeer (i)))
             if (wp->isInside (fg))
                 return true;
 
@@ -2998,7 +3029,7 @@ static BOOL CALLBACK enumAlwaysOnTopWindows (HWND hwnd, LPARAM lParam)
             if (GetWindowInfo (hwnd, &info)
                  && (info.dwExStyle & WS_EX_TOPMOST) != 0)
             {
-                *reinterpret_cast <bool*> (lParam) = true;
+                *reinterpret_cast<bool*> (lParam) = true;
                 return FALSE;
             }
         }
@@ -3203,7 +3234,7 @@ void SystemClipboard::copyTextToClipboard (const String& text)
             {
                 if (HGLOBAL bufH = GlobalAlloc (GMEM_MOVEABLE | GMEM_DDESHARE | GMEM_ZEROINIT, bytesNeeded + sizeof (WCHAR)))
                 {
-                    if (WCHAR* const data = static_cast <WCHAR*> (GlobalLock (bufH)))
+                    if (WCHAR* const data = static_cast<WCHAR*> (GlobalLock (bufH)))
                     {
                         text.copyToUTF16 (data, bytesNeeded);
                         GlobalUnlock (bufH);

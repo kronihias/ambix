@@ -68,7 +68,7 @@
       @see jassert()
   */
   #define juce_breakDebugger        { ::kill (0, SIGTRAP); }
-#elif JUCE_USE_INTRINSICS
+#elif JUCE_USE_MSVC_INTRINSICS
   #ifndef __INTEL_COMPILER
     #pragma intrinsic (__debugbreak)
   #endif
@@ -212,6 +212,26 @@ namespace juce
 
 
 //==============================================================================
+#if JUCE_MSVC && ! defined (DOXYGEN)
+ #define JUCE_WARNING_HELPER(file, line, mess) message(file "(" JUCE_STRINGIFY (line) ") : Warning: " #mess)
+ #define JUCE_COMPILER_WARNING(message)  __pragma(JUCE_WARNING_HELPER (__FILE__, __LINE__, message));
+#else
+ #ifndef DOXYGEN
+  #define JUCE_WARNING_HELPER(mess) message(#mess)
+ #endif
+
+ /** This macro allows you to emit a custom compiler warning message.
+     Very handy for marking bits of code as "to-do" items, or for shaming
+     code written by your co-workers in a way that's hard to ignore.
+
+     GCC and Clang provide the \#warning directive, but MSVC doesn't, so this macro
+     is a cross-compiler way to get the same functionality as \#warning.
+ */
+ #define JUCE_COMPILER_WARNING(message)  _Pragma(JUCE_STRINGIFY (JUCE_WARNING_HELPER (message)));
+#endif
+
+
+//==============================================================================
 #if JUCE_CATCH_UNHANDLED_EXCEPTIONS
 
   #define JUCE_TRY try
@@ -317,6 +337,10 @@ namespace juce
  #if (__GNUC__ * 100 + __GNUC_MINOR__) >= 407 && ! defined (JUCE_DELETED_FUNCTION)
   #define JUCE_DELETED_FUNCTION = delete
  #endif
+
+ #if (__GNUC__ * 100 + __GNUC_MINOR__) >= 406 && ! defined (JUCE_COMPILER_SUPPORTS_LAMBDAS)
+  #define JUCE_COMPILER_SUPPORTS_LAMBDAS 1
+ #endif
 #endif
 
 #if JUCE_CLANG && defined (__has_feature)
@@ -336,6 +360,13 @@ namespace juce
   #define JUCE_DELETED_FUNCTION = delete
  #endif
 
+ #if __has_feature (cxx_lambdas) \
+      && ((JUCE_MAC && defined (MAC_OS_X_VERSION_10_8) && MAC_OS_X_VERSION_MIN_REQUIRED > MAC_OS_X_VERSION_10_8) \
+           || (JUCE_IOS && defined (__IPHONE_7_0) && __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_7_0) \
+           || ! (JUCE_MAC || JUCE_IOS))
+  #define JUCE_COMPILER_SUPPORTS_LAMBDAS 1
+ #endif
+
  #ifndef JUCE_COMPILER_SUPPORTS_OVERRIDE_AND_FINAL
   #define JUCE_COMPILER_SUPPORTS_OVERRIDE_AND_FINAL 1
  #endif
@@ -352,6 +383,7 @@ namespace juce
 
 #if defined (_MSC_VER) && _MSC_VER >= 1700
  #define JUCE_COMPILER_SUPPORTS_OVERRIDE_AND_FINAL 1
+ #define JUCE_COMPILER_SUPPORTS_LAMBDAS 1
 #endif
 
 #ifndef JUCE_DELETED_FUNCTION
