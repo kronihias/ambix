@@ -54,6 +54,7 @@ public:
         menuEnabled (false),
         useDragEvents (false),
         scrollWheelEnabled (true),
+        scrollWheelEndless(false),
         snapsToMousePos (true),
         parentForPopupDisplay (nullptr)
     {
@@ -1004,18 +1005,42 @@ public:
                 {
                     if (valueBox != nullptr)
                         valueBox->hideEditor (false);
-
+                    
+                    /////////////////////
+                    // modified by Matthias Kronlachner
                     const double value = (double) currentValue.getValue();
-                    const double delta = getMouseWheelDelta (value, (std::abs (wheel.deltaX) > std::abs (wheel.deltaY)
-                                                                        ? -wheel.deltaX : wheel.deltaY)
-                                                                      * (wheel.isReversed ? -1.0f : 1.0f));
-                    if (delta != 0)
+                    
+                    double newValue = value;
+                    
+                    if (!scrollWheelEndless)
                     {
-                        const double newValue = value + jmax (interval, std::abs (delta)) * (delta < 0 ? -1.0 : 1.0);
-
-                        DragInProgress drag (*this);
-                        setValue (owner.snapValue (newValue, notDragging), sendNotificationSync);
+                        const double delta = getMouseWheelDelta (value, (std::abs (wheel.deltaX) > std::abs (wheel.deltaY)
+                                                                         ? -wheel.deltaX : wheel.deltaY)
+                                                                 * (wheel.isReversed ? -1.0f : 1.0f));
+                        if (delta != 0)
+                        {
+                            newValue = value + jmax (interval, std::abs (delta)) * (delta < 0 ? -1.0 : 1.0);
+                        }
+                    } else {
+                        const double currentPos = owner.valueToProportionOfLength (value);
+                        const double proportionDelta = (wheel.deltaX != 0 ? -wheel.deltaX : wheel.deltaY) * (wheel.isReversed ? -0.15f : 0.15f);
+                        
+                        // behavior to wrap slider around with wheel
+                        double changeValue = currentPos + proportionDelta;
+                        if (changeValue > 1.f)
+                            changeValue -= 1.f;
+                        
+                        if (changeValue < 0.f)
+                            changeValue += 1.0;
+                        
+                        newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, changeValue));
                     }
+                    
+                    ////////////////////
+                    
+                    DragInProgress drag (*this);
+                    setValue (owner.snapValue (newValue, notDragging), sendNotificationSync);
+                    
                 }
             }
 
@@ -1271,6 +1296,7 @@ public:
     bool useDragEvents;
     bool incDecDragged;
     bool scrollWheelEnabled;
+    bool scrollWheelEndless;
     bool snapsToMousePos;
 
     ScopedPointer<Label> valueBox;
@@ -1575,6 +1601,7 @@ void Slider::valueChanged() {}
 //==============================================================================
 void Slider::setPopupMenuEnabled (const bool menuEnabled)   { pimpl->menuEnabled = menuEnabled; }
 void Slider::setScrollWheelEnabled (const bool enabled)     { pimpl->scrollWheelEnabled = enabled; }
+void Slider::setScrollWheelEndless (const bool enabled)     { pimpl->scrollWheelEndless = enabled; }
 
 bool Slider::isHorizontal() const noexcept   { return pimpl->isHorizontal(); }
 bool Slider::isVertical() const noexcept     { return pimpl->isVertical(); }

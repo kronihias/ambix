@@ -1,57 +1,118 @@
---- /Users/matthias/SDKs/JUCE/modules/juce_gui_basics/widgets/juce_Slider.cpp	2014-01-07 09:11:53.000000000 +0200
-+++ JUCE/modules/juce_gui_basics/widgets/juce_Slider.cpp	2014-01-09 14:09:38.000000000 +0200
-@@ -54,6 +54,7 @@
+--- ../modules/juce_gui_basics/widgets/juce_Slider.cpp	2014-10-13 20:45:26.000000000 +0200
++++ /Users/matthias/SDKs/JUCE/modules/juce_gui_basics/widgets/juce_Slider.cpp	2014-08-17 06:57:44.000000000 +0200
+@@ -54,7 +54,6 @@
          menuEnabled (false),
          useDragEvents (false),
          scrollWheelEnabled (true),
-+        scrollWheelEndless(false),
+-        scrollWheelEndless(false),
          snapsToMousePos (true),
          parentForPopupDisplay (nullptr)
      {
-@@ -987,8 +988,28 @@
-                 const double proportionDelta = (wheel.deltaX != 0 ? -wheel.deltaX : wheel.deltaY)
-                                                    * (wheel.isReversed ? -0.15f : 0.15f);
-                 const double currentPos = owner.valueToProportionOfLength (value);
--                const double newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, currentPos + proportionDelta));
--
-+                
-+                //////
-+                // modified by Matthias Kronlachner
-+                double newValue = 0.f;
-+                
-+                if (!scrollWheelEndless)
-+                {
-+                    newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, currentPos + proportionDelta));
-+                } else {
-+                    // behavior to wrap slider around with wheel
-+                    double changeValue = currentPos + proportionDelta;
-+                    
-+                    if (changeValue > 1.f)
-+                        changeValue -= 1.f;
-+                    
-+                    if (changeValue < 0.f)
-+                        changeValue += 1.f;
-+                    
-+                    newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, changeValue));
-+                }
-+                ////
-+                
-                 double delta = (newValue != value) ? jmax (std::abs (newValue - value), interval) : 0;
-                 if (value > newValue)
-                     delta = -delta;
-@@ -1248,6 +1269,7 @@
+@@ -465,9 +464,9 @@
+                               const bool stopAtEnd)
+     {
+         // make sure the values are sensible..
+-        jassert (startAngleRadians >= 0 && endAngleRadians >= 0);
+-        jassert (startAngleRadians < float_Pi * 4.0f && endAngleRadians < float_Pi * 4.0f);
+-        jassert (startAngleRadians < endAngleRadians);
++        jassert (rotaryStart >= 0 && rotaryEnd >= 0);
++        jassert (rotaryStart < float_Pi * 4.0f && rotaryEnd < float_Pi * 4.0f);
++        jassert (rotaryStart < rotaryEnd);
+ 
+         rotaryStart = startAngleRadians;
+         rotaryEnd = endAngleRadians;
+@@ -567,7 +566,6 @@
+ 
+             valueBox->setWantsKeyboardFocus (false);
+             valueBox->setText (previousTextBoxContent, dontSendNotification);
+-            valueBox->setTooltip (owner.getTooltip());
+ 
+             if (valueBox->isEditable() != editableText) // (avoid overriding the single/double click flags unless we have to)
+                 valueBox->setEditable (editableText && owner.isEnabled());
+@@ -579,6 +577,10 @@
+                 valueBox->addMouseListener (&owner, false);
+                 valueBox->setMouseCursor (MouseCursor::ParentCursor);
+             }
++            else
++            {
++                valueBox->setTooltip (owner.getTooltip());
++            }
+         }
+         else
+         {
+@@ -1005,42 +1007,18 @@
+                 {
+                     if (valueBox != nullptr)
+                         valueBox->hideEditor (false);
+-                    
+-                    /////////////////////
+-                    // modified by Matthias Kronlachner
++
+                     const double value = (double) currentValue.getValue();
+-                    
+-                    double newValue = value;
+-                    
+-                    if (!scrollWheelEndless)
++                    const double delta = getMouseWheelDelta (value, (wheel.deltaX != 0 ? -wheel.deltaX : wheel.deltaY)
++                                                                        * (wheel.isReversed ? -1.0f : 1.0f));
++
++                    if (delta != 0)
+                     {
+-                        const double delta = getMouseWheelDelta (value, (std::abs (wheel.deltaX) > std::abs (wheel.deltaY)
+-                                                                         ? -wheel.deltaX : wheel.deltaY)
+-                                                                 * (wheel.isReversed ? -1.0f : 1.0f));
+-                        if (delta != 0)
+-                        {
+-                            newValue = value + jmax (interval, std::abs (delta)) * (delta < 0 ? -1.0 : 1.0);
+-                        }
+-                    } else {
+-                        const double currentPos = owner.valueToProportionOfLength (value);
+-                        const double proportionDelta = (wheel.deltaX != 0 ? -wheel.deltaX : wheel.deltaY) * (wheel.isReversed ? -0.15f : 0.15f);
+-                        
+-                        // behavior to wrap slider around with wheel
+-                        double changeValue = currentPos + proportionDelta;
+-                        if (changeValue > 1.f)
+-                            changeValue -= 1.f;
+-                        
+-                        if (changeValue < 0.f)
+-                            changeValue += 1.0;
+-                        
+-                        newValue = owner.proportionOfLengthToValue (jlimit (0.0, 1.0, changeValue));
++                        const double newValue = value + jmax (interval, std::abs (delta)) * (delta < 0 ? -1.0 : 1.0);
++
++                        DragInProgress drag (*this);
++                        setValue (owner.snapValue (newValue, notDragging), sendNotificationSync);
+                     }
+-                    
+-                    ////////////////////
+-                    
+-                    DragInProgress drag (*this);
+-                    setValue (owner.snapValue (newValue, notDragging), sendNotificationSync);
+-                    
+                 }
+             }
+ 
+@@ -1296,7 +1274,6 @@
      bool useDragEvents;
      bool incDecDragged;
      bool scrollWheelEnabled;
-+    bool scrollWheelEndless;
+-    bool scrollWheelEndless;
      bool snapsToMousePos;
  
      ScopedPointer<Label> valueBox;
-@@ -1551,6 +1573,7 @@
+@@ -1313,7 +1290,6 @@
+         {
+             setAlwaysOnTop (true);
+             setAllowedPlacement (owner.getLookAndFeel().getSliderPopupPlacement (s));
+-            setLookAndFeel (&s.getLookAndFeel());
+         }
+ 
+         void paintContent (Graphics& g, int w, int h)
+@@ -1601,7 +1577,6 @@
  //==============================================================================
  void Slider::setPopupMenuEnabled (const bool menuEnabled)   { pimpl->menuEnabled = menuEnabled; }
  void Slider::setScrollWheelEnabled (const bool enabled)     { pimpl->scrollWheelEnabled = enabled; }
-+void Slider::setScrollWheelEndless (const bool enabled)     { pimpl->scrollWheelEndless = enabled; }
+-void Slider::setScrollWheelEndless (const bool enabled)     { pimpl->scrollWheelEndless = enabled; }
  
  bool Slider::isHorizontal() const noexcept   { return pimpl->isHorizontal(); }
  bool Slider::isVertical() const noexcept     { return pimpl->isVertical(); }
