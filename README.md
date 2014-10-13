@@ -51,7 +51,7 @@ plug-in reference:
 
 * ambix_warp - warp soundfield towards equator, poles, front or back...* 
 
-* ambix_widening - frequency dependant rotation around the z-axis, use this for source widening or creating diffuse early reflections, article: http://dx.doi.org/10.14279/depositonce-12
+* ambix_widening - frequency dependant rotation around the z-axis, use this for source widening or creating diffuse early reflections, article: http://dx.doi.org/10.14279/depositonce-12, Created with help of Franz Zotter and Matthias Frank
 
 
 
@@ -121,8 +121,8 @@ LV2 plug-in
 
 - go to the folder *lv2-ttl-generator* and **> make** for compiling the tool *lv2_ttl_generator*
 
-- go to the _bin folder and execute the script *> ./../../lv2-ttl-generator/generate-ttl.sh*
-this will generate all needed .tll files, you can copy all .lv2 folders now to /usr/lib/lv2
+- go to the _bin folder (eg. *ambix/BUILD/_bin* ) and execute the script *> ./../../lv2-ttl-generator/generate-ttl.sh*
+this will generate all needed .tll files, afterwards you can copy all .lv2 folders from *ambix/BUILD/_bin/lv2* to /usr/lib/lv2
 
 known problems
 -----------
