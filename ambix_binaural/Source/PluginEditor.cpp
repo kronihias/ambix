@@ -87,7 +87,8 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     btn_open->setColour (TextButton::buttonOnColourId, Colours::blue);
 
     addAndMakeVisible (label2 = new Label ("new label",
-                                           "Virtual speakers: "));
+                                           "Virtual loudspeakers: "));
+
     label2->setFont (Font (15.0000f, Font::plain));
     label2->setJustificationType (Justification::centredRight);
     label2->setEditable (false, false, false);
@@ -104,6 +105,12 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     label3->setColour (TextEditor::textColourId, Colours::black);
     label3->setColour (TextEditor::backgroundColourId, Colour (0x0));
 
+#if BINAURAL_DECODER
+#else
+    label2->setText("Loudspeakers: ", dontSendNotification);
+    label3->setText("", dontSendNotification);
+#endif
+    
     addAndMakeVisible (label4 = new Label ("new label",
                                            "debug window"));
     label4->setFont (Font (10.0000f, Font::plain));
