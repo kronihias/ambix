@@ -120,7 +120,7 @@ static const String& getPluginURI()
     static const String pluginURI(String("urn:cabbage:")+File::getSpecialLocation(File::currentExecutableFile).getFileNameWithoutExtension().replace("cabbage-",""));
  #endif
 #else
-    static const String pluginURI(JucePlugin_LV2URI);
+    static const String pluginURI(String("urn:ambix:")+String(JucePlugin_LV2URI));
 #endif
     return pluginURI;
 }
