@@ -378,7 +378,11 @@ void Ambix_encoderAudioProcessorEditor::changeListenerCallback (ChangeBroadcaste
     sld_size->setValue(ourProcessor->getParameter(Ambix_encoderAudioProcessor::SizeParam), dontSendNotification);
     
     // set for gui!
-    sphere_opengl->setSource((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, (ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f);
+#if INPUT_CHANNELS > 1
+    sphere_opengl->setSource((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, (ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, ourProcessor->getParameter(Ambix_encoderAudioProcessor::WidthParam));
+#else
+        sphere_opengl->setSource((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, (ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, 0.f);
+#endif
     
 #if INPUT_CHANNELS > 1
     sld_width->setValue(ourProcessor->getParameter(Ambix_encoderAudioProcessor::WidthParam)*360.f, dontSendNotification);

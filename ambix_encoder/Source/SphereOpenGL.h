@@ -123,7 +123,7 @@ public:
     void mouseUp (const MouseEvent& e);
     void mouseDrag (const MouseEvent& e);
     
-    void setSource(float azimuth, float elevation); // pass in degree!
+    void setSource(float azimuth, float elevation, float width); // pass in degree!
     
     Ambix_encoderAudioProcessor* processor;
     
@@ -133,12 +133,16 @@ private:
     
     SolidSphere sphere;
     SolidSphere sphere_source;
+    SolidSphere sphere_source_small;
     
     float mPhi;
     float mTheta;
     
     float _mTheta; // old
     float _mPhi;
+    
+    float mWidth;
+    float _mWidth;
     
     bool _first_run;
 };

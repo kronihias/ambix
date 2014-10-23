@@ -30,8 +30,9 @@ double constrainAngle(double x){
 }
 
 SphereOpenGL::SphereOpenGL() :
-sphere(0.9f, 12, 24),
-sphere_source(0.1f, 12, 24),
+sphere(0.9f, 12, 12),
+sphere_source(0.1f, 12, 12),
+sphere_source_small(0.05f, 12, 12),
 _first_run(true)
 {
     
@@ -112,22 +113,38 @@ void SphereOpenGL::renderOpenGL()
     
     // draw source
     glColor4f(1,1,0.0,1.0);
-    // Convert Spherical to Cartesian coordinates: mPhi measured from +y
-    // and mTheta measured counterclockwise from -z.
     
-    /*
-     float x = 0.9f*cosf(mTheta)*sinf(mPhi);
-     float z = -0.9f*sinf(mTheta)*sinf(-mPhi);
-     float y = 0.9f*sinf(mTheta);
-     */
+#if INPUT_CHANNELS < 2
     float x = 0.9f * sinf(mPhi) * cosf(mTheta);
     float y = 0.9f * cosf(mPhi) * cosf(mTheta);
     float z = 0.9f * sinf(mTheta);
     
-    // std::cout << x << " " << y << " " << z << std::endl;
     sphere_source.draw(x, y, z);
+#else
+    for (int i=0; i < INPUT_CHANNELS; i++)
+    {
+        // Convert Spherical to Cartesian coordinates: mPhi measured from +y
+        // and mTheta measured counterclockwise from -z.
+        
+        float mPhi_this = mPhi - mWidth * (0.5f - (float)i/(float)(INPUT_CHANNELS-1));
+        
+        float x = 0.9f * sinf(mPhi_this) * cosf(mTheta);
+        float y = 0.9f * cosf(mPhi_this) * cosf(mTheta);
+        float z = 0.9f * sinf(mTheta);
+        
+        sphere_source.draw(x, y, z);
+    }
+
+# if INPUT_CHANNELS%2 == 0
+    // draw small sphere at origin if even number of input channels
+    float x = 0.9f * sinf(mPhi) * cosf(mTheta);
+    float y = 0.9f * cosf(mPhi) * cosf(mTheta);
+    float z = 0.9f * sinf(mTheta);
+    glColor4f(1,0,0,0.5);
+    sphere_source_small.draw(x, y, z);
+#endif
     
-    
+#endif
     // draw sphere
     glColor4f(0.89f,0.89f,0.9f,0.7f);
 
@@ -148,15 +165,17 @@ void SphereOpenGL::openGLContextClosing()
     
 }
 
-void SphereOpenGL::setSource(float azimuth, float elevation)
+void SphereOpenGL::setSource(float azimuth, float elevation, float width)
 {
     mPhi = azimuth * (float)DEG2RAD;
     mTheta = elevation * (float)DEG2RAD;
     
+    mWidth = width*2*M_PI;
     if (_first_run)
     {
         _mPhi = mPhi;
         _mTheta = mTheta;
+        _mWidth = mWidth;
         
         _first_run = false;
     }
