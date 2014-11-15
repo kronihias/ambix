@@ -194,10 +194,10 @@ bool SpkConv::loadIr(const File& audioFile, double sampleRate, int BufferLength,
     
 
     // send hrir to zita-convolver
-    conv.impdata_create(0, 0, 1, HrirBuffer.getReadPointer(ch_l),
+    conv.impdata_create(0, 0, 1, (float*)HrirBuffer.getReadPointer(ch_l),
                          delay_samples, ir_length+delay_samples);
     
-    conv.impdata_create(0, 1, 1, HrirBuffer.getReadPointer(ch_r),
+    conv.impdata_create(0, 1, 1, (float*)HrirBuffer.getReadPointer(ch_r),
                          delay_samples, ir_length+delay_samples);
     
     
