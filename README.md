@@ -146,6 +146,8 @@ http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_st
 
 changelog
 -----------
+* v0.2.3 (2014-12-27) multichannel encoder display actual source positions, compatibility with audiomulch for saving settings
+
 * v0.2.2 (2014-08-18) encoder flickering fix, added osc settings, new control modes for encoder display: right mouse click for relative source movement, press shift to freeze elevation while moving and ctrl to freeze azimuth
 
 * v0.2.1 (2014-04-17) fixed vst identifier for Plogue Bidule compatibility
