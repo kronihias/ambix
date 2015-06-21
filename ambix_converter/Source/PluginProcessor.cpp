@@ -511,27 +511,12 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
         ACNtoLM(i, l, m);
         
         
-        int _in_ch_seq = in_ch_seq[i];
-        int _out_ch_seq = out_ch_seq[i];
-        
-        if (in_2d)
-        {
-            _in_ch_seq = in_2d_ch_seq[ACN3DtoACN2D(i)];
-            if (_in_ch_seq > getNumInputChannels())
-                _in_ch_seq = -1;
-        }
-        
-        if (out_2d)
-        {
-            _out_ch_seq = out_2d_ch_seq[ACN3DtoACN2D(i)];
-            if (_out_ch_seq > getNumOutputChannels())
-                _out_ch_seq = -1;
-        }
-        
+        int _in_ch_seq = in_2d ? in_2d_ch_seq[ACN3DtoACN2D(i)] : in_ch_seq[i];
+        int _out_ch_seq = out_2d ? out_2d_ch_seq[ACN3DtoACN2D(i)] : out_ch_seq[i];
         
         // std::cout << "InputCh: " << i << " IN_CHANNEL: " << _in_ch_seq << " OUT_CHANNEL: " << _out_ch_seq << std::endl;
         
-        if (_in_ch_seq != -1 && _out_ch_seq != -1 && _in_ch_seq < getNumInputChannels())
+        if (_in_ch_seq < getNumInputChannels() && _out_ch_seq < getNumOutputChannels())
         {
             // copy input channels to output channels!
             output_buffer.copyFrom(_out_ch_seq, 0, buffer, _in_ch_seq, 0, NumSamples);
