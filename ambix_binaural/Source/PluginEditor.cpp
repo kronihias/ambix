@@ -39,7 +39,8 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
       num_hrtf (0),
       btn_preset_folder (0),
 #if BINAURAL_DECODER
-      tgl_load_irs(0),
+    tgl_load_irs(0),
+    box_conv_buffer (0),
 #endif
       _width(0)
 {
@@ -139,7 +140,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     num_spk->setColour (TextEditor::backgroundColourId, Colour (0x0));
 
     addAndMakeVisible (num_hrtf = new Label ("new label",
-                                             "0"));
+                                             ""));
     num_hrtf->setFont (Font (15.0000f, Font::plain));
     num_hrtf->setJustificationType (Justification::centredRight);
     num_hrtf->setEditable (false, false, false);
@@ -160,6 +161,12 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     tgl_load_irs->setButtonText (TRANS("load IRs"));
     tgl_load_irs->addListener (this);
     tgl_load_irs->setColour (ToggleButton::textColourId, Colours::white);
+    
+    addAndMakeVisible(box_conv_buffer = new ComboBox ("new combobox"));
+    box_conv_buffer->setTooltip("set higher buffer size to optimize CPU performance but increased latency");
+    box_conv_buffer->addListener(this);
+    box_conv_buffer->setEditableText (false);
+    box_conv_buffer->setJustificationType (Justification::centredLeft);
 #endif
     
     setSize (350, 300);
@@ -207,6 +214,7 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
     
 #if BINAURAL_DECODER
     tgl_load_irs = nullptr;
+    box_conv_buffer = nullptr;
 #endif
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -266,7 +274,7 @@ void Ambix_binauralAudioProcessorEditor::resized()
     label5->setBounds (8, 64, 56, 24);
     txt_debug->setBounds (16, 184, 320, 96);
     btn_open->setBounds (280, 64, 56, 24);
-    label2->setBounds (72, 128, 127, 24);
+    label2->setBounds (62, 128, 137, 24);
     label3->setBounds (48, 152, 152, 24);
     label4->setBounds (24, 280, 64, 16);
     num_ch->setBounds (192, 104, 40, 24);
@@ -274,7 +282,8 @@ void Ambix_binauralAudioProcessorEditor::resized()
     num_hrtf->setBounds (192, 152, 40, 24);
     btn_preset_folder->setBounds (248, 96, 94, 24);
 #if BINAURAL_DECODER
-    tgl_load_irs->setBounds (256, 152, 80, 24);
+    tgl_load_irs->setBounds (260, 125, 80, 24);
+    box_conv_buffer->setBounds (271, 155, 65, 22);
 #endif
     
 }
@@ -290,7 +299,7 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
 	
     num_spk->setText(String(ourProcessor->_AmbiSpeakers.size()), dontSendNotification);
 #if BINAURAL_DECODER
-    num_hrtf->setText(String(ourProcessor->_SpkConv.size()), dontSendNotification);
+    num_hrtf->setText(String(ourProcessor->num_conv), dontSendNotification);
 #endif
     num_ch->setText(String(ourProcessor->_AmbiChannels), dontSendNotification);
     
@@ -302,6 +311,26 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
     
 #if BINAURAL_DECODER
     tgl_load_irs->setToggleState(ourProcessor->_load_ir, dontSendNotification);
+    
+    box_conv_buffer->clear(dontSendNotification);
+    
+    unsigned int buf = ourProcessor->getBufferSize();
+    unsigned int conv_buf = ourProcessor->getConvBufferSize();
+    
+    int sel = 0;
+    unsigned int val = 0;
+    
+    for (int i=0; val < 8192; i++) {
+        
+        val = buf*pow(2,i);
+        
+        box_conv_buffer->addItem(String(val), i+1);
+        
+        if (val == conv_buf)
+            sel = i;
+    }
+    
+    box_conv_buffer->setSelectedItemIndex(sel, dontSendNotification);
 #endif
 }
 
@@ -382,6 +411,20 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
         
     }
     
+}
+
+void Ambix_binauralAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
+{
+    Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
+#if BINAURAL_DECODER
+    if (comboBoxThatHasChanged == box_conv_buffer)
+    {
+        int val = box_conv_buffer->getText().getIntValue();
+        
+        // std::cout << "set size: " << val << std::endl;
+        ourProcessor->setConvBufferSize(val);
+    }
+#endif
 }
 
 void Ambix_binauralAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)

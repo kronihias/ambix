@@ -24,7 +24,9 @@
 #include "AmbiSpeaker.h"
 
 #if BINAURAL_DECODER
-    #include "SpkConv.h"
+
+    #include "MtxConv.h"
+    #include "ConvolverData.h"
 #endif
 
 //==============================================================================
@@ -84,12 +86,17 @@ public:
     void LoadConfiguration(File configFile); // do the loading
     
     void UnloadConfiguration();
+    void ReloadConfiguration();
     
-
+    unsigned int getBufferSize();
+    unsigned int getConvBufferSize();
+    void setConvBufferSize(unsigned int bufsize);
+    
     OwnedArray<AmbiSpeaker> _AmbiSpeakers;
 
 #if BINAURAL_DECODER
-    OwnedArray<SpkConv> _SpkConv;
+    // OwnedArray<SpkConv> _SpkConv;
+    int num_conv;
 #endif
     
     int _AmbiChannels;
@@ -121,10 +128,27 @@ public:
     
 private:
     
+    AudioSampleBuffer ambi_spk_buffer_;
+    
+    File _configFile;
+    
+#if BINAURAL_DECODER
+    bool loadIr(AudioSampleBuffer* IRBuffer, const File& audioFile, double &samplerate, float gain=1.f, int offset=0, int length=0);
+    
+    ConvolverData conv_data;
+    
+    MtxConvMaster mtxconv_;
+    
+#endif
+    
     double SampleRate;
     int BufferSize;
     
+    int ConvBufferSize;
+    
     bool isProcessing;
+    
+    
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_binauralAudioProcessor)
 };

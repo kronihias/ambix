@@ -30,13 +30,13 @@ public:
     AmbiSpeaker (double SampleRate, int BufSize);
     ~AmbiSpeaker();
     
-    void process(AudioSampleBuffer& InputBuffer);
+    void process(AudioSampleBuffer& InputBuffer, AudioSampleBuffer& OutputBuffer, int out_ch);
     void setDecoderRow(Array<float>& Row);
     
     float getPeak();
     float getRMS();
     
-    AudioSampleBuffer OutputBuffer; // holds the speaker output
+    // AudioSampleBuffer OutputBuffer; // holds the speaker output
     
 private:
     Array<float> DecoderRow; // row of the decoder matrix belonging to this speaker

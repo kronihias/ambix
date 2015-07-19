@@ -51,6 +51,7 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
                                 _load_ir(true),
                                 SampleRate(44100),
                                 isProcessing(false)
+
 {
     presetDir = presetDir.getSpecialLocation(File::userApplicationDataDirectory).getChildFile("ambix/binaural_presets");
     std::cout << "Search dir:" << presetDir.getFullPathName() << std::endl;
@@ -66,10 +67,18 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
     // this is for the open dialog of the gui
     lastDir = lastDir.getSpecialLocation(File::userHomeDirectory);
     
+    BufferSize = getBlockSize();
+    ConvBufferSize = getBlockSize();
+    SampleRate = getSampleRate();
+    
 }
 
 Ambix_binauralAudioProcessor::~Ambix_binauralAudioProcessor()
 {
+#if BINAURAL_DECODER
+    mtxconv_.StopProc();
+    mtxconv_.Cleanup();
+#endif
 }
 
 void Ambix_binauralAudioProcessor::SearchPresets(File SearchFolder)
@@ -181,9 +190,13 @@ double Ambix_binauralAudioProcessor::getTailLengthSeconds() const
 #if BINAURAL_DECODER
     if (configLoaded)
     {
-        return _SpkConv.getFirst()->irLength();
+        // return _SpkConv.getFirst()->irLength();
+        // double tail_s = (double)conv_data.getMaxLength()/getSampleRate();
+        return 0.f;
+        
+        
     } else {
-        return 0.0;
+        return 0.f;
     }
 #else
     return 0.0;
@@ -218,11 +231,23 @@ void Ambix_binauralAudioProcessor::changeProgramName (int index, const String& n
 //==============================================================================
 void Ambix_binauralAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    SampleRate = sampleRate;
-    BufferSize = samplesPerBlock;
     
+    if (SampleRate != sampleRate || BufferSize != samplesPerBlock)
+    {
+        SampleRate = sampleRate;
+        BufferSize = samplesPerBlock;
+        
+        ReloadConfiguration();
+    }
+    
+    if (configLoaded)
+    {
+#if BINAURAL_DECODER
+        mtxconv_.Reset();
+#endif
+        
+        ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
+    }
 }
 
 void Ambix_binauralAudioProcessor::releaseResources()
@@ -244,10 +269,12 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
         
         int NumSpeakers = _AmbiSpeakers.size();
         
+        ambi_spk_buffer_.clear();
+        
         // decode into ambisonics speaker signals
         for (int i=0; i < NumSpeakers; i++) {
             
-            _AmbiSpeakers.getUnchecked(i)->process(buffer);
+            _AmbiSpeakers.getUnchecked(i)->process(buffer, ambi_spk_buffer_, i);
             
         }
         
@@ -260,6 +287,7 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
         // less than 2 channels (prevent crash here)
         if (buffer.getNumChannels() >= 2)
         {
+            /*
           int NumConvolutions = _SpkConv.size();
         
           // do convolution
@@ -269,6 +297,8 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                 _SpkConv.getUnchecked(i)->process(_AmbiSpeakers.getUnchecked(i)->OutputBuffer, buffer);
             
             }
+             */
+            mtxconv_.processBlock(ambi_spk_buffer_, buffer);
         }
 #else
         int NumSamples = buffer.getNumSamples();
@@ -277,7 +307,7 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
         // copy back the ambisonics speaker signals
         for (int i=0; i < jmin(NumSpeakers, getNumOutputChannels()); i++) {
             
-            buffer.copyFrom(i, 0,  _AmbiSpeakers.getUnchecked(i)->OutputBuffer, 0, 0, NumSamples);
+            buffer.copyFrom(i, 0,  ambi_spk_buffer_, i, 0, NumSamples);
         }
 #endif
     }
@@ -312,6 +342,15 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
         std::cout << "Config Unloaded..." << std::endl;
     }
     
+    if (ConvBufferSize < BufferSize)
+        ConvBufferSize = BufferSize;
+    
+    ConvBufferSize = nextPowerOfTwo(ConvBufferSize);
+    
+#if BINAURAL_DECODER
+    conv_data.setSampleRate(getSampleRate());
+#endif
+    
     String debug;
     debug << "\ntrying to load " << configFile.getFullPathName() << "\n\n";
     
@@ -320,8 +359,12 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     // debug print samplerate and buffer size
     debug = "Samplerate: ";
     debug << SampleRate;
-    debug << " Buffer Size: ";
-    debug << BufferSize;
+    debug << " Host Buffer Size: ";
+    debug << (int)BufferSize;
+#if BINAURAL_DECODER
+    debug << " Convolution Buffer Size: ";
+    debug << (int)ConvBufferSize;
+#endif
     DebugPrint(debug);
     
     activePreset = configFile.getFileName(); // store filename only, on restart search preset folder for it!
@@ -516,7 +559,8 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
             
             if (line.contains("#HRTF")) {
                 
-                _SpkConv.clear();
+                // _SpkConv.clear();
+                num_conv = 0;
                 
                 for (currentLine = currentLine+1; currentLine < myLines.size(); currentLine++)
                 {
@@ -538,8 +582,12 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                         sscanf(lineChar, "%s%f%f%i", filename, &gain, &delay, &swapChannels);
                         
                         
+                        if ( (swapChannels != 0 )|| (swapChannels != 1) )
+                            swapChannels = 0;
+                        
                         File IrFilename = configFile.getParentDirectory().getChildFile(String(filename));
                         
+                        /*
                         _SpkConv.add(new SpkConv());
                         if (_SpkConv.getLast()->loadIr(IrFilename, SampleRate, BufferSize, gain * global_hrtf_gain, delay, swapChannels))
                         {
@@ -552,6 +600,41 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                             debug << "ERROR: could not load file " << filename;
                             DebugPrint(debug << "\n");
                         }
+                         */
+                        
+                        AudioSampleBuffer TempAudioBuffer(2,256);
+                        double src_samplerate;
+                        
+                        if (loadIr(&TempAudioBuffer, IrFilename, src_samplerate, gain, 0, 0))
+                        {
+                            int numspl = TempAudioBuffer.getNumSamples();
+                            
+                            AudioSampleBuffer TempAudioBufferL(1, numspl);
+                            AudioSampleBuffer TempAudioBufferR(1, numspl);
+                            
+                            TempAudioBufferL.copyFrom(0, 0, TempAudioBuffer, 0, 0, numspl);
+                            TempAudioBufferR.copyFrom(0, 0, TempAudioBuffer, 1, 0, numspl);
+                            
+                            // compute delay in samples
+                            int delay_samples = (int) (src_samplerate * (delay/1000.f));
+                            
+                            // add IR to my convolution data - gain is already done while reading file
+                            conv_data.addIR(num_conv, 0+swapChannels, 0, delay_samples, 0, &TempAudioBufferL, src_samplerate);
+                            conv_data.addIR(num_conv, (1+swapChannels)%2, 0, delay_samples, 0, &TempAudioBufferR, src_samplerate);
+                            // addIR(int in_ch, int out_ch, int offset, int delay, int length, AudioSampleBuffer* buffer, double src_samplerate);
+                            
+                            String debug;
+                            debug << "add conv # " << num_conv+1 << " " << filename << " gain: " << gain << " delay: " << delay << " swap: " << swapChannels;
+                            DebugPrint(debug << "\n");
+                            
+                            num_conv++;
+                            
+                        } else {
+                            String debug;
+                            debug << "ERROR: could not load file " << filename;
+                            DebugPrint(debug << "\n");
+                        }
+                        
                     }
                 } // iterate over lines in #HRTF
                 
@@ -756,11 +839,32 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
         
         
     } // end iterate over configuration file lines
+    
+#if BINAURAL_DECODER
+    
+    
+    setLatencySamples(ConvBufferSize-BufferSize);
+    
+    mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), ConvBufferSize, conv_data.getMaxLength(), 8192);
+    
+    // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
+    for (int i=0; i < conv_data.getNumIRs(); i++)
+    {
+        
+        mtxconv_.AddFilter(conv_data.getInCh(i), conv_data.getOutCh(i), *conv_data.getIR(i));
+        
+    }
+    
+    mtxconv_.StartProc();
+    
+#endif
+    
+    ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
+    
     configLoaded = true;
 
-#if BINAURAL_DECODER
-    setLatencySamples(BufferSize);
-#endif
+
+    _configFile = configFile;
     
     sendChangeMessage(); // notify editor
     
@@ -776,12 +880,14 @@ void Ambix_binauralAudioProcessor::UnloadConfiguration()
 #if BINAURAL_DECODER
     //std::cout << "Unloading Convolution..." << std::endl;
     
-    if (_load_ir) {
-        for (int i=0; i < _SpkConv.size(); i++) {
-            
-            _SpkConv.getUnchecked(i)->unloadIr();
-        }
-        _SpkConv.clear();
+    if (_load_ir)
+    {
+        conv_data.clear();
+        num_conv = 0;
+        
+        mtxconv_.StopProc();
+    
+        mtxconv_.Cleanup();
     }
     
     //std::cout << "Unloaded Convolution..." << std::endl;
@@ -791,6 +897,60 @@ void Ambix_binauralAudioProcessor::UnloadConfiguration()
 
 }
 
+void Ambix_binauralAudioProcessor::ReloadConfiguration()
+{
+    if (configLoaded)
+        LoadConfiguration(_configFile);
+}
+
+#if BINAURAL_DECODER
+bool Ambix_binauralAudioProcessor::loadIr(AudioSampleBuffer* IRBuffer, const File& audioFile, double &samplerate, float gain, int offset, int length)
+{
+    if (!audioFile.existsAsFile())
+    {
+        std::cout << "ERROR: file does not exist!!" << std::endl;
+        return false;
+    }
+    
+    AudioFormatManager formatManager;
+    
+    // this can read .wav and .aiff
+    formatManager.registerBasicFormats();
+    
+    AudioFormatReader* reader = formatManager.createReaderFor(audioFile);
+    
+    if (!reader) {
+        std::cout << "ERROR: could not read impulse response file!" << std::endl;
+    }
+    
+    int ir_length = (int)reader->lengthInSamples;
+    
+    if (ir_length <= 0) {
+        std::cout << "wav file has zero samples" << std::endl;
+        return false;
+    }
+    
+    if (reader->numChannels != 2) {
+        std::cout << "wav file has incorrect channel count: " << reader->numChannels << std::endl;
+        return false;
+    }
+    
+    samplerate = reader->sampleRate;
+    
+    IRBuffer->setSize(2, ir_length);
+    
+    reader->read(IRBuffer, 0, ir_length, 0, true, true);
+    
+    // resampling is done in conv_data
+    
+    // scale ir with gain
+    IRBuffer->applyGain(gain);
+    
+    delete reader;
+    
+    return true;
+}
+#endif
 
 void Ambix_binauralAudioProcessor::DebugPrint(String debugText)
 {
@@ -800,6 +960,26 @@ void Ambix_binauralAudioProcessor::DebugPrint(String debugText)
     temp << _DebugText;
     
     _DebugText = temp;
+}
+
+unsigned int Ambix_binauralAudioProcessor::getBufferSize()
+{
+    return BufferSize;
+}
+
+unsigned int Ambix_binauralAudioProcessor::getConvBufferSize()
+{
+    return ConvBufferSize;
+}
+
+
+void Ambix_binauralAudioProcessor::setConvBufferSize(unsigned int bufsize)
+{
+    if (nextPowerOfTwo(bufsize) != ConvBufferSize)
+    {
+        ConvBufferSize = nextPowerOfTwo(bufsize);
+        ReloadConfiguration();
+    }
 }
 
 //==============================================================================
@@ -826,7 +1006,8 @@ void Ambix_binauralAudioProcessor::getStateInformation (MemoryBlock& destData)
     // add some attributes to it..
     xml.setAttribute ("activePreset", activePreset);
     xml.setAttribute ("presetDir", presetDir.getFullPathName());
-
+    xml.setAttribute("ConvBufferSize", (int)ConvBufferSize);
+    
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
 }
@@ -849,6 +1030,8 @@ void Ambix_binauralAudioProcessor::setStateInformation (const void* data, int si
             activePreset  = xmlState->getStringAttribute("activePreset", "");
             
             newPresetDir = xmlState->getStringAttribute("presetDir", presetDir.getFullPathName());
+            
+            ConvBufferSize = xmlState->getIntAttribute("ConvBufferSize", ConvBufferSize);
         }
         
         if (activePreset.isNotEmpty()) {

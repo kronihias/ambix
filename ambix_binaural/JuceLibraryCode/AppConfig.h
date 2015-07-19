@@ -61,10 +61,6 @@
 // this is the formular for 3d... not meant to be changed!
 #define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
 
-#ifndef _WIN32
-// #define USE_ZITA_CONVOLVER // zita convolver is not compatible with Steinberg VST SDK! use only for LV2 version
-#endif
-
 // [END_USER_CODE_SECTION]
 
 //==============================================================================

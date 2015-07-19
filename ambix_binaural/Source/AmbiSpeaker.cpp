@@ -20,7 +20,7 @@
 #include "AmbiSpeaker.h"
 
 
-AmbiSpeaker::AmbiSpeaker(double SampleRate, int BufSize) : OutputBuffer(1,256)
+AmbiSpeaker::AmbiSpeaker(double SampleRate, int BufSize)
 {
     
     if (SampleRate <= 0.f)
@@ -43,21 +43,17 @@ AmbiSpeaker::~AmbiSpeaker()
 }
 
 
-void AmbiSpeaker::process(AudioSampleBuffer& InputBuffer)
+void AmbiSpeaker::process(AudioSampleBuffer& InputBuffer, AudioSampleBuffer& OutputBuffer, int out_ch)
 {
     int NumSamples = InputBuffer.getNumSamples();
     int NumChannels = InputBuffer.getNumChannels();
 
-    
+    /*
     if (NumSamples > OutputBuffer.getNumSamples())
     {
         OutputBuffer.setSize(1, NumSamples); //resize output buffer if necessary
     }
-    
-    
-    // clear output buffer
-    OutputBuffer.clear();
-    
+    */
     
     // add channels according decoder row
     for (int i=0; i < std::min(DecoderRow.size(), NumChannels) ; i++) {
@@ -65,7 +61,7 @@ void AmbiSpeaker::process(AudioSampleBuffer& InputBuffer)
         if (DecoderRow[i] != 0.f) {
             
             // add to output buffer with gainfactor from decoder row
-            OutputBuffer.addFrom(0, 0, InputBuffer, i, 0, NumSamples, DecoderRow[i]);
+            OutputBuffer.addFrom(out_ch, 0, InputBuffer, i, 0, NumSamples, DecoderRow[i]);
             
         }
         
@@ -73,7 +69,7 @@ void AmbiSpeaker::process(AudioSampleBuffer& InputBuffer)
     
     // compute and store peak value
     
-    _my_meter_dsp.calc((float*)OutputBuffer.getReadPointer(0), NumSamples);
+    _my_meter_dsp.calc((float*)OutputBuffer.getReadPointer(out_ch), NumSamples);
     
 }
 
