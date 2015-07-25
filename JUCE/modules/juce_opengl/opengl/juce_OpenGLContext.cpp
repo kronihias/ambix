@@ -2,7 +2,7 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2015 - ROLI Ltd.
 
    Permission is granted to use this software under the terms of either:
    a) the GPL v2 (or any later version)
@@ -22,13 +22,18 @@
   ==============================================================================
 */
 
-class OpenGLContext::CachedImage  : public CachedComponentImage,
-                                    public Thread
+class OpenGLContext::CachedImage  : public CachedComponentImage
+                                 #if JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD
+                                  , private Thread
+                                 #endif
 {
 public:
     CachedImage (OpenGLContext& c, Component& comp,
                  const OpenGLPixelFormat& pixFormat, void* contextToShare)
-        : Thread ("OpenGL Rendering"),
+        :
+         #if JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD
+          Thread ("OpenGL Rendering"),
+         #endif
           context (c), component (comp),
           scale (1.0),
          #if JUCE_OPENGL3
@@ -58,7 +63,7 @@ public:
 
     void start()
     {
-       #if ! JUCE_ANDROID
+       #if JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD
         if (nativeContext != nullptr)
             startThread (6);
        #endif
@@ -66,7 +71,7 @@ public:
 
     void stop()
     {
-       #if ! JUCE_ANDROID
+       #if JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD
         stopThread (10000);
        #endif
         hasInitialised = false;
@@ -95,11 +100,11 @@ public:
     {
         needsUpdate = 1;
 
-       #if JUCE_ANDROID
+       #if JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD
+        notify();
+       #else
         if (nativeContext != nullptr)
             nativeContext->triggerRepaint();
-       #else
-        notify();
        #endif
     }
 
@@ -151,9 +156,19 @@ public:
         {
             // This avoids hogging the message thread when doing intensive rendering.
             if (lastMMLockReleaseTime + 1 >= Time::getMillisecondCounter())
+            {
+               #if JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD
                 wait (2);
+               #else
+                Thread::sleep (2);
+               #endif
+            }
 
+           #if JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD
             mmLock = new MessageManagerLock (this);  // need to acquire this before locking the context.
+           #else
+            mmLock = new MessageManagerLock (Thread::getCurrentThread());
+           #endif
             if (! mmLock->lockWasGained())
                 return false;
 
@@ -173,6 +188,8 @@ public:
             context.currentRenderScale = scale;
             context.renderer->renderOpenGL();
             clearGLError();
+
+            bindVertexArray();
         }
 
         if (context.renderComponents)
@@ -214,6 +231,14 @@ public:
                     invalidateAll();
             }
         }
+    }
+
+    void bindVertexArray() noexcept
+    {
+       #if JUCE_OPENGL3
+        if (vertexArrayObject != 0)
+            glBindVertexArray (vertexArrayObject);
+       #endif
     }
 
     void checkViewportBounds()
@@ -262,8 +287,18 @@ public:
         glEnable (GL_TEXTURE_2D);
         clearGLError();
        #endif
-        context.extensions.glActiveTexture (GL_TEXTURE0);
+
+       #if JUCE_WINDOWS
+        // some stupidly old drivers are missing this function, so try to at least avoid a crash here,
+        // but if you hit this assertion you may want to have your own version check before using the
+        // component rendering stuff on such old drivers.
+        jassert (context.extensions.glActiveTexture != nullptr);
+        if (context.extensions.glActiveTexture != nullptr)
+       #endif
+            context.extensions.glActiveTexture (GL_TEXTURE0);
+
         glBindTexture (GL_TEXTURE_2D, cachedImageFrameBuffer.getTextureID());
+        bindVertexArray();
 
         const Rectangle<int> cacheBounds (cachedImageFrameBuffer.getWidth(), cachedImageFrameBuffer.getHeight());
         context.copyTexture (cacheBounds, cacheBounds, cacheBounds.getWidth(), cacheBounds.getHeight(), false);
@@ -322,6 +357,7 @@ public:
     }
 
     //==============================================================================
+   #if JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD
     void run() override
     {
         {
@@ -355,6 +391,7 @@ public:
 
         shutdownOnThread();
     }
+   #endif
 
     void initialiseOnThread()
     {
@@ -370,7 +407,7 @@ public:
         if (OpenGLShaderProgram::getLanguageVersion() > 1.2)
         {
             glGenVertexArrays (1, &vertexArrayObject);
-            glBindVertexArray (vertexArrayObject);
+            bindVertexArray();
         }
        #endif
 
@@ -434,36 +471,6 @@ public:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CachedImage)
 };
-
-//==============================================================================
-#if JUCE_ANDROID
-void OpenGLContext::NativeContext::contextCreatedCallback()
-{
-    isInsideGLCallback = true;
-
-    if (CachedImage* const c = CachedImage::get (component))
-        c->initialiseOnThread();
-    else
-        jassertfalse;
-
-    isInsideGLCallback = false;
-}
-
-void OpenGLContext::NativeContext::renderCallback()
-{
-    isInsideGLCallback = true;
-
-    if (CachedImage* const c = CachedImage::get (component))
-    {
-        if (c->context.continuousRepaint)
-            c->context.triggerRepaint();
-
-        c->renderFrame();
-    }
-
-    isInsideGLCallback = false;
-}
-#endif
 
 //==============================================================================
 class OpenGLContext::Attachment  : public ComponentMovementWatcher,
@@ -563,7 +570,7 @@ private:
     {
         Component& comp = *getComponent();
         CachedImage* const newCachedImage = new CachedImage (context, comp,
-                                                             context.pixelFormat,
+                                                             context.openGLPixelFormat,
                                                              context.contextToShareWith);
         comp.setCachedComponentImage (newCachedImage);
         newCachedImage->start(); // (must wait until this is attached before starting its thread)
@@ -600,6 +607,7 @@ private:
 OpenGLContext::OpenGLContext()
     : nativeContext (nullptr), renderer (nullptr), currentRenderScale (1.0),
       contextToShareWith (nullptr), versionRequired (OpenGLContext::defaultGLVersion),
+      imageCacheMaxSize (8 * 1024 * 1024),
       renderComponents (true), useMultisampling (false), continuousRepaint (false)
 {
 }
@@ -639,7 +647,7 @@ void OpenGLContext::setPixelFormat (const OpenGLPixelFormat& preferredPixelForma
     // Call it before attaching your context, or use detach() first, before calling this!
     jassert (nativeContext == nullptr);
 
-    pixelFormat = preferredPixelFormat;
+    openGLPixelFormat = preferredPixelFormat;
 }
 
 void OpenGLContext::setNativeSharedContext (void* nativeContextToShareWith) noexcept
@@ -816,6 +824,9 @@ void OpenGLContext::setAssociatedObject (const char* name, ReferenceCountedObjec
     }
 }
 
+void OpenGLContext::setImageCacheSize (size_t newSize) noexcept     { imageCacheMaxSize = newSize; }
+size_t OpenGLContext::getImageCacheSize() const noexcept            { return imageCacheMaxSize; }
+
 void OpenGLContext::copyTexture (const Rectangle<int>& targetClipArea,
                                  const Rectangle<int>& anchorPosAndTextureSize,
                                  const int contextWidth, const int contextHeight,
@@ -944,3 +955,33 @@ void OpenGLContext::copyTexture (const Rectangle<int>& targetClipArea,
 
     JUCE_CHECK_OPENGL_ERROR
 }
+
+//==============================================================================
+#if JUCE_ANDROID
+void OpenGLContext::NativeContext::contextCreatedCallback()
+{
+    isInsideGLCallback = true;
+
+    if (CachedImage* const c = CachedImage::get (component))
+        c->initialiseOnThread();
+    else
+        jassertfalse;
+
+    isInsideGLCallback = false;
+}
+
+void OpenGLContext::NativeContext::renderCallback()
+{
+    isInsideGLCallback = true;
+
+    if (CachedImage* const c = CachedImage::get (component))
+    {
+        if (c->context.continuousRepaint)
+            c->context.triggerRepaint();
+
+        c->renderFrame();
+    }
+
+    isInsideGLCallback = false;
+}
+#endif

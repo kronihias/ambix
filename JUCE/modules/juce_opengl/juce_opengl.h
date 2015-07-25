@@ -2,7 +2,7 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2015 - ROLI Ltd.
 
    Permission is granted to use this software under the terms of either:
    a) the GPL v2 (or any later version)
@@ -32,6 +32,10 @@
 
 #if JUCE_IOS || JUCE_ANDROID
  #define JUCE_OPENGL_ES 1
+#endif
+
+#if ! JUCE_ANDROID
+ #define JUCE_OPENGL_CREATE_JUCE_RENDER_THREAD 1
 #endif
 
 #if JUCE_WINDOWS
@@ -125,11 +129,12 @@ class OpenGLTexture;
 class OpenGLFrameBuffer;
 class OpenGLShaderProgram;
 
+#include "geometry/juce_Quaternion.h"
+#include "geometry/juce_Matrix3D.h"
+#include "geometry/juce_Vector3D.h"
+#include "geometry/juce_Draggable3DOrientation.h"
 #include "native/juce_MissingGLDefinitions.h"
 #include "opengl/juce_OpenGLHelpers.h"
-#include "opengl/juce_Quaternion.h"
-#include "opengl/juce_Matrix3D.h"
-#include "opengl/juce_Draggable3DOrientation.h"
 #include "opengl/juce_OpenGLPixelFormat.h"
 #include "native/juce_OpenGLExtensions.h"
 #include "opengl/juce_OpenGLRenderer.h"
@@ -141,7 +146,7 @@ class OpenGLShaderProgram;
 #include "opengl/juce_OpenGLRenderer.h"
 #include "opengl/juce_OpenGLShaderProgram.h"
 #include "opengl/juce_OpenGLTexture.h"
-#include "opengl/juce_Vector3D.h"
+#include "utils/juce_OpenGLAppComponent.h"
 
 }
 

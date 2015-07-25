@@ -2,7 +2,7 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2015 - ROLI Ltd.
 
    Permission is granted to use this software under the terms of either:
    a) the GPL v2 (or any later version)
@@ -110,15 +110,7 @@ struct Flipper
             PixelARGB* const dst = (PixelARGB*) (dataCopy + w * (h - 1 - y));
 
             for (int x = 0; x < w; ++x)
-            {
-               #if JUCE_ANDROID
-                PixelType s (src[x]);
-                dst[x].setARGB (s.getAlpha(), s.getBlue(), s.getGreen(), s.getRed());
-               #else
                 dst[x].set (src[x]);
-               #endif
-            }
-
 
             srcData += lineStride;
         }
@@ -164,14 +156,21 @@ void OpenGLTexture::loadARGBFlipped (const PixelARGB* pixels, int w, int h)
 
 void OpenGLTexture::release()
 {
-    if (textureID != 0
-         && ownerContext == OpenGLContext::getCurrentContext())
+    if (textureID != 0)
     {
-        glDeleteTextures (1, &textureID);
+        // If the texture is deleted while the owner context is not active, it's
+        // impossible to delete it, so this will be a leak until the context itself
+        // is deleted.
+        jassert (ownerContext == OpenGLContext::getCurrentContext());
 
-        textureID = 0;
-        width = 0;
-        height = 0;
+        if (ownerContext == OpenGLContext::getCurrentContext())
+        {
+            glDeleteTextures (1, &textureID);
+
+            textureID = 0;
+            width = 0;
+            height = 0;
+        }
     }
 }
 

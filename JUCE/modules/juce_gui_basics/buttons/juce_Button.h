@@ -2,7 +2,7 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2015 - ROLI Ltd.
 
    Permission is granted to use this software under the terms of either:
    a) the GPL v2 (or any later version)
@@ -342,6 +342,9 @@ public:
         enters or exits the button, or the mouse-button is pressed or released.
     */
     void setState (ButtonState newState);
+
+    /** Returns the button's current over/down/up state. */
+    ButtonState getState() const noexcept               { return buttonState; }
 
     // This method's parameters have changed - see the new version.
     JUCE_DEPRECATED (void setToggleState (bool, bool));
