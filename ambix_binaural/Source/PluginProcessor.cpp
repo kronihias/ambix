@@ -830,6 +830,11 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     // output debug...
                     String debug;
 					debug << "speaker # " << _AmbiSpeakers.size() << " with " << DecoderRow.size() << " coefficients";
+                    // decoder has higher order than the plugin!! -> report warning
+                    if (curr_n < max_n)
+                    {
+                        debug << "\n WARNING: probably you are using a preset inteded to be used at a higher order!";
+                    }
                     DebugPrint(debug << "\n");
                     
                 } // end if line not zero
