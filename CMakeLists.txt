@@ -18,8 +18,6 @@ SET(NUM_OUTPUTS_DECODER 48 CACHE STRING "output channels for decoder")
 SET(NUM_FILTERS 2 CACHE STRING "number of directional filters that can be controlled for directional_loudness")
 SET(NUM_FILTERS_VMIC 4 CACHE STRING "number of directional filters (==outputs) for vmic")
 SET(BUILD_STANDALONE TRUE CACHE BOOL "build standalone application (for those with editor)")
-SET(WITH_ZITA_CONVOLVER FALSE CACHE BOOL "build with zita-convolver (not compatible with VST license!)")
-
 
 SET(BUILD_VST TRUE CACHE BOOL "build VST plugins")
 IF (APPLE)
