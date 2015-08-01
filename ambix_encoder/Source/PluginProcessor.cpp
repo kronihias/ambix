@@ -87,6 +87,8 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
     myProperties.setStorageParameters(prop_options);
     
 #if WITH_OSC
+    st = NULL; // prevent crash..
+    
     osc_in = false;
 	osc_out = false;
 	
@@ -267,6 +269,7 @@ bool Ambix_encoderAudioProcessor::oscIn(bool arg)
         arg = false;
         osc_in = false;
         osc_error = "OSC: not receiving";
+        st = NULL;
 	}
 	return arg;
 }
