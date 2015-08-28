@@ -62,7 +62,7 @@ public:
 
         if (filter == nullptr)
         {
-            jassertfalse    // Your filter didn't create correctly! In a standalone app that's not too great.
+            jassertfalse;    // Your filter didn't create correctly! In a standalone app that's not too great.
             JUCEApplication::quit();
         }
 
