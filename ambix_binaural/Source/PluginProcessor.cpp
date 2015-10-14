@@ -582,7 +582,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                         sscanf(lineChar, "%s%f%f%i", filename, &gain, &delay, &swapChannels);
                         
                         
-                        if ( (swapChannels != 0 )|| (swapChannels != 1) )
+                        if ( (swapChannels != 0 ) && (swapChannels != 1) )
                             swapChannels = 0;
                         
                         File IrFilename = configFile.getParentDirectory().getChildFile(String(filename));
