@@ -28,6 +28,10 @@
     #define AMBI_ORDER 5   // N
 #endif
 
+#ifndef WITH_OSC
+    #define WITH_OSC	1
+#endif
+
 #define Plugin_Name                   ambix_rotator_o
 #define Plugin_Code                   1095921456 // ARo0
 
@@ -136,6 +140,9 @@
 
 #ifndef  JucePlugin_Build_VST
  #define JucePlugin_Build_VST              1
+#endif
+#ifndef  JucePlugin_Build_VST3
+#define JucePlugin_Build_VST3              0
 #endif
 #ifndef  JucePlugin_Build_LV2
  #define JucePlugin_Build_LV2              0

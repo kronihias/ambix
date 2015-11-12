@@ -8,22 +8,6 @@ ELSE( DEFINED SPECIFIC_PROJECTNAME )
 	SET (SUBPROJECT_NAME ${SUBDIRNAME}_o${AMBI_ORDER})
 ENDIF(DEFINED SPECIFIC_PROJECTNAME )
 
-
-IF(APPLE)
-	IF(WITH_EIGEN)
-		ADD_DEFINITIONS(
-    		-std=c++98
-    		-stdlib=libstdc++
-			-Wno-c++11-extensions #avoid c++11 warning msg
-			)
-	ELSE(WITH_EIGEN)
-		# switch to c++11
-		ADD_DEFINITIONS(
-			-std=c++11
-		)
-	ENDIF(WITH_EIGEN)
-ENDIF (APPLE)
-
 # add the folder with Juce includes
 INCLUDE_DIRECTORIES ( JuceLibraryCode )
 
@@ -108,7 +92,7 @@ ADD_LIBRARY(${SUBPROJECT_NAME} MODULE ${JUCE_PLUGIN_CLIENT_SOURCE} ${SOURCE} )
 ADD_DEPENDENCIES (${SUBPROJECT_NAME} ${JUCE_STATIC_LIB})
 
 ####################
-# additional libs (FFTW3F, liblo, Eigen3 is header only)
+# additional libs (FFTW3F, Eigen3 is header only)
 
 IF(WITH_FFTW3)
 
@@ -120,25 +104,12 @@ IF(WITH_FFTW3)
 	)
 ENDIF(WITH_FFTW3)
 
-IF(WITH_LIBLO)
-	TARGET_LINK_LIBRARIES( ${SUBPROJECT_NAME}
-		${LIBLO_LIBRARIES}
-	)
-ENDIF(WITH_LIBLO)
 
 IF(WITH_LIBSOXR)
 	TARGET_LINK_LIBRARIES( ${SUBPROJECT_NAME}
 		${LIBSOXR_LIBRARIES}
 	)
 ENDIF(WITH_LIBSOXR)
-
-IF(WIN32)
-  IF (WITH_LIBLO OR WITH_FFTW3)
-    TARGET_LINK_LIBRARIES( ${SUBPROJECT_NAME}
-		  ${CMAKE_THREAD_LIBS_INIT}
-      )
-  ENDIF (WITH_LIBLO OR WITH_FFTW3)
-ENDIF(WIN32)
 
 ####################
 #plattform specifics
@@ -266,3 +237,21 @@ IF(WIN32)
 	)
 ENDIF(WIN32)
 
+
+################################################
+# change to static linking for ms visual c++
+IF(WIN32)
+
+set(CompilerFlags
+        CMAKE_CXX_FLAGS
+        CMAKE_CXX_FLAGS_DEBUG
+        CMAKE_CXX_FLAGS_RELEASE
+        CMAKE_C_FLAGS
+        CMAKE_C_FLAGS_DEBUG
+        CMAKE_C_FLAGS_RELEASE
+        )
+foreach(CompilerFlag ${CompilerFlags})
+  string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
+endforeach()
+
+ENDIF(WIN32)

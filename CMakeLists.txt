@@ -107,6 +107,11 @@ ENDIF(WITH_ZITA_CONVOLVER)
 # SET(CMAKE_C_FLAGS_RELEASE "-Os") # use small size?
 # SET(CMAKE_CXX_FLAGS_RELEASE "-Os") # use small size?
 
+IF(APPLE)
+	ADD_DEFINITIONS(
+		-Wno-c++11-extensions # supress c++11 warnings
+	)
+ENDIF(APPLE)
 
 
 ADD_DEFINITIONS(-DNDEBUG=1)
@@ -205,14 +210,13 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Eigen3 REQUIRED)
 
-find_package(liblo REQUIRED)
 find_package(libsoxr REQUIRED)
 
 IF (WITH_ZITA_CONVOLVER)
 	find_package(FFTW3 COMPONENTS single)
 ENDIF (WITH_ZITA_CONVOLVER)
 
-include_directories(${EIGEN3_INCLUDE_DIR} ${FFTW3_INCLUDE_DIR} ${LIBLO_INCLUDE_DIRS} ${LIBSOXR_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIR} ${FFTW3_INCLUDE_DIR} ${LIBSOXR_INCLUDE_DIRS})
 
 
 ################################################
@@ -264,11 +268,11 @@ IF(UNIX AND NOT APPLE AND NOT ANDROID)
    SET ( JUCE_LIBRARIES ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${X11_LIBRARY} ${XEXT_LIBRARY} ${XINERAMA_LIBRARY} ${ASOUND_LIBRARY} ${DL_LIBRARY} ${FREETYPE_LIBRARY} ${PTHREAD_LIBRARY} ${RT_LIBRARY} )
    
 
-   FIND_LIBRARY    ( LIBLO_LIBRARY lo )
    FIND_LIBRARY    ( LIBSOXR_LIBRARY soxr )
+   FIND_LIBRARY    ( FFTW3F_LIBRARY fftw3f )
+   
    IF(WITH_ZITA_CONVOLVER)
 	    FIND_LIBRARY    ( ZITA_CONVOLVER_LIBRARY zita-convolver )
-   		FIND_LIBRARY    ( FFTW3F_LIBRARY fftw3f )
    ENDIF(WITH_ZITA_CONVOLVER)	
    
    ADD_DEFINITIONS(-DJUCE_LINUX=1)
@@ -281,11 +285,11 @@ ENDIF(UNIX AND NOT APPLE AND NOT ANDROID)
 
 
 IF(WIN32)
-  set(THREADS_USE_PTHREADS_WIN32 true)
-	find_package(Threads REQUIRED)
+  # set(THREADS_USE_PTHREADS_WIN32 true)
+  #	find_package(Threads REQUIRED)
   FIND_LIBRARY    ( FFTW3F_LIBRARY fftw3f )
   
-  include_directories(${THREADS_PTHREADS_INCLUDE_DIR})
+  # include_directories(${THREADS_PTHREADS_INCLUDE_DIR})
   ADD_DEFINITIONS(-DJUCE_WINDOWS=1)
 ENDIF(WIN32)
 
@@ -311,6 +315,7 @@ IF(APPLE)
 		${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_gui_basics/juce_gui_basics.mm
 		${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_gui_extra/juce_gui_extra.mm
 		${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_opengl/juce_opengl.mm
+		${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_osc/juce_osc.cpp
 		#        ${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_video/juce_video.mm
 	)
 	SET ( JUCE_PLUGIN_CLIENT_SOURCE
@@ -350,6 +355,7 @@ ELSE(APPLE)
 		${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_gui_basics/juce_gui_basics.cpp
 		${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_gui_extra/juce_gui_extra.cpp
 		${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_opengl/juce_opengl.cpp
+		${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_osc/juce_osc.cpp
 		#        ${CMAKE_HOME_DIRECTORY}/JUCE/modules/juce_video/juce_video.cpp
 	)
 
