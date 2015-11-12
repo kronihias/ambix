@@ -38,8 +38,10 @@ namespace juce
 #include "gui/juce_AudioThumbnailBase.h"
 #include "gui/juce_AudioThumbnail.h"
 #include "gui/juce_AudioThumbnailCache.h"
+#include "gui/juce_AudioVisualiserComponent.h"
 #include "gui/juce_MidiKeyboardComponent.h"
 #include "gui/juce_AudioAppComponent.h"
+#include "gui/juce_BluetoothMidiDevicePairingDialogue.h"
 #include "players/juce_AudioProcessorPlayer.h"
 
 }

@@ -587,7 +587,8 @@ public:
             sendMouseEvent (ev);
         else
             // moved into another window which overlaps this one, so trigger an exit
-            handleMouseEvent (0, Point<float> (-1.0f, -1.0f), currentModifiers, getMouseTime (ev));
+            handleMouseEvent (0, Point<float> (-1.0f, -1.0f), currentModifiers,
+                              getMousePressure (ev), getMouseTime (ev));
 
         showArrowCursorIfNeeded();
     }
@@ -678,7 +679,8 @@ public:
     void sendMouseEvent (NSEvent* ev)
     {
         updateModifiers (ev);
-        handleMouseEvent (0, getMousePos (ev, view), currentModifiers, getMouseTime (ev));
+        handleMouseEvent (0, getMousePos (ev, view), currentModifiers,
+                          getMousePressure (ev), getMouseTime (ev));
     }
 
     bool handleKeyEvent (NSEvent* ev, bool isKeyDown)
@@ -1007,7 +1009,49 @@ public:
 
     static int getKeyCodeFromEvent (NSEvent* ev)
     {
-        const String unmodified (nsStringToJuce ([ev charactersIgnoringModifiers]));
+        // Unfortunately, charactersIgnoringModifiers does not ignore the shift key.
+        // Using [ev keyCode] is not a solution either as this will,
+        // for example, return VK_KEY_Y if the key is pressed which
+        // is typically located at the Y key position on a QWERTY
+        // keyboard. However, on international keyboards this might not
+        // be the key labeled Y (for example, on German keyboards this key
+        // has a Z label). Therefore, we need to query the current keyboard
+        // layout to figure out what character the key would have produced
+        // if the shift key was not pressed
+        String unmodified;
+
+       #if JUCE_SUPPORT_CARBON
+        if (TISInputSourceRef currentKeyboard = TISCopyCurrentKeyboardInputSource())
+        {
+            CFDataRef layoutData = (CFDataRef) TISGetInputSourceProperty (currentKeyboard,
+                                                                          kTISPropertyUnicodeKeyLayoutData);
+
+            if (layoutData != nullptr)
+            {
+                if (const UCKeyboardLayout* layoutPtr = (const UCKeyboardLayout*) CFDataGetBytePtr (layoutData))
+                {
+
+                    UInt32 keysDown = 0;
+                    UniChar buffer[4];
+                    UniCharCount actual;
+
+                    if (UCKeyTranslate (layoutPtr, [ev keyCode], kUCKeyActionDown, 0, LMGetKbdType(),
+                                        kUCKeyTranslateNoDeadKeysBit, &keysDown, sizeof (buffer) / sizeof (UniChar),
+                                        &actual, buffer) == 0)
+                        unmodified = String (CharPointer_UTF16 (reinterpret_cast<CharPointer_UTF16::CharType*> (buffer)), 4);
+                }
+            }
+
+            CFRelease (currentKeyboard);
+        }
+
+        // did the above layout conversion fail
+        if (unmodified.isEmpty())
+       #endif
+        {
+            unmodified = nsStringToJuce ([ev charactersIgnoringModifiers]);
+        }
+
         int keyCode = unmodified[0];
 
         if (keyCode == 0x19) // (backwards-tab)
@@ -1026,7 +1070,9 @@ public:
                                               '8', KeyPress::numberPad8, '9', KeyPress::numberPad9,
                                               '+', KeyPress::numberPadAdd, '-', KeyPress::numberPadSubtract,
                                               '*', KeyPress::numberPadMultiply, '/', KeyPress::numberPadDivide,
-                                              '.', KeyPress::numberPadDecimalPoint, '=', KeyPress::numberPadEquals };
+                                              '.', KeyPress::numberPadDecimalPoint,
+                                              ',', KeyPress::numberPadDecimalPoint, // (to deal with non-english kbds)
+                                              '=', KeyPress::numberPadEquals };
 
             for (int i = 0; i < numElementsInArray (numPadConversions); i += 2)
                 if (keyCode == numPadConversions [i])
@@ -1036,10 +1082,15 @@ public:
         return keyCode;
     }
 
-    static int64 getMouseTime (NSEvent* e)
+    static int64 getMouseTime (NSEvent* e) noexcept
     {
         return (Time::currentTimeMillis() - Time::getMillisecondCounter())
-                + (int64) ([e timestamp] * 1000.0);
+                 + (int64) ([e timestamp] * 1000.0);
+    }
+
+    static float getMousePressure (NSEvent* e) noexcept
+    {
+        return (float) e.pressure;
     }
 
     static Point<float> getMousePos (NSEvent* e, NSView* view)

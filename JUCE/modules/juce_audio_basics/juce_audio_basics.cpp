@@ -40,6 +40,10 @@
  #define JUCE_USE_SSE_INTRINSICS 0
 #endif
 
+#if JUCE_MINGW
+ #define alloca __builtin_alloca
+#endif
+
 #ifndef JUCE_USE_SSE_INTRINSICS
  #define JUCE_USE_SSE_INTRINSICS 1
 #endif
@@ -76,7 +80,6 @@ namespace juce
 {
 
 #include "buffers/juce_AudioDataConverters.cpp"
-#include "buffers/juce_AudioSampleBuffer.cpp"
 #include "buffers/juce_FloatVectorOperations.cpp"
 #include "effects/juce_IIRFilter.cpp"
 #include "effects/juce_LagrangeInterpolator.cpp"

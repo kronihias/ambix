@@ -34,9 +34,9 @@
 
     See also SystemStats::getJUCEVersion() for a string version.
 */
-#define JUCE_MAJOR_VERSION      3
-#define JUCE_MINOR_VERSION      2
-#define JUCE_BUILDNUMBER        0
+#define JUCE_MAJOR_VERSION      4
+#define JUCE_MINOR_VERSION      0
+#define JUCE_BUILDNUMBER        1
 
 /** Current Juce version number.
 
@@ -104,6 +104,10 @@
  #pragma warning (pop)
 #endif
 
+#if JUCE_MINGW
+ #include <sys/types.h>
+#endif
+
 #if JUCE_ANDROID
  #include <atomic>
  #include <byteswap.h>
@@ -116,6 +120,7 @@
 #undef min
 #undef major
 #undef minor
+#undef KeyPress
 
 //==============================================================================
 // DLL building settings on Windows

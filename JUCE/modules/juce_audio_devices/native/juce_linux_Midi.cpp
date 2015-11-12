@@ -471,7 +471,7 @@ private:
     snd_midi_event_t* midiParser;
     int maxEventSize;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiOutputDevice);
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiOutputDevice)
 };
 
 } // namespace
@@ -497,7 +497,7 @@ MidiOutput* MidiOutput::openDevice (int deviceIndex)
 
     if (port.isValid())
     {
-        newDevice = new MidiOutput();
+        newDevice = new MidiOutput (devices [deviceIndex]);
         newDevice->internal = new MidiOutputDevice (newDevice, port);
     }
 
@@ -512,7 +512,7 @@ MidiOutput* MidiOutput::createNewDevice (const String& deviceName)
 
     if (port.isValid())
     {
-        newDevice = new MidiOutput();
+        newDevice = new MidiOutput (deviceName);
         newDevice->internal = new MidiOutputDevice (newDevice, port);
     }
 

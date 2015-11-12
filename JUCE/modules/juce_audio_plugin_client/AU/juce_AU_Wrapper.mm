@@ -64,8 +64,8 @@
     juce website for more info on how to get them:
     http://www.juce.com/forum/topic/aus-xcode
 */
-#include "AUMIDIEffectBase.h"
-#include "MusicDeviceBase.h"
+#include "CoreAudioUtilityClasses/AUMIDIEffectBase.h"
+#include "CoreAudioUtilityClasses/MusicDeviceBase.h"
 #undef Point
 #undef Component
 
@@ -84,7 +84,7 @@
 #if BUILD_AU_CARBON_UI
  #undef Button
  #define Point CarbonDummyPointName
- #include "AUCarbonViewBase.h"
+ #include "CoreAudioUtilityClasses/AUCarbonViewBase.h"
  #undef Point
 #endif
 
@@ -504,6 +504,45 @@ public:
         return numChannelConfigs;
     }
 
+    UInt32 GetAudioChannelLayout (AudioUnitScope scope, AudioUnitElement element,
+                                  AudioChannelLayout* outLayoutPtr, Boolean& outWritable) override
+    {
+        // fallback to old code if this plug-in does not have multi channel IO
+        if (! hasMultiChannelConfiguration())
+            return 0;
+
+        if (element == 0 && (scope == kAudioUnitScope_Output || scope == kAudioUnitScope_Input))
+        {
+            outWritable = false;
+
+            const int numChannels = (scope == kAudioUnitScope_Output) ? findNumOutputChannels()
+                                                                      : findNumInputChannels();
+
+            const size_t sizeInBytes = (sizeof (AudioChannelLayout) - sizeof (AudioChannelDescription)) +
+                                       (static_cast<size_t> (numChannels) * sizeof (AudioChannelDescription));
+
+            if (outLayoutPtr != nullptr)
+            {
+                zeromem (outLayoutPtr, sizeInBytes);
+
+                outLayoutPtr->mChannelLayoutTag = kAudioChannelLayoutTag_UseChannelDescriptions;
+                outLayoutPtr->mNumberChannelDescriptions = static_cast<UInt32> (numChannels);
+
+                for (int i = 0; i < numChannels; ++i)
+                {
+                    AudioChannelDescription& layoutDescr = outLayoutPtr->mChannelDescriptions [i];
+
+                    layoutDescr.mChannelLabel = kAudioChannelLabel_Unused;
+                    layoutDescr.mChannelFlags = kAudioChannelFlags_AllOff;
+                }
+            }
+
+            return static_cast<UInt32> (sizeInBytes);
+        }
+
+        return JuceAUBaseClass::GetAudioChannelLayout(scope, element, outLayoutPtr, outWritable);
+    }
+
     //==============================================================================
     ComponentResult GetParameterInfo (AudioUnitScope inScope,
                                       AudioUnitParameterID inParameterID,
@@ -519,6 +558,10 @@ public:
                                                 | kAudioUnitParameterFlag_IsReadable
                                                 | kAudioUnitParameterFlag_HasCFNameString
                                                 | kAudioUnitParameterFlag_ValuesHaveStrings);
+
+           #if JucePlugin_AUHighResolutionParameters
+            outParameterInfo.flags |= (UInt32) kAudioUnitParameterFlag_IsHighResolution;
+           #endif
 
             const String name (juceFilter->getParameterName (index));
 
@@ -575,7 +618,7 @@ public:
 
     // No idea what this method actually does or what it should return. Current Apple docs say nothing about it.
     // (Note that this isn't marked 'override' in case older versions of the SDK don't include it)
-    bool CanScheduleParameters() const                   { return false; }
+    bool CanScheduleParameters() const override          { return false; }
 
     //==============================================================================
     ComponentResult Version() override                   { return JucePlugin_VersionCode; }
@@ -679,22 +722,22 @@ public:
         AUEventListenerNotify (0, 0, &auEvent);
     }
 
-    void audioProcessorParameterChanged (AudioProcessor*, int index, float /*newValue*/)
+    void audioProcessorParameterChanged (AudioProcessor*, int index, float /*newValue*/) override
     {
         sendAUEvent (kAudioUnitEvent_ParameterValueChange, index);
     }
 
-    void audioProcessorParameterChangeGestureBegin (AudioProcessor*, int index)
+    void audioProcessorParameterChangeGestureBegin (AudioProcessor*, int index) override
     {
         sendAUEvent (kAudioUnitEvent_BeginParameterChangeGesture, index);
     }
 
-    void audioProcessorParameterChangeGestureEnd (AudioProcessor*, int index)
+    void audioProcessorParameterChangeGestureEnd (AudioProcessor*, int index) override
     {
         sendAUEvent (kAudioUnitEvent_EndParameterChangeGesture, index);
     }
 
-    void audioProcessorChanged (AudioProcessor*)
+    void audioProcessorChanged (AudioProcessor*) override
     {
         PropertyChanged (kAudioUnitProperty_Latency,       kAudioUnitScope_Global, 0);
         PropertyChanged (kAudioUnitProperty_ParameterList, kAudioUnitScope_Global, 0);
@@ -710,10 +753,8 @@ public:
         return ! IsInitialized();
     }
 
-    // (these two slightly different versions are because the definition changed between 10.4 and 10.5)
-    ComponentResult StartNote (MusicDeviceInstrumentID, MusicDeviceGroupID, NoteInstanceID&, UInt32, const MusicDeviceNoteParams&) { return noErr; }
-    ComponentResult StartNote (MusicDeviceInstrumentID, MusicDeviceGroupID, NoteInstanceID*, UInt32, const MusicDeviceNoteParams&) { return noErr; }
-    ComponentResult StopNote (MusicDeviceGroupID, NoteInstanceID, UInt32)   { return noErr; }
+    ComponentResult StartNote (MusicDeviceInstrumentID, MusicDeviceGroupID, NoteInstanceID*, UInt32, const MusicDeviceNoteParams&) override { return noErr; }
+    ComponentResult StopNote (MusicDeviceGroupID, NoteInstanceID, UInt32) override   { return noErr; }
 
     //==============================================================================
     ComponentResult Initialize() override
@@ -843,7 +884,7 @@ public:
 
             for (unsigned int i = 0; i < outBuffer.mNumberBuffers; ++i)
             {
-                AudioBuffer& buf = outBuffer.mBuffers[i];
+                ::AudioBuffer& buf = outBuffer.mBuffers[i];
 
                 if (buf.mNumberChannels == 1)
                 {
@@ -865,7 +906,7 @@ public:
 
             for (unsigned int i = 0; i < inBuffer.mNumberBuffers; ++i)
             {
-                const AudioBuffer& buf = inBuffer.mBuffers[i];
+                const ::AudioBuffer& buf = inBuffer.mBuffers[i];
 
                 if (buf.mNumberChannels == 1)
                 {
@@ -984,7 +1025,7 @@ public:
 
                 for (unsigned int i = 0; i < outBuffer.mNumberBuffers; ++i)
                 {
-                    AudioBuffer& buf = outBuffer.mBuffers[i];
+                    ::AudioBuffer& buf = outBuffer.mBuffers[i];
 
                     if (buf.mNumberChannels > 1)
                     {
@@ -1365,6 +1406,21 @@ private:
         SetAFactoryPresetAsCurrent (currentPreset);
     }
 
+    //==============================================================================
+    bool hasMultiChannelConfiguration () noexcept
+    {
+        for (int i = 0; i < numChannelConfigs; ++i)
+        {
+           #if !JucePlugin_IsSynth
+            if (channelConfigs[i][0] > 2)
+                return true;
+           #endif
+            if (channelConfigs[i][1] > 2)
+                return true;
+        }
+        return false;
+    }
+
     JUCE_DECLARE_NON_COPYABLE (JuceAU)
 };
 
@@ -1643,7 +1699,7 @@ JUCE_FACTORY_ENTRY   (JuceAU, JucePlugin_AUExportPrefix)
 #endif
 
 #if ! JUCE_DISABLE_AU_FACTORY_ENTRY
- #include "AUPlugInDispatch.cpp"
+ #include "CoreAudioUtilityClasses/AUPlugInDispatch.cpp"
 #endif
 
 #endif
