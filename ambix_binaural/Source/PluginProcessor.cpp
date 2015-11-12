@@ -71,6 +71,10 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
     ConvBufferSize = getBlockSize();
     SampleRate = getSampleRate();
     
+#if BINAURAL_DECODER
+    num_conv = 0;
+#endif
+    
 }
 
 Ambix_binauralAudioProcessor::~Ambix_binauralAudioProcessor()
