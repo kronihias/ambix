@@ -38,7 +38,8 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     sld_az_move (0),
     txt_az_move (0),
     txt_el_move (0),
-	sphere_opengl(0)
+	sphere_opengl(0),
+    changed_(true)
 {
     tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
     
@@ -195,6 +196,9 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     String str_id = "ID: ";
     str_id << ownerFilter->m_id;
     lbl_id->setText(str_id, dontSendNotification);
+    
+    timerCallback(); // get status from dsp
+    startTimer(45); // update display rate
 }
 
 Ambix_encoderAudioProcessorEditor::~Ambix_encoderAudioProcessorEditor()
@@ -234,7 +238,7 @@ void Ambix_encoderAudioProcessorEditor::paint (Graphics& g)
     //[UserPrePaint] Add your own custom painting code here..
     //[/UserPrePaint]
 
-    g.fillAll (Colours::white);
+    //g.fillAll (Colours::white);
     
     g.setGradientFill (ColourGradient (Colour (0xff4e4e4e),
                                        (float) (proportionOfWidth (0.6314f)), (float) (proportionOfHeight (0.5842f)),
@@ -368,68 +372,100 @@ void Ambix_encoderAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWa
     }
 }
 
+void Ambix_encoderAudioProcessorEditor::timerCallback()
+{
+    const ScopedTryLock myScopedTryLock (lock_);
+    
+    // try to lock -> avoid calling this method multiple times from outside
+    if (myScopedTryLock.isLocked())
+    {
+        
+        if (changed_)
+        {
+            changed_ = false;
+            
+            Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
+            
+            sld_az->setValue((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, dontSendNotification);
+            sld_el->setValue((ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, dontSendNotification);
+            sld_size->setValue(ourProcessor->getParameter(Ambix_encoderAudioProcessor::SizeParam), dontSendNotification);
+            
+            /*
+            // set for gui!
+#if INPUT_CHANNELS > 1
+            sphere_opengl->setSource((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, (ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, ourProcessor->getParameter(Ambix_encoderAudioProcessor::WidthParam));
+#else
+            sphere_opengl->setSource((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, (ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, 0.f);
+#endif
+            */
+            
+#if INPUT_CHANNELS > 1
+            sld_width->setValue(ourProcessor->getParameter(Ambix_encoderAudioProcessor::WidthParam)*360.f, dontSendNotification);
+#endif
+            
+            
+            sld_speed->setValue(ourProcessor->getParameter(Ambix_encoderAudioProcessor::SpeedParam)*360, dontSendNotification);
+            
+            String az_mv;
+            
+            float azimuth_mv_param = ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthMvParam);
+            float speed_param = ourProcessor->getParameter(Ambix_encoderAudioProcessor::SpeedParam);
+            
+            sld_az_move->setValue(azimuth_mv_param, dontSendNotification);
+            
+            
+            
+            if (azimuth_mv_param <= 0.48f)
+            {
+                az_mv << "-" << String((int)(pow(speed_param*360.f, (0.45f - azimuth_mv_param)*2.22222f)+0.5f)).substring(0, 5) << " deg/s"; // from 0->90deg/sec
+            } else if (azimuth_mv_param >= 0.52f) {
+                az_mv << String((int)(pow(speed_param*360.f, (azimuth_mv_param - 0.55f)*2.22222f) + 0.5f)).substring(0, 5) << " deg/s";
+            } else {
+                az_mv << "0 deg/s";
+            }
+            
+            txt_az_move->setText(az_mv);
+            
+            
+            String el_mv;
+            
+            float elevation_mv_param = ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationMvParam);
+            
+            sld_el_move->setValue(elevation_mv_param, dontSendNotification);
+            
+            
+            if (elevation_mv_param <= 0.48f)
+            {
+                el_mv << "-" << String((int)(pow(speed_param*360.f, (0.45f - elevation_mv_param)*2.22222f) + 0.5f)).substring(0, 4) << " deg/s"; // from 0->90deg/sec
+            } else if (elevation_mv_param >= 0.52f) {
+                el_mv << String((int)(pow(speed_param*360.f, (elevation_mv_param - 0.55f)*2.22222f) + 0.5f)).substring(0, 4) << " deg/s";
+            } else {
+                el_mv << "0 deg/s";
+            }
+            
+            
+            
+            txt_el_move->setText(el_mv);
+            
+            
+        }
+    }
+    
+}
 
 void Ambix_encoderAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
-    Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
+    changed_ = true;
     
-    sld_az->setValue((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, dontSendNotification);
-    sld_el->setValue((ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, dontSendNotification);
-    sld_size->setValue(ourProcessor->getParameter(Ambix_encoderAudioProcessor::SizeParam), dontSendNotification);
+    Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
     
     // set for gui!
 #if INPUT_CHANNELS > 1
     sphere_opengl->setSource((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, (ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, ourProcessor->getParameter(Ambix_encoderAudioProcessor::WidthParam));
 #else
-        sphere_opengl->setSource((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, (ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, 0.f);
+    sphere_opengl->setSource((ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthParam) - 0.5f) * 360.f, (ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, 0.f);
 #endif
     
-#if INPUT_CHANNELS > 1
-    sld_width->setValue(ourProcessor->getParameter(Ambix_encoderAudioProcessor::WidthParam)*360.f, dontSendNotification);
-#endif
-    
-    sld_speed->setValue(ourProcessor->getParameter(Ambix_encoderAudioProcessor::SpeedParam)*360, dontSendNotification);
-    
-    String az_mv;
-    
-    float azimuth_mv_param = ourProcessor->getParameter(Ambix_encoderAudioProcessor::AzimuthMvParam);
-    float speed_param = ourProcessor->getParameter(Ambix_encoderAudioProcessor::SpeedParam);
-    
-    sld_az_move->setValue(azimuth_mv_param, dontSendNotification);
-    
-    
-    
-    if (azimuth_mv_param <= 0.48f)
-    {
-        az_mv << "-" << String((int)(pow(speed_param*360.f, (0.45f - azimuth_mv_param)*2.22222f)+0.5f)).substring(0, 5) << " deg/s"; // from 0->90deg/sec
-    } else if (azimuth_mv_param >= 0.52f) {
-        az_mv << String((int)(pow(speed_param*360.f, (azimuth_mv_param - 0.55f)*2.22222f) + 0.5f)).substring(0, 5) << " deg/s";
-    } else {
-        az_mv << "0 deg/s";
-    }
-    
-    txt_az_move->setText(az_mv);
-    
-    
-    String el_mv;
-    
-    float elevation_mv_param = ourProcessor->getParameter(Ambix_encoderAudioProcessor::ElevationMvParam);
-    
-    sld_el_move->setValue(elevation_mv_param, dontSendNotification);
-    
-    
-    if (elevation_mv_param <= 0.48f)
-    {
-        el_mv << "-" << String((int)(pow(speed_param*360.f, (0.45f - elevation_mv_param)*2.22222f) + 0.5f)).substring(0, 4) << " deg/s"; // from 0->90deg/sec
-    } else if (elevation_mv_param >= 0.52f) {
-        el_mv << String((int)(pow(speed_param*360.f, (elevation_mv_param - 0.55f)*2.22222f) + 0.5f)).substring(0, 4) << " deg/s";
-    } else {
-        el_mv << "0 deg/s";
-    }
-    
-    
-    
-    txt_el_move->setText(el_mv);
 }
 
 

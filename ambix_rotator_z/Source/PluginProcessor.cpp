@@ -22,85 +22,67 @@
 
 #include "SphericalHarmonic/tools.h"
 
+
 #ifdef WITH_OSC
-void error(int num, const char *msg, const char *path)
+void Ambix_rotator_zAudioProcessor::oscMessageReceived (const OSCMessage& message)
 {
-	printf("liblo server error %d in path %s: %s\n", num, path, msg);
-	fflush(stdout);
-}
-
-int headpose_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                     void *data, void *user_data) // /head_pose [User_ID] [x] [y] [z] [pitch] [yaw] [roll]
-{
-	Ambix_rotator_zAudioProcessor *me = (Ambix_rotator_zAudioProcessor*)user_data;
-	
-	//me->setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::RotXParam, ((argv[6]->f)*(-1.f))/360.f+0.5f);
-	//me->setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::rotyParam, (argv[4]->f)/360.f+0.5f);
-	me->setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::RotZParam, ((argv[5]->f)*(-1.f))/360.f+0.5f);
-	
-	return 0;
-}
-
-int rotation_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                     void *data, void *user_data) // /rotation [pitch] [yaw] [roll]
-{
-	Ambix_rotator_zAudioProcessor *me = (Ambix_rotator_zAudioProcessor*)user_data;
-	
-	//me->setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::rotxParam, argv[2]->f/360.f+0.5f);
-	//me->setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::rotyParam, argv[0]->f/360.f+0.5f);
-	me->setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::RotZParam, argv[1]->f/360.f+0.5f);
-	
-	//lo_send(addr,"/rotation", "ffff", me->getParameter(rhox), me->getParameter(rhoy), me->getParameter(rhoz), me->getParameter(zoomx)); //test osc output
-	
-	return 0;
-}
-
-bool Ambix_rotator_zAudioProcessor::oscIn(bool arg)
-{
-	if (arg) {
-        if (!osc_in) {
-
-            st = lo_server_thread_new(osc_in_port.toUTF8(), error);
-			if (st != NULL)
-			{
-				lo_server_thread_add_method(st, "/rotation", "fff", rotation_handler, this);
-				lo_server_thread_add_method(st, "/head_pose", "fffffff", headpose_handler, this);
-
-				int res = lo_server_thread_start(st);
-				if (res == 0)
-				{
-					arg = true;
-					osc_in = true;
-					osc_error = "OSC: receiving on port ";
-					osc_error += osc_in_port;
-				}
-            } else {
-                osc_error = "OSC: ERROR port is not free";
-                //osc_error.formatted("OSC: ERROR %s", lo_address_errstr());
-                arg = false;
-                osc_in = false;
-            }
-        } else {
-            
-            oscIn(false);
-            oscIn(true);
-        }
-	} else { // turn off osc
-        if (osc_in)
+    
+    if (message.getAddressPattern() == OSCAddressPattern("/rotation")) {
+        // /rotation [pitch] [yaw] [roll]
+        float val=0.f;
+        
+        if (message[1].getType() == OSCTypes::float32)
         {
-			lo_server_thread_stop(st);
-
-#ifndef _WIN32
-            lo_server_thread_free(st); // this crashes in windows
-#endif
-            arg = false;
-            osc_in = false;
-            osc_error = "OSC: not receiving";
+            val = (float)message[1].getFloat32();
         }
-	}
-	return arg;
+        else if (message[1].getType() == OSCTypes::int32)
+        {
+            val = (float)message[1].getInt32();
+        }
+        
+        setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::RotZParam, jlimit(0.f, 1.f, val/360.f+0.5f));
+        
+        
+    } else if (message.getAddressPattern() == OSCAddressPattern("/head_pose")) {
+        // /head_pose [User_ID] [x] [y] [z] [pitch] [yaw] [roll]
+        
+        float val=0.f;
+        
+        if (message[5].getType() == OSCTypes::float32)
+        {
+            val = (float)message[5].getFloat32();
+        }
+        else if (message[5].getType() == OSCTypes::int32)
+        {
+            val = (float)message[5].getInt32();
+        }
+        
+        setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::RotZParam, jlimit(0.f, 1.f, val/360.f+0.5f));
+    }
+    
+// debug the message
+#if 0
+    std::cout << "osc message received: " << message.getAddressPattern().toString() << " ";
+    
+    for (int i=0; i<message.size(); i++) {
+        
+        if (message[i].getType() == OSCTypes::float32)
+        {
+            std::cout << "[f] " << message[i].getFloat32() << " ";
+        }
+        else if (message[i].getType() == OSCTypes::int32)
+        {
+            std::cout << "[i] " << message[i].getInt32() << " ";
+        }
+        else if (message[i].getType() == OSCTypes::string)
+            std::cout << "[s] " << message[i].getString() << " ";
+    }
+    std::cout << std::endl;
+#endif
+    
 }
 #endif
+
 
 //==============================================================================
 Ambix_rotator_zAudioProcessor::Ambix_rotator_zAudioProcessor() :
@@ -120,19 +102,22 @@ Ambix_rotator_zAudioProcessor::Ambix_rotator_zAudioProcessor() :
     _sin_z.set(0, 0.f);
     
 #ifdef WITH_OSC
-    osc_in = false;
     osc_in_port ="7120";
-#ifndef _WIN32
-    oscIn(true); // deactivate osc for windows in the moment..
+    
+    // specify here on which UDP port number to receive incoming OSC messages
+    if (! connect (osc_in_port.getIntValue()))
+    {
+        std::cout << "Could not connect to port " << osc_in_port << std::endl;
+    } else {
+        OSCReceiver::addListener (this);
+    }
 #endif
-#endif
+
 }
 
 Ambix_rotator_zAudioProcessor::~Ambix_rotator_zAudioProcessor()
 {
-#ifdef WITH_OSC
-    oscIn(false);
-#endif
+    
 }
 
 //==============================================================================

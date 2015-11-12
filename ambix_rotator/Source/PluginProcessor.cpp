@@ -21,6 +21,85 @@
 #include "PluginEditor.h"
 #include "Ressources/t_design.h"
 
+#ifdef WITH_OSC
+void Ambix_rotatorAudioProcessor::oscMessageReceived (const OSCMessage& message)
+{
+    
+    if (message.getAddressPattern() == OSCAddressPattern("/rotation")) {
+        // /rotation [pitch] [yaw] [roll]
+        
+        float val[3];
+        
+        for (int i=0; i < jmin(3,message.size()); i++) {
+            
+            val[i] = 0.5f;
+            
+            // get the value wheter it is a int or float value
+            if (message[i].getType() == OSCTypes::float32)
+            {
+                val[i] = (float)message[i].getFloat32();
+            }
+            else if (message[i].getType() == OSCTypes::int32)
+            {
+                val[i] = (float)message[i].getInt32();
+            }
+            
+        }
+        
+        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::PitchParam, jlimit(0.f, 1.f, val[0]/360.f+0.5f));
+        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::YawParam, jlimit(0.f, 1.f, val[1]/360.f+0.5f));
+        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RollParam, jlimit(0.f, 1.f, val[2]/360.f+0.5f));
+        
+    } else if (message.getAddressPattern() == OSCAddressPattern("/head_pose")) {
+        // /head_pose [User_ID] [x] [y] [z] [pitch] [yaw] [roll]
+        
+        float val[7];
+        
+        for (int i=4; i < jmin(7,message.size()); i++) {
+            
+            val[i] = 0.5f;
+            
+            // get the value wheter it is a int or float value
+            if (message[i].getType() == OSCTypes::float32)
+            {
+                val[i] = (float)message[i].getFloat32();
+            }
+            else if (message[i].getType() == OSCTypes::int32)
+            {
+                val[i] = (float)message[i].getInt32();
+            }
+            
+        }
+        
+        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::PitchParam, jlimit(0.f, 1.f, val[4]/360.f+0.5f));
+        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::YawParam, jlimit(0.f, 1.f, val[5]/360.f+0.5f));
+        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RollParam, jlimit(0.f, 1.f, val[6]/360.f+0.5f));
+        
+    }
+    
+    // debug the message
+#if 0
+    std::cout << "osc message received: " << message.getAddressPattern().toString() << " ";
+    
+    for (int i=0; i<message.size(); i++) {
+        
+        if (message[i].getType() == OSCTypes::float32)
+        {
+            std::cout << "[f] " << message[i].getFloat32() << " ";
+        }
+        else if (message[i].getType() == OSCTypes::int32)
+        {
+            std::cout << "[i] " << message[i].getInt32() << " ";
+        }
+        else if (message[i].getType() == OSCTypes::string)
+            std::cout << "[s] " << message[i].getString() << " ";
+    }
+    std::cout << std::endl;
+#endif
+    
+}
+#endif
+
 //==============================================================================
 Ambix_rotatorAudioProcessor::Ambix_rotatorAudioProcessor() :
 yaw_param(0.5f),
@@ -37,6 +116,18 @@ output_buffer(AMBI_CHANNELS,256)
     // set transformation matrix to identity matrix
     Sh_transf = Eigen::MatrixXd::Identity(AMBI_CHANNELS, AMBI_CHANNELS);
     _Sh_transf = Eigen::MatrixXd::Identity(AMBI_CHANNELS, AMBI_CHANNELS);
+
+#ifdef WITH_OSC
+    osc_in_port ="7120";
+    
+    // specify here on which UDP port number to receive incoming OSC messages
+    if (! connect (osc_in_port.getIntValue()))
+    {
+        std::cout << "Could not connect to port " << osc_in_port << std::endl;
+    } else {
+        OSCReceiver::addListener (this);
+    }
+#endif
 }
 
 Ambix_rotatorAudioProcessor::~Ambix_rotatorAudioProcessor()
@@ -87,6 +178,7 @@ void Ambix_rotatorAudioProcessor::setParameter (int index, float newValue)
 		default:
             break;
 	}
+    sendChangeMessage();
 }
 
 const String Ambix_rotatorAudioProcessor::getParameterName (int index)
@@ -127,7 +219,7 @@ const String Ambix_rotatorAudioProcessor::getParameterText (int index)
             break;
             
         case RotOrderParam:
-            if (rot_order_param < 0.5f)
+            if (rot_order_param <= 0.5f)
                 text = "yaw-pitch-roll";
             else
                 text = "roll-pitch-yaw";
@@ -433,13 +525,13 @@ void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
 //==============================================================================
 bool Ambix_rotatorAudioProcessor::hasEditor() const
 {
-    return false; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 AudioProcessorEditor* Ambix_rotatorAudioProcessor::createEditor()
 {
-    //return new Ambix_rotatorAudioProcessorEditor (this);
-  return nullptr;
+    return new Ambix_rotatorAudioProcessorEditor (this);
+  //return nullptr;
 }
 
 //==============================================================================

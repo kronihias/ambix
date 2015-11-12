@@ -1,7 +1,3 @@
-IF(WITH_OSC)
-	SET( WITH_LIBLO TRUE )
-ENDIF(WITH_OSC)
-
 SET( WITH_EIGEN TRUE )
 SET( WITH_SphericalHarmonic TRUE )
 SET ( WITH_MyMeterDsp TRUE )
@@ -10,7 +6,5 @@ ADD_DEFINITIONS(-DINPUT_CHANNELS=1)
 
 # SET ( SPECIFIC_PROJECTNAME ambix_encoder )
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_encoder )
-
-SET(OSX_COPY_LIB liblo.7.dylib)
 
 INCLUDE(${SRC_DIR}/CMakeLists_subprojects.txt.inc)

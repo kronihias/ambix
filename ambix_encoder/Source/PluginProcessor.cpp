@@ -24,7 +24,8 @@
 //==============================================================================
 int Ambix_encoderAudioProcessor::s_ID = 0; // for counting id!
 
-Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor(): 
+Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
+                        myProperties(),
                         azimuth_param(0.5f),
                         elevation_param(0.5f),
                         size_param(0.f),
@@ -43,8 +44,8 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
                         elevation_mv_param(0.5f),
                         InputBuffer(INPUT_CHANNELS, 512),
                         rms(0.0f),
-                        dpk(0.0f),
-                        myProperties()
+                        dpk(0.0f)
+
 {
     // create encoders
     for (int i =0; i < INPUT_CHANNELS; i++) {
@@ -87,22 +88,21 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
     myProperties.setStorageParameters(prop_options);
     
 #if WITH_OSC
-    st = NULL; // prevent crash..
-    
+
     osc_in = false;
 	osc_out = false;
 	
-	osc_in_port = "7120";
+	osc_in_port = "0";
 	
 	osc_out_ip = myProperties.getUserSettings()->getValue("osc_out_ip", "localhost");
 	osc_out_port = myProperties.getUserSettings()->getValue("osc_out_port", "7130");
     
     osc_interval = myProperties.getUserSettings()->getIntValue("osc_out_interval", 50);
     
-    osc_error = "OSC: not receiving";
-    
     osc_out = myProperties.getUserSettings()->getBoolValue("osc_out", true);
     osc_in = myProperties.getUserSettings()->getBoolValue("osc_in", true);
+    
+    oscReceiver = new OSCReceiver;
     
     oscOut(osc_out);
     oscIn(osc_in);
@@ -146,16 +146,23 @@ void Ambix_encoderAudioProcessor::sendOSC() // send osc data
     
     if (osc_out)
     {
+        OSCMessage mymsg = OSCMessage("/ambi_enc");
+        mymsg.addInt32(m_id); // source id
+        mymsg.addString("test"); // name... currently unused
+        mymsg.addFloat32(2.0f); // distance... currently unused
+        mymsg.addFloat32(360.f*(azimuth_param-0.5f)); // azimuth -180....180°
+        mymsg.addFloat32(360.f*(elevation_param-0.5f)); // elevation -180....180°
+        mymsg.addFloat32(size_param); // size param 0.0 ... 1.0
+        mymsg.addFloat32(dpk); // digital peak value linear 0.0 ... 1.0 (=0dBFS)
+        mymsg.addFloat32(rms); // rms value linear 0.0 ... 1.0 (=0dBFS)
+        
         if(osc_in)
         {
-            for (int i = 0; i < addresses.size(); i++) {
-                lo_send(addresses.getReference(i),"/ambi_enc", "fsffffffi", (float)m_id, "test", 2.0f, 360.f*(azimuth_param-0.5f), 360.f*(elevation_param-0.5f), size_param, dpk, rms, osc_in_port.getIntValue());
-            }
-            
-        } else {
-            for (int i = 0; i < addresses.size(); i++) {
-                lo_send(addresses.getReference(i),"/ambi_enc", "fsffffff", (float)m_id, "test", 2.0f, 360.f*(azimuth_param-0.5f), 360.f*(elevation_param-0.5f), size_param, dpk, rms);
-            }
+            mymsg.addInt32(osc_in_port.getIntValue()); // osc receiver udp port
+        }
+        
+        for (int i = 0; i < oscSenders.size(); i++) {
+            oscSenders.getUnchecked(i)->send(mymsg);
         }
         
         _azimuth_param = azimuth_param; // change buffers
@@ -164,43 +171,56 @@ void Ambix_encoderAudioProcessor::sendOSC() // send osc data
         _rms = rms;
         _dpk = dpk;
     }
-}
-
-
-// /ambi_enc_set <id> <distance> <azimuth> <elevation> <size>
-int ambi_enc_set_handler(const char *path, const char *types, lo_arg **argv, int argc,
-                         void *data, void *user_data)
-{
-	Ambix_encoderAudioProcessor *me = (Ambix_encoderAudioProcessor*)user_data;
-	
-    me->setParameterNotifyingHost(Ambix_encoderAudioProcessor::AzimuthParam, (argv[2]->f+180.f)/360.f);
-    me->setParameterNotifyingHost(Ambix_encoderAudioProcessor::ElevationParam, (argv[3]->f+180.f)/360.f);
-	me->setParameterNotifyingHost(Ambix_encoderAudioProcessor::SizeParam, argv[4]->f);
     
-	return 0;
 }
 
-void error(int num, const char *msg, const char *path)
+
+// this is called if an OSC message is received
+void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
 {
-    std::cout << "liblo server error " << num << "in path " << path << ": " << msg << std::endl;
+    // /ambi_enc_set <id> <distance> <azimuth> <elevation> <size>
+    
+    // parse the message for int and float
+    float val[5];
+    
+    for (int i=0; i < jmin(5,message.size()); i++) {
+        
+        val[i] = 0.5f;
+        
+        // get the value wheter it is a int or float value
+        if (message[i].getType() == OSCTypes::float32)
+        {
+            val[i] = (float)message[i].getFloat32();
+        }
+        else if (message[i].getType() == OSCTypes::int32)
+        {
+            val[i] = (float)message[i].getInt32();
+        }
+        
+    }
+    
+    setParameterNotifyingHost(Ambix_encoderAudioProcessor::AzimuthParam, jlimit(0.f, 1.f, (val[2]+180.f)/360.f) );
+    setParameterNotifyingHost(Ambix_encoderAudioProcessor::ElevationParam, jlimit(0.f, 1.f, (val[3]+180.f)/360.f) );
+	setParameterNotifyingHost(Ambix_encoderAudioProcessor::SizeParam, jlimit(0.f, 1.f, val[4]));
+    
 }
 
-bool Ambix_encoderAudioProcessor::oscOut(bool arg)
+void Ambix_encoderAudioProcessor::oscOut(bool arg)
 {
 	if (osc_out) {
         stopTimer();
         
-        // free
-        for (int i=0; i < addresses.size(); i++) {
-            lo_address_free(addresses.getReference(i));
-            // free(addresses.getReference(i));
-            addresses.remove(i);
-        }
+        oscSenders.clear();
+        
         osc_out = false;
+        
     }
     
     if (arg)
     {
+        bool suc = false;
+        
+        // parse all ip/port configurations
         
         String tmp_out_ips = osc_out_ip.trim();
         String tmp_out_ports = osc_out_port.trim();
@@ -216,62 +236,74 @@ bool Ambix_encoderAudioProcessor::oscOut(bool arg)
             if (tmp_out_ports.length() > 0)
                 tmp_port = tmp_out_ports.upToFirstOccurrenceOf(";", false, false);
             
-            addresses.add((lo_address*) malloc(sizeof(lo_address)));
+            // create new sender
+            
+            if (tmp_ip.equalsIgnoreCase("localhost"))
+                tmp_ip = "127.0.0.1";
+            
+            oscSenders.add(new OSCSender());
+            suc = oscSenders.getLast()->connect(tmp_ip, tmp_port.getIntValue()) ? true : suc;
             
             
-            addresses.getReference(addresses.size()-1) = lo_address_new(tmp_ip.toUTF8(), tmp_port.toUTF8());
+            // std::cout << "add sender: " << tmp_ip << " " << tmp_port << " success: " << suc << std::endl;
             
-            
+            // trim
             tmp_out_ips = tmp_out_ips.fromFirstOccurrenceOf(";", false, false).trim();
             
             tmp_out_ports = tmp_out_ports.fromFirstOccurrenceOf(";", false, false).trim();
             
         }
         
-        osc_out = true;
+        if (suc)
+        {
+            osc_out = true;
+            startTimer(osc_interval); // osc send rate
+        }
         
-        startTimer(osc_interval); // osc send rate
         
 	}
     
-	return arg;
 }
 
-bool Ambix_encoderAudioProcessor::oscIn(bool arg)
+void Ambix_encoderAudioProcessor::oscIn(bool arg)
 {
 	if (arg) {
-        st = lo_server_thread_new(NULL, error); //choose port by itself (free port)
-		
-		lo_server_thread_add_method(st, "/ambi_enc_set", "fffff", ambi_enc_set_handler, this);
-		int res = lo_server_thread_start(st);
-		
-		if (res == 0)
-		{
-            osc_in_port = String(lo_server_thread_get_port(st));
-			arg = true;
-			osc_in = true;
-			osc_error = "OSC: receiving on port ";
-			osc_error += osc_in_port;
-		} else {
-			osc_error = "OSC: ERROR port is not free";
-			//osc_error.formatted("OSC: ERROR %s", lo_address_errstr());
-			arg = false;
-			osc_in = false;
-		}
+        
+        int port = 7200+m_id;
+        
+        
+        Random rand(Time::currentTimeMillis());
+        
+        int trials = 0;
+        
+        while (trials++ < 10)
+        {
+            // std::cout << "try to connect to port " << port << std::endl;
+
+            
+            if (oscReceiver->connect(port))
+            {
+                oscReceiver->addListener (this, "/ambi_enc_set");
+                
+                osc_in_port = String(port);
+                osc_in = true;
+                
+                break;
+            }
+            
+            port += rand.nextInt(999);
+            
+        }
+        
 	} else { // turn off osc
-		if (st != NULL)
-		{
-			lo_server_thread_stop(st);
-			#ifndef WIN32
-			lo_server_thread_free(st); // this crashes in windows
-			#endif
-		}
-        arg = false;
+        
         osc_in = false;
-        osc_error = "OSC: not receiving";
-        st = NULL;
+        
+        oscReceiver->removeListener(this);
+        
+        oscReceiver->disconnect();
+        
 	}
-	return arg;
 }
 
 void Ambix_encoderAudioProcessor::changeTimer(int time)

@@ -40,7 +40,8 @@
 class Ambix_encoderAudioProcessorEditor  : public AudioProcessorEditor,
                                            public SliderListener,
                                            public ChangeListener,
-                                           public ButtonListener
+                                           public ButtonListener,
+                                           public Timer
 {
 public:
     //==============================================================================
@@ -59,6 +60,8 @@ public:
     void changeListenerCallback (ChangeBroadcaster *source);
     
     void modifierKeysChanged (const ModifierKeys &modifiers );
+    
+    void timerCallback();
     
     // Binary resources:
     static const char* settings_png;
@@ -86,6 +89,10 @@ private:
     ScopedPointer<ImageButton> btn_settings;
   
     ScopedPointer<SphereOpenGL> sphere_opengl;
+    
+    bool changed_; // this is true if parameters have changed
+    
+    CriticalSection     lock_;              // lock critical section
     
     juce::Component::SafePointer<juce::DialogWindow> _settingsDialogWindow;
     

@@ -27,7 +27,12 @@
 //==============================================================================
 /**
 */
-class Ambix_rotatorAudioProcessor  : public AudioProcessor
+class Ambix_rotatorAudioProcessor  : public AudioProcessor,
+#ifdef WITH_OSC
+                                    private OSCReceiver,
+                                    private OSCReceiver::Listener<OSCReceiver::RealtimeCallback>,
+#endif
+                                    public ChangeBroadcaster
 {
 public:
     //==============================================================================
@@ -84,6 +89,14 @@ public:
     void getStateInformation (MemoryBlock& destData);
     void setStateInformation (const void* data, int sizeInBytes);
 
+#ifdef WITH_OSC
+    
+	String osc_in_port;
+    
+    // JUCE OSC
+    void oscMessageReceived (const OSCMessage& message);
+#endif
+    
 private:
     
     void calcParams();

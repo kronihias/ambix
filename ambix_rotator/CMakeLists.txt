@@ -1,6 +1,5 @@
-SET( WITH_EIGEN TRUE )
-SET( WITH_SphericalHarmonic TRUE )
-SET( WITH_T_DESIGN TRUE )
+ADD_SUBDIRECTORY ( ambix_rotator )
 
-
-INCLUDE(${SRC_DIR}/CMakeLists_subprojects.txt.inc)
+IF (BUILD_STANDALONE)
+	ADD_SUBDIRECTORY ( ambix_rotator_standalone )
+ENDIF (BUILD_STANDALONE)

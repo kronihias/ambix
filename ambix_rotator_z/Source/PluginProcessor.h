@@ -22,10 +22,6 @@
 
 #include "JuceHeader.h"
 
-#ifdef WITH_OSC
-#include "lo/lo.h"
-#endif
-
 // AMBISONICS ORDER IS DEFINED IN AppConfig.h!!!!!
 
 #define _2PI 6.2831853071795
@@ -34,6 +30,11 @@
 /**
 */
 class Ambix_rotator_zAudioProcessor  : public AudioProcessor
+#ifdef WITH_OSC
+                                       ,
+                                       private OSCReceiver,
+                                       private OSCReceiver::Listener<OSCReceiver::RealtimeCallback>
+#endif
 {
 public:
     //==============================================================================
@@ -88,16 +89,11 @@ public:
     void setStateInformation (const void* data, int sizeInBytes);
 
 #ifdef WITH_OSC
-    bool oscIn(bool arg);
-    
-    
-    lo_server_thread st;
-	lo_address addr;
-	
-	bool osc_in;
-	String osc_error;
-    
+
 	String osc_in_port;
+    
+    // JUCE OSC
+    void oscMessageReceived (const OSCMessage& message);
 #endif
     
 private:

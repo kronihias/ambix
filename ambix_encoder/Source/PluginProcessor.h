@@ -30,10 +30,6 @@
 
 #include "MyMeterDsp/MyMeterDsp.h"
 
-#if WITH_OSC
-    #include "lo/lo.h"
-#endif
-
 #define _2PI 6.2831853071795
 
 //==============================================================================
@@ -42,6 +38,7 @@
 class Ambix_encoderAudioProcessor  : public AudioProcessor,
 #if WITH_OSC
                                     public Timer,
+                                    private OSCReceiver::ListenerWithOSCAddress<OSCReceiver::RealtimeCallback>,
 #endif
                                     public ChangeBroadcaster
 {
@@ -124,10 +121,13 @@ public:
 #if WITH_OSC
     void timerCallback(); // call osc send in timer callback
     
+    // JUCE OSC
+    void oscMessageReceived (const OSCMessage& message);
+    
     void sendOSC(); // send osc data
     
-    bool oscOut(bool arg); // activate osc out
-    bool oscIn(bool arg); // activate osc in
+    void oscOut(bool arg); // activate osc out
+    void oscIn(bool arg); // activate osc in
     
     void changeTimer(int time);
     
@@ -136,12 +136,8 @@ public:
 	bool osc_out;
     int osc_interval;
     
-	String osc_error;
-    
 	String osc_in_port, osc_out_ip, osc_out_port;
     
-    lo_server_thread st;
-	Array<lo_address> addresses;
 #endif
     
     ApplicationProperties myProperties;
@@ -176,6 +172,13 @@ private:
     
     float rms; // rms of W channel
     float dpk; // peak value of W channel
+    
+#if WITH_OSC
+    ScopedPointer<OSCReceiver> oscReceiver;
+    
+    OwnedArray<OSCSender> oscSenders;
+    
+#endif
     /*
     void calcParams();
      
