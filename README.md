@@ -13,8 +13,7 @@ More information: http://www.juce.com
 
 > other libraries being used:
 > Eigen (MPL2, http://eigen.tuxfamily.org), 
-> FFTConvolver (GPL, http://github.com/HiFi-LoFi/FFTConvolver), 
-> liblo (LGPL, http://liblo.sourceforge.net),
+> FFTConvolver (GPL, http://github.com/HiFi-LoFi/FFTConvolver),
 > libsoxr (LGPL, http://soxr.sourceforge.net)
 
 this software package goes well together with the mcfx - multichannel cross plattform audio plug-in suite: http://www.matthiaskronlachner.com/?p=1910
@@ -60,12 +59,12 @@ prerequisites for building
 
 - cmake, working build environment
 - Steinberg VST 2.4 SDK
-- fftw3, liblo, Eigen 3
+- fftw3, Eigen 3
 - Standalone applications: ASIO SDK if you want ASIO under Windows
 
 Install LINUX dependencies (Debian, Ubuntu):
 --------------
-*$ sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libeigen3-dev liblo-dev freeglut3-dev libxmu-dev libxi-dev*
+*$ sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libeigen3-dev freeglut3-dev libxmu-dev libxi-dev*
 
 currently not as developer package available: http://soxr.sourceforge.net
 
@@ -74,13 +73,13 @@ optional: libfftw3-dev
 Install MacOSX dependencies (through MacPorts):
 --------------
 
-*$ sudo port install liblo eigen3-devel*
+*$ sudo port install eigen3-devel*
 
 optional: fftw-3-single
 
 Install Windows dependencies
 --------------
-*getting the dependencies for Windows is a little bit more tricky. you have to get liblo, pthreads, libsoxr and Eigen. liblo is not available as prebuilt version, therefore you have to build it by yourself*
+*getting the dependencies for Windows is a little bit more tricky. you have to get pthreads, libsoxr and Eigen.*
 
 
 howto build ambix yourself:
