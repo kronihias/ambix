@@ -229,19 +229,21 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
     // restrict the angles
     if (el > 90.f)
     {
-        el -= 180.f;
+        el = 180.f-el;
+        az += 180.f;
     }
     
     if (el < -90.f)
     {
-        el += 180.f;
+        el = 180.f+el;
+        az += 180.f;
     }
     
     if (az > 180.f)
-        az -= 180.f;
+        az -= 360.f;
     
     if (az < -180.f)
-        az += 180.f;
+        az += 360.f;
     
     // set the drag button
     btn_drag.getUnchecked(idx)->setBounds (degtoxpos(az)-8, degtoypos(el)-8, 16, 16);
