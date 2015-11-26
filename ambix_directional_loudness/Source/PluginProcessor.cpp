@@ -30,17 +30,17 @@ _param_changed(false),
 output_buffer(AMBI_CHANNELS,256)
 {
     // init parameters
-    shape.setConstant(0.f);
+    shape.setConstant(0.f); // circular
     
-    width.setConstant(0.f);
+    width.setConstant(0.1f); // +-18°
     
-    height.setConstant(0.f);
+    height.setConstant(0.1f); // +-18°
     
     gain.setConstant(0.5f); // 0 dB
     
-    window.setConstant(0.f);
+    window.setConstant(false); // off
     
-    transition.setConstant(0.f);
+    transition.setConstant(0.f); // not used yet
     
     center_sph.setConstant(0.5f); // 0 deg
     
@@ -98,7 +98,7 @@ float Ambix_directional_loudnessAudioProcessor::getParameter (int index)
             
             
         case 6:
-            return window(filter_id);
+            return window(filter_id) ? 1.f : 0.f;
             
             
         case 7:
@@ -110,6 +110,17 @@ float Ambix_directional_loudnessAudioProcessor::getParameter (int index)
     }
 }
 
+/*
+ Parameters:
+ ////////////
+ Azimuth
+ Elevation
+ Shape
+ Width
+ Height
+ Gain
+ Window
+*/
 void Ambix_directional_loudnessAudioProcessor::setParameter (int index, float newValue)
 {
     
@@ -130,7 +141,7 @@ void Ambix_directional_loudnessAudioProcessor::setParameter (int index, float ne
                 break;
                 
             case 2:
-                shape(filter_id) = newValue;
+                shape(filter_id) = (newValue <= 0.5f ? 0 : 1.f);
                 break;
                 
             case 3:
@@ -146,7 +157,7 @@ void Ambix_directional_loudnessAudioProcessor::setParameter (int index, float ne
                 break;
                 
             case 6:
-                window(filter_id) = newValue;
+                window(filter_id) = newValue > 0.5f ? true : false;
                 break;
                 
             case 7:
@@ -160,6 +171,7 @@ void Ambix_directional_loudnessAudioProcessor::setParameter (int index, float ne
         
     }
     
+    sendChangeMessage();
 }
 
 const String Ambix_directional_loudnessAudioProcessor::getParameterName (int index)
@@ -198,7 +210,7 @@ const String Ambix_directional_loudnessAudioProcessor::getParameterName (int ind
             break;
             
         case 6:
-            text = "window";
+            text = "solo";
             break;
             
         case 7:
@@ -258,10 +270,10 @@ const String Ambix_directional_loudnessAudioProcessor::getParameterText (int ind
             break;
             
         case 6:
-            if (window(filter_id) <= 0.5)
-                text = "no";
+            if (window(filter_id))
+                text = "on";
             else
-                text = "yes";
+                text = "off";
             break;
             
         case 7:
@@ -483,10 +495,19 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
         // scale the SH_matrix and save as Sh_matrix_mod
         Sh_matrix_mod = Sh_matrix;
         
+        bool one_filter_is_solo = false;
+        for (int k=0; k < NUM_FILTERS; k++)
+        {
+            one_filter_is_solo = one_filter_is_solo || window(k);
+        }
+        
         // iterate over all sample points
         for (int i=0; i < Sh_matrix_mod.rows(); i++)
         {
             double multipl = 1.f;
+            
+            if (one_filter_is_solo)
+                multipl = 0.f;
             
             // iterate over all filters
             for (int k=0; k < NUM_FILTERS; k++)
@@ -494,7 +515,23 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
                 Eigen::Vector2d Sph_coord_vec = Sph_coord.row(i);
                 Eigen::Vector2d _center_sph_vec = _center_sph.row(k);
                 
-                multipl *= (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), (window(k) > 0.5f), transition(k));
+                if (one_filter_is_solo)
+                {
+                    double newmult = (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), window(k), transition(k));
+                    
+                    if (window(k) && multipl == 0.f)
+                    {
+                        multipl = newmult;
+                    } else if (newmult != 0.f){
+                        // don't override other soloed filters...
+                        multipl *= newmult;
+                    }
+                    
+                } else {
+                    
+                    multipl *= (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), window(k), transition(k));
+                    
+                }
             }
             
             Sh_matrix_mod.row(i) *= multipl;
@@ -553,13 +590,13 @@ void Ambix_directional_loudnessAudioProcessor::processBlock (AudioSampleBuffer& 
 //==============================================================================
 bool Ambix_directional_loudnessAudioProcessor::hasEditor() const
 {
-    return false; // (change this to false if you choose to not supply an editor)
+    return true; // (change this to false if you choose to not supply an editor)
 }
 
 AudioProcessorEditor* Ambix_directional_loudnessAudioProcessor::createEditor()
 {
-    //return new Ambix_directional_loudnessAudioProcessorEditor (this);
-    return nullptr;
+    return new Ambix_directional_loudnessAudioProcessorEditor (this);
+    // return nullptr;
 }
 
 //==============================================================================

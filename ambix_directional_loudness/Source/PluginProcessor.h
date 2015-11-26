@@ -28,6 +28,7 @@
 
 
 typedef Eigen::Array<float, NUM_FILTERS, 1> ArrayParam;
+typedef Eigen::Array<bool, NUM_FILTERS, 1> ArrayBoolParam;
 typedef Eigen::Array<double, NUM_FILTERS, 2> SphCoordParam;
 typedef Eigen::Array<double, NUM_FILTERS, 3> CarthCoordParam;
 
@@ -65,7 +66,6 @@ inline float ParamToRMS(float param)
         rms = 10.f; // +20 dB
     }
     
-    
     return rms;
 }
 
@@ -75,10 +75,49 @@ inline float ParamToDB(float param)
     return rmstodb(ParamToRMS(param));
 }
 
+
+inline float DbToParam(float db)
+{
+    if (db <= -99.f) {
+        return 0.f;
+    }
+    else if (db <= 0.f)
+    {
+        return sqrt(dbtorms(db))*0.5f;
+    }
+    else// if (db > 0.f)
+    {
+        // return    0.5f+sqrt(dbtorms(db)-1.f);
+        
+        return sqrt((dbtorms(db) - 1.f) / 9.f)*0.5f+0.5f;
+    }
+}
+
+inline float ParamToDeg360(float param)
+{
+    return (param-0.5f)*360.f;
+}
+
+inline float Deg360ToParam(float deg)
+{
+    return (deg+180.f)*(1.f/360.f);
+}
+
+inline float ParamToDeg180(float param)
+{
+    return param*180.f;
+}
+
+inline float Deg180ToParam(float deg)
+{
+    return deg*(1.f/180.f);
+}
+
 //==============================================================================
 /**
 */
-class Ambix_directional_loudnessAudioProcessor  : public AudioProcessor
+class Ambix_directional_loudnessAudioProcessor  : public AudioProcessor,
+                                                  public ChangeBroadcaster
 {
 public:
     //==============================================================================
@@ -126,7 +165,18 @@ public:
     //==============================================================================
     void getStateInformation (MemoryBlock& destData);
     void setStateInformation (const void* data, int sizeInBytes);
-
+    
+    enum Parameters
+	{
+        AzimuthParam,
+        ElevationParam,
+        ShapeParam,
+        WidthParam,
+        HeightParam,
+        GainParam,
+        WindowParam
+	};
+    
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
@@ -138,7 +188,7 @@ private:
     ArrayParam width;
     ArrayParam height;
     ArrayParam gain;
-    ArrayParam window;
+    ArrayBoolParam window;
     ArrayParam transition;
     
     SphCoordParam center_sph;
