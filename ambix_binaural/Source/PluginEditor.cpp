@@ -363,13 +363,27 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
         }
         
         // add item to submenu
-        popup_submenu.getLast()->addItem(i+1, ourProcessor->_presetFiles.getUnchecked(i).getFileNameWithoutExtension());
+        // check if this preset is loaded
+        
+        if (ourProcessor->_configFile == ourProcessor->_presetFiles.getUnchecked(i))
+        {
+            popup_submenu.getLast()->addItem(i+1, ourProcessor->_presetFiles.getUnchecked(i).getFileNameWithoutExtension(), true, true);
+        } else {
+            popup_submenu.getLast()->addItem(i+1, ourProcessor->_presetFiles.getUnchecked(i).getFileNameWithoutExtension());
+        }
+        
         
     }
     
     // add all subdirs to main menu
     for (int i=0; i < popup_submenu.size(); i++) {
-        popup_presets.addSubMenu(Subdirs.getReference(i), *popup_submenu.getUnchecked(i));
+        if (Subdirs.getReference(i) == ourProcessor->_configFile.getParentDirectory().getFileName())
+        {
+            popup_presets.addSubMenu(Subdirs.getReference(i), *popup_submenu.getUnchecked(i), true, nullptr, true);
+        } else {
+            popup_presets.addSubMenu(Subdirs.getReference(i), *popup_submenu.getUnchecked(i));
+        }
+        
     }
     
     popup_presets.addItem(-1, String("open from file..."));
@@ -408,7 +422,7 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
     {
         demoComponent->stopTimer();
         ourProcessor->LoadPreset(result - 1);
-        
+        // popup_presets
     }
     
 }
@@ -547,6 +561,7 @@ void Ambix_binauralAudioProcessorEditor::changeListenerCallback (ChangeBroadcast
 {
     UpdateText();
     DrawMeters();
+    UpdatePresets();
     repaint();
     startTimer(100);
 }

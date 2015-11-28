@@ -126,11 +126,12 @@ public:
 
     bool _load_ir; // normally false, true if you don't want to load new impulse resonses (for fast decoder matrix switching)
     
+    File _configFile;
+    
 private:
     
     AudioSampleBuffer ambi_spk_buffer_;
     
-    File _configFile;
     
 #if BINAURAL_DECODER
     bool loadIr(AudioSampleBuffer* IRBuffer, const File& audioFile, double &samplerate, float gain=1.f, int offset=0, int length=0);
