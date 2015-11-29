@@ -29,6 +29,68 @@
     #include "ConvolverData.h"
 #endif
 
+
+#define LOGTEN 2.302585092994
+
+inline float rmstodb(float rms)
+{
+    return (float) (20.f/LOGTEN * logf(rms));
+}
+
+inline float dbtorms(float db)
+{
+    return expf((float) (LOGTEN * 0.05f) * db);
+}
+
+// scale parameter for host between 0.0 and 1.0 to -inf dB ... +20dB
+inline float ParamToRMS(float param)
+{
+    float rms = 0.f;
+    
+    if (param < 0.f )
+    {
+        rms = 0.f;
+    }
+    else if ((param >= 0.f) && (param <= 0.5f))
+    {
+        rms = (param * 2) * (param * 2); // normalize and square
+    }
+    else if ((param > 0.5f) && (param < 1.f))
+    {
+        rms = ((param - 0.5f) / 0.5f) * ((param - 0.5f) / 0.5f) * 9.f + 1.f;
+    }
+    else if (param >= 1.f)
+    {
+        rms = 10.f; // +20 dB
+    }
+    
+    return rms;
+}
+
+// scale parameter for host between 0.0 and 1.0
+inline float ParamToDB(float param)
+{
+    return rmstodb(ParamToRMS(param));
+}
+
+
+inline float DbToParam(float db)
+{
+    if (db <= -99.f) {
+        return 0.f;
+    }
+    else if (db <= 0.f)
+    {
+        return sqrt(dbtorms(db))*0.5f;
+    }
+    else// if (db > 0.f)
+    {
+        // return    0.5f+sqrt(dbtorms(db)-1.f);
+        
+        return sqrt((dbtorms(db) - 1.f) / 9.f)*0.5f+0.5f;
+    }
+}
+
 //==============================================================================
 /**
 */
@@ -149,6 +211,7 @@ private:
     
     bool isProcessing;
     
+    float _gain; // output gain
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_binauralAudioProcessor)

@@ -155,6 +155,16 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     btn_preset_folder->setColour (TextButton::buttonColourId, Colours::white);
     btn_preset_folder->setColour (TextButton::buttonOnColourId, Colours::blue);
     
+    addAndMakeVisible (sld_gain = new Slider ("new slider"));
+    sld_gain->setTooltip (TRANS("Output Volume"));
+    sld_gain->setRange (-99, 20, 0.1);
+    sld_gain->setSliderStyle (Slider::LinearVertical);
+    sld_gain->setTextBoxStyle (Slider::TextBoxBelow, false, 45, 20);
+    sld_gain->setColour (Slider::thumbColourId, Colours::white);
+    sld_gain->addListener (this);
+    sld_gain->setSkewFactor (1.6f);
+    sld_gain->setDoubleClickReturnValue(true, 0.f);
+    
 #if BINAURAL_DECODER
     addAndMakeVisible (tgl_load_irs = new ToggleButton ("new toggle button"));
     tgl_load_irs->setTooltip (TRANS("load impulse responses if new preset being loaded - deactivate if IRs already loaded - for fast decoder matrix switching"));
@@ -180,6 +190,8 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     txt_preset->setText(ownerFilter->box_preset_str);
     txt_preset->setCaretPosition(txt_preset->getTotalNumChars()-1);
     txt_preset->setTooltip(txt_preset->getText());
+    
+    sld_gain->setValue(ParamToDB(ownerFilter->getParameter(0)), dontSendNotification);
     
     startTimer (100);
     
@@ -211,6 +223,7 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
     num_spk = nullptr;
     num_hrtf = nullptr;
     btn_preset_folder = nullptr;
+    sld_gain = nullptr;
     
 #if BINAURAL_DECODER
     tgl_load_irs = nullptr;
@@ -239,8 +252,14 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
 
     g.setColour (Colour (0x410000ff));
     g.fillRoundedRectangle (18.0f, 100.0f, 222.0f, 76.0f, 10.0000f);
-
+    
     g.setColour (Colours::white);
+
+    g.setFont (Font (12.40f, Font::plain));
+    g.drawText (TRANS("Volume [dB]"),
+                351, 276, 65, 23,
+                Justification::centred, true);
+    
     g.setFont (Font (17.2000f, Font::bold));
 #if BINAURAL_DECODER
     g.drawText ("AMBIX-BINAURAL-DECODER",
@@ -262,9 +281,6 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
               Justification::centred, true);
 #endif
 
-
-    
-    
 }
 
 void Ambix_binauralAudioProcessorEditor::resized()
@@ -281,6 +297,7 @@ void Ambix_binauralAudioProcessorEditor::resized()
     num_spk->setBounds (192, 128, 40, 24);
     num_hrtf->setBounds (192, 152, 40, 24);
     btn_preset_folder->setBounds (248, 96, 94, 24);
+    sld_gain->setBounds (351, 18, 48, 254);
 #if BINAURAL_DECODER
     tgl_load_irs->setBounds (260, 125, 80, 24);
     box_conv_buffer->setBounds (271, 155, 65, 22);
@@ -441,6 +458,16 @@ void Ambix_binauralAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxThat
 #endif
 }
 
+void Ambix_binauralAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWasMoved)
+{
+    Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
+    
+    if (sliderThatWasMoved == sld_gain)
+    {
+        ourProcessor->setParameterNotifyingHost(0, DbToParam(sld_gain->getValue()));
+    }
+}
+
 void Ambix_binauralAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
@@ -502,6 +529,7 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
     
     if (_meters.size() != ourProcessor->_AmbiSpeakers.size()) {
         
+        int xoffset = 15;
         
         // clear meters first?
         _meters.clear();
@@ -511,13 +539,13 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
         _scales.add(new MyMeterScale());
         addChildComponent(_scales.getLast());
         _scales.getLast()->setVisible(true);
-        _scales.getLast()->setBounds(370, 53, 20, 170);
+        _scales.getLast()->setBounds(xoffset+370, 53, 20, 170);
         
         
         for (int i=0; i < ourProcessor->_AmbiSpeakers.size(); i++) {
             _meters.add(new MyMeter());
             addChildComponent(_meters.getLast());
-            _meters.getLast()->setBounds(394 + 15*i, 60, 8, 163);
+            _meters.getLast()->setBounds(xoffset+394 + 15*i, 60, 8, 163);
             _meters.getLast()->setVisible(true);
             if (Label* const LABEL = new Label ("new label", String (i+1)))
             {
@@ -527,16 +555,16 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
                 _labels.getUnchecked(i)->setFont (Font (11.0000f, Font::plain));
                 _labels.getUnchecked(i)->setColour (Label::textColourId, Colours::white);
                 _labels.getUnchecked(i)->setJustificationType (Justification::centred);
-                _labels.getUnchecked(i)->setBounds(385 + 15*i, 222, 25, 14);
+                _labels.getUnchecked(i)->setBounds(xoffset+385 + 15*i, 222, 25, 14);
             }
         }
         
-        _width = _meters.size() * 15 + 80;
+        _width = _meters.size() * 15 + 85;
         
         _scales.add(new MyMeterScale());
         addChildComponent(_scales.getLast());
         _scales.getLast()->setVisible(true);
-        _scales.getLast()->setBounds(350 + _width - 40, 53, 20, 170);
+        _scales.getLast()->setBounds(xoffset+350 + _width - 40, 53, 20, 170);
             
         
     }
@@ -559,6 +587,10 @@ void Ambix_binauralAudioProcessorEditor::UpdateMeters()
 
 void Ambix_binauralAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
+    Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
+    
+    sld_gain->setValue(ParamToDB(ourProcessor->getParameter(0)), dontSendNotification);
+    
     UpdateText();
     DrawMeters();
     UpdatePresets();

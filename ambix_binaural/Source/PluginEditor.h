@@ -40,7 +40,8 @@ class Ambix_binauralAudioProcessorEditor  : public AudioProcessorEditor,
                                             public ButtonListener,
                                             public Timer,
                                             public ChangeListener,
-                                            public ComboBoxListener
+                                            public ComboBoxListener,
+                                            public SliderListener
 {
 public:
     //==============================================================================
@@ -58,6 +59,8 @@ public:
     void changeListenerCallback (ChangeBroadcaster *source);
     
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged);
+    
+    void sliderValueChanged (Slider* sliderThatWasMoved);
     
     static void menuItemChosenCallback (int result, Ambix_binauralAudioProcessorEditor* demoComponent);
     
@@ -93,6 +96,7 @@ private:
     ScopedPointer<Label> num_spk;
     ScopedPointer<Label> num_hrtf;
     ScopedPointer<TextButton> btn_preset_folder;
+    ScopedPointer<Slider> sld_gain;
     
 #if BINAURAL_DECODER
     ScopedPointer<ToggleButton> tgl_load_irs;

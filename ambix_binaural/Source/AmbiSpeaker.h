@@ -27,11 +27,13 @@
 class AmbiSpeaker
 {
 public:
-    AmbiSpeaker (double SampleRate, int BufSize);
+    AmbiSpeaker (double SampleRate, int BufSize, float gainfactor);
     ~AmbiSpeaker();
     
     void process(AudioSampleBuffer& InputBuffer, AudioSampleBuffer& OutputBuffer, int out_ch);
     void setDecoderRow(Array<float>& Row);
+    
+    void setGainFactor(float gainfactor);
     
     float getPeak();
     float getRMS();
@@ -39,7 +41,12 @@ public:
     // AudioSampleBuffer OutputBuffer; // holds the speaker output
     
 private:
-    Array<float> DecoderRow; // row of the decoder matrix belonging to this speaker
+    Array<float> DecoderRow_orig; // row of the decoder matrix belonging to this speaker (without gainfactor)
+    Array<float> DecoderRow; // includes gain factor
+    Array<float> DecoderRow_; // used for gain interpolation
+    
+    float gain;
+    bool newgainvalue; // this flag is true if new gain value arrived -> do interpolation
     
     MyMeterDsp _my_meter_dsp;
 

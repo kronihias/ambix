@@ -26,16 +26,6 @@
 
 #define LOGTEN 2.302585092994
 
-inline float rmstodb(float rms)
-{
-    return (float) (20.f/LOGTEN * logf(rms));
-}
-
-inline float dbtorms(float db)
-{
-    return expf((float) (LOGTEN * 0.05f) * db);
-}
-
 #ifdef _WINDOWS
 #include <windows.h>
 #else
@@ -50,7 +40,8 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
                                 box_preset_str("no preset loaded"),
                                 _load_ir(true),
                                 SampleRate(44100),
-                                isProcessing(false)
+                                isProcessing(false),
+                                _gain(0.5f)
 
 {
     presetDir = presetDir.getSpecialLocation(File::userApplicationDataDirectory).getChildFile("ambix/binaural_presets");
@@ -124,36 +115,60 @@ const String Ambix_binauralAudioProcessor::getName() const
 
 int Ambix_binauralAudioProcessor::getNumParameters()
 {
-    return 0;
+    return 1;
 }
 
 float Ambix_binauralAudioProcessor::getParameter (int index)
 {
-    return 0.0f;
+    return _gain;
 }
 
 void Ambix_binauralAudioProcessor::setParameter (int index, float newValue)
 {
+    _gain = jlimit(0.f, 1.f, newValue);
+    
+    int NumSpeakers = _AmbiSpeakers.size();
+    
+    for (int i=0; i < NumSpeakers; i++) {
+        _AmbiSpeakers.getUnchecked(i)->setGainFactor(ParamToRMS(_gain));
+    }
 }
 
 const String Ambix_binauralAudioProcessor::getParameterName (int index)
 {
-    return String::empty;
+    return String("OutGain");
 }
 
 const String Ambix_binauralAudioProcessor::getParameterText (int index)
 {
-    return String::empty;
+    String text;
+    text = String(ParamToDB(_gain)).substring(0, 5);
+    text << " dB";
+    return text;
 }
 
 const String Ambix_binauralAudioProcessor::getInputChannelName (int channelIndex) const
 {
-    return String (channelIndex + 1);
+    String text ("ACN ");
+    text << channelIndex;
+    return text;
 }
 
 const String Ambix_binauralAudioProcessor::getOutputChannelName (int channelIndex) const
 {
-    return String (channelIndex + 1);
+    String text;
+    if (BINAURAL_DECODER)
+    {
+        if (channelIndex == 0)
+            text << "LeftHeadphone";
+        else
+            text << "RightHeadphone";
+    } else {
+        text << "LS ";
+        text << channelIndex + 1;
+    }
+    
+    return text;
 }
 
 bool Ambix_binauralAudioProcessor::isInputChannelStereoPair (int index) const
@@ -826,7 +841,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     ///////////////////
                     // finally add speaker with decoder row
                     
-                    _AmbiSpeakers.add(new AmbiSpeaker(getSampleRate(), getBlockSize()));
+                    _AmbiSpeakers.add(new AmbiSpeaker(getSampleRate(), getBlockSize(), ParamToRMS(_gain) ));
                     _AmbiSpeakers.getLast()->setDecoderRow(DecoderRow);
                     
                     _AmbiChannels = jmax(_AmbiChannels, DecoderRow.size());
@@ -1016,6 +1031,7 @@ void Ambix_binauralAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("activePreset", activePreset);
     xml.setAttribute ("presetDir", presetDir.getFullPathName());
     xml.setAttribute("ConvBufferSize", (int)ConvBufferSize);
+    xml.setAttribute("Gain", _gain);
     
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
@@ -1041,6 +1057,8 @@ void Ambix_binauralAudioProcessor::setStateInformation (const void* data, int si
             newPresetDir = xmlState->getStringAttribute("presetDir", presetDir.getFullPathName());
             
             ConvBufferSize = xmlState->getIntAttribute("ConvBufferSize", ConvBufferSize);
+            
+            _gain = jlimit(0.f, 1.f, (float)xmlState->getDoubleAttribute("Gain", 0.5f));
         }
         
         if (activePreset.isNotEmpty()) {

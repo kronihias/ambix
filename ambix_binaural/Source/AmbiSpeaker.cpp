@@ -20,7 +20,7 @@
 #include "AmbiSpeaker.h"
 
 
-AmbiSpeaker::AmbiSpeaker(double SampleRate, int BufSize)
+AmbiSpeaker::AmbiSpeaker(double SampleRate, int BufSize, float gainfactor) : newgainvalue(false)
 {
     
     if (SampleRate <= 0.f)
@@ -28,6 +28,8 @@ AmbiSpeaker::AmbiSpeaker(double SampleRate, int BufSize)
     
     if (BufSize <= 0)
         BufSize = 256;
+    
+    gain = jlimit(0.f, 20.f, gainfactor);
     
     // init meter
     _my_meter_dsp.setAudioParams((int)SampleRate, (int)BufSize);
@@ -48,24 +50,45 @@ void AmbiSpeaker::process(AudioSampleBuffer& InputBuffer, AudioSampleBuffer& Out
     int NumSamples = InputBuffer.getNumSamples();
     int NumChannels = InputBuffer.getNumChannels();
 
-    /*
-    if (NumSamples > OutputBuffer.getNumSamples())
+    if (newgainvalue)
     {
-        OutputBuffer.setSize(1, NumSamples); //resize output buffer if necessary
-    }
-    */
-    
-    // add channels according decoder row
-    for (int i=0; i < std::min(DecoderRow.size(), NumChannels) ; i++) {
+        int n = DecoderRow.size();
+        for (int i = 0; i < n; i++) {
+            DecoderRow.set(i, DecoderRow_orig.getUnchecked(i) * gain);
+        }
         
-        if (DecoderRow[i] != 0.f) {
+        // add channels according decoder row with interpolation
+        for (int i=0; i < std::min(DecoderRow.size(), NumChannels) ; i++)
+        {
             
-            // add to output buffer with gainfactor from decoder row
-            OutputBuffer.addFrom(out_ch, 0, InputBuffer, i, 0, NumSamples, DecoderRow[i]);
+            if (DecoderRow[i] != 0.f) {
+                
+                OutputBuffer.addFromWithRamp(out_ch, 0, InputBuffer.getReadPointer(i), NumSamples, DecoderRow_[i], DecoderRow[i]);
+            }
+            
+        }
+        
+        newgainvalue = false;
+        
+    } else {
+        
+        // add channels according decoder row without interpolation
+        for (int i=0; i < std::min(DecoderRow.size(), NumChannels) ; i++)
+        {
+            
+            if (DecoderRow[i] != 0.f) {
+                
+                // add to output buffer with gainfactor from decoder row
+                OutputBuffer.addFrom(out_ch, 0, InputBuffer, i, 0, NumSamples, DecoderRow[i]);
+                
+            }
             
         }
         
     }
+    
+    
+    
     
     // compute and store peak value
     
@@ -78,21 +101,29 @@ void AmbiSpeaker::setDecoderRow(Array<float>& Row)
 {
     if (Row.size() > 0) {
         
-        DecoderRow = Row; // copy the array
+        // copy the array
+        DecoderRow_orig = Row;
+        DecoderRow = Row;
         
-        /*
-        std::cout << "decoder row: ";
-        
-        for (int i=0; i< DecoderRow.size(); i++) {
-            
-            std::cout << DecoderRow[i] << " ";
+        int n = DecoderRow_orig.size();
+        for (int i = 0; i < n; i++) {
+            DecoderRow.set(i, DecoderRow_orig.getUnchecked(i) * gain);
             
         }
-        std::cout << std::endl;
-         */
+        DecoderRow_ = DecoderRow;
+    }
+}
+
+void AmbiSpeaker::setGainFactor(float gainfactor)
+{
+    // save the old values first
+    int n = DecoderRow_.size();
+    for (int i = 0; i < n; i++) {
+        DecoderRow_.set(i, DecoderRow_orig.getUnchecked(i) * gain);
     }
     
-    
+    gain = gainfactor;
+    newgainvalue = true;
 }
 
 float AmbiSpeaker::getPeak()
