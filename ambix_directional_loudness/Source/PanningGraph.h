@@ -98,7 +98,8 @@ private:
 
 class PanningGraph    :  public Component,
 public SettableTooltipClient,
-public ButtonListener
+public ButtonListener,
+public ChangeBroadcaster
 {
     friend class GraphComponent;
 public:
@@ -120,6 +121,8 @@ public:
     void mouseDrag	(const MouseEvent &event);
     void mouseWheelMove (const MouseEvent &event, const MouseWheelDetails &wheel);
     
+    int getCurrentId();
+    
     // Binary resources:
     static const char* drag_off_png;
     static const int drag_off_pngSize;
@@ -140,6 +143,8 @@ private:
     
     OwnedArray<ImageButton> btn_drag;
     
+    OwnedArray<Label> lbl_drag;
+    
     OwnedArray<GraphComponent> graphs_;
     
     float lxmargin; // space for y labels
@@ -155,7 +160,7 @@ private:
     
     TooltipWindow tooltipWindow;
     
-    int mouse_near_filter_id;
+    int mouse_near_filter_id; // the filter currently used for ui
     float mouse_down_width;
     float mouse_down_height;
     

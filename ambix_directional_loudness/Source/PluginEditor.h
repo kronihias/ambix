@@ -24,6 +24,7 @@
 #include "JuceHeader.h"
 #include "PluginProcessor.h"
 #include "PanningGraph.h"
+#include "FilterTab.h"
 //[/Headers]
 
 
@@ -37,11 +38,8 @@
                                                                     //[/Comments]
 */
 class Ambix_directional_loudnessAudioProcessorEditor  : public AudioProcessorEditor,
-                                                        public ButtonListener,
-                                                        public SliderListener,
-                                                        public ComboBoxListener,
                                                         public ChangeListener,
-                                                        public Timer
+                                                        public ButtonListener
 {
 public:
     //==============================================================================
@@ -54,14 +52,13 @@ public:
 
     void paint (Graphics& g);
     void resized();
-    void buttonClicked (Button* buttonThatWasClicked);
-    void sliderValueChanged (Slider* sliderThatWasMoved);
-    void comboBoxChanged (ComboBox* comboBoxThatHasChanged);
-
-    void timerCallback();
     
     void changeListenerCallback (ChangeBroadcaster *source);
     
+    void buttonClicked (Button* buttonThatWasClicked);
+
+    void selectFilterTab(int id);
+
     // Binary resources:
     static const char* solo_symbol_png;
     static const int solo_symbol_pngSize;
@@ -69,14 +66,7 @@ public:
     static const int solo_symbol_over_pngSize;
     static const char* solo_symbol_act_png;
     static const int solo_symbol_act_pngSize;
-    static const char* drag_off_png;
-    static const int drag_off_pngSize;
-    static const char* drag_over_png;
-    static const int drag_over_pngSize;
-    static const char* drag_on_png;
-    static const int drag_on_pngSize;
-
-
+    
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     //[/UserVariables]
@@ -84,22 +74,15 @@ private:
     //==============================================================================
     ScopedPointer<Label> lbl_gd;
     ScopedPointer<Component> filtergraph;
-    ScopedPointer<Slider> sld_az_1;
-    ScopedPointer<Slider> sld_el_1;
-    ScopedPointer<ComboBox> box_shape_1;
-    ScopedPointer<Slider> sld_w_1;
-    ScopedPointer<Slider> sld_h_1;
-    ScopedPointer<ImageButton> btn_solo_1;
-    ScopedPointer<Slider> sld_gain_1;
-    ScopedPointer<Slider> sld_az_2;
-    ScopedPointer<Slider> sld_el_2;
-    ScopedPointer<ComboBox> box_shape_2;
-    ScopedPointer<Slider> sld_w_2;
-    ScopedPointer<Slider> sld_h_2;
-    ScopedPointer<ImageButton> btn_solo_2;
-    ScopedPointer<Slider> sld_gain_2;
+    
+    ScopedPointer<TabbedComponent> tabbedComponent;
+    ScopedPointer<TabbedComponent> tabbedComponent2;
+    
+    OwnedArray<FilterTab> _filtertabs;
     
     ScopedPointer<PanningGraph> panninggraph;
+    
+    ScopedPointer<ImageButton> btn_solo_reset;
     
     TooltipWindow tooltipWindow;
     
@@ -112,7 +95,5 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_directional_loudnessAudioProcessorEditor)
 };
 
-//[EndFile] You can add extra defines here...
-//[/EndFile]
 
 #endif   // __JUCE_HEADER_CDA58EC13A3FDFE9__

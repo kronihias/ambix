@@ -202,6 +202,33 @@ Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioP
     sld_gain_2->setColour (Slider::rotarySliderOutlineColourId, Colours::aqua);
     sld_gain_2->addListener (this);
 
+    addAndMakeVisible (tabbedComponent = new TabbedComponent (TabbedButtonBar::TabsAtTop));
+    tabbedComponent->setTabBarDepth (30);
+    tabbedComponent->addTab (TRANS("Tab 0"), Colour (0xff7d0000), 0, false);
+    tabbedComponent->setCurrentTabIndex (0);
+
+    addAndMakeVisible (tabbedComponent2 = new TabbedComponent (TabbedButtonBar::TabsAtTop));
+    tabbedComponent2->setTabBarDepth (30);
+    tabbedComponent2->addTab (TRANS("Tab 0"), Colour (0xff7d0000), 0, false);
+    tabbedComponent2->setCurrentTabIndex (0);
+
+    addAndMakeVisible (lbl_drag = new Label ("new label",
+                                             TRANS("1")));
+    lbl_drag->setFont (Font (15.00f, Font::plain));
+    lbl_drag->setJustificationType (Justification::centred);
+    lbl_drag->setEditable (false, false, false);
+    lbl_drag->setColour (Label::textColourId, Colours::white);
+    lbl_drag->setColour (TextEditor::textColourId, Colours::black);
+    lbl_drag->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+
+    addAndMakeVisible (btn_solo_reset = new ImageButton ("new button"));
+    btn_solo_reset->setTooltip (TRANS("Reset all solos"));
+    btn_solo_reset->addListener (this);
+
+    btn_solo_reset->setImages (false, true, true,
+                               ImageCache::getFromMemory (solo_symbol_png, solo_symbol_pngSize), 1.000f, Colour (0x00000000),
+                               ImageCache::getFromMemory (solo_symbol_over_png, solo_symbol_over_pngSize), 1.000f, Colour (0x00000000),
+                               ImageCache::getFromMemory (solo_symbol_act_png, solo_symbol_act_pngSize), 1.000f, Colour (0x00000000));
 
     //[UserPreSize]
     //[/UserPreSize]
@@ -235,6 +262,10 @@ Ambix_directional_loudnessAudioProcessorEditor::~Ambix_directional_loudnessAudio
     sld_h_2 = nullptr;
     btn_solo_2 = nullptr;
     sld_gain_2 = nullptr;
+    tabbedComponent = nullptr;
+    tabbedComponent2 = nullptr;
+    lbl_drag = nullptr;
+    btn_solo_reset = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -339,6 +370,9 @@ void Ambix_directional_loudnessAudioProcessorEditor::paint (Graphics& g)
                 524, 276, 30, 23,
                 Justification::centredLeft, true);
 
+    g.setColour (Colour (0xff2f2866));
+    g.fillRoundedRectangle (0.0f, 0.0f, 234.0f, 110.0f, 10.000f);
+
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
 }
@@ -365,6 +399,10 @@ void Ambix_directional_loudnessAudioProcessorEditor::resized()
     sld_h_2->setBounds (494, 360, 84, 22);
     btn_solo_2->setBounds (557, 279, 20, 20);
     sld_gain_2->setBounds (441, 278, 76, 22);
+    tabbedComponent->setBounds (20, 253, 282, 140);
+    tabbedComponent2->setBounds (322, 253, 282, 140);
+    lbl_drag->setBounds (230, 182, 26, 23);
+    btn_solo_reset->setBounds (597, 254, 20, 20);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -388,6 +426,11 @@ void Ambix_directional_loudnessAudioProcessorEditor::buttonClicked (Button* butt
     {
         //[UserButtonCode_btn_solo_2] -- add your button handler code here..
         //[/UserButtonCode_btn_solo_2]
+    }
+    else if (buttonThatWasClicked == btn_solo_reset)
+    {
+        //[UserButtonCode_btn_solo_reset] -- add your button handler code here..
+        //[/UserButtonCode_btn_solo_reset]
     }
 
     //[UserbuttonClicked_Post]
@@ -527,6 +570,7 @@ BEGIN_JUCER_METADATA
           fontname="Default font" fontsize="15" bold="0" italic="0" justification="33"/>
     <TEXT pos="524 276 30 23" fill="solid: ffffffff" hasStroke="0" text="[dB]"
           fontname="Default font" fontsize="15" bold="0" italic="0" justification="33"/>
+    <ROUNDRECT pos="0 0 234 110" cornerSize="10" fill="solid: ff2f2866" hasStroke="0"/>
   </BACKGROUND>
   <LABEL name="new label" id="b45e45d811b90270" memberName="lbl_gd" virtualName=""
          explicitFocusOrder="0" pos="0 0 204 16" textCol="ff7fffd4" edTextCol="ff000000"
@@ -624,6 +668,30 @@ BEGIN_JUCER_METADATA
           rotaryslideroutline="ff00ffff" min="-18" max="18" int="0.10000000000000000555"
           style="Rotary" textBoxPos="TextBoxRight" textBoxEditable="1"
           textBoxWidth="45" textBoxHeight="18" skewFactor="1"/>
+  <TABBEDCOMPONENT name="new tabbed component" id="2710a64906f39372" memberName="tabbedComponent"
+                   virtualName="" explicitFocusOrder="0" pos="20 253 282 140" orientation="top"
+                   tabBarDepth="30" initialTab="0">
+    <TAB name="Tab 0" colour="ff7d0000" useJucerComp="0" contentClassName=""
+         constructorParams="" jucerComponentFile=""/>
+  </TABBEDCOMPONENT>
+  <TABBEDCOMPONENT name="new tabbed component" id="2c3bf016a431a90f" memberName="tabbedComponent2"
+                   virtualName="" explicitFocusOrder="0" pos="322 253 282 140" orientation="top"
+                   tabBarDepth="30" initialTab="0">
+    <TAB name="Tab 0" colour="ff7d0000" useJucerComp="0" contentClassName=""
+         constructorParams="" jucerComponentFile=""/>
+  </TABBEDCOMPONENT>
+  <LABEL name="new label" id="1838d88f72a345e5" memberName="lbl_drag"
+         virtualName="" explicitFocusOrder="0" pos="230 182 26 23" textCol="ffffffff"
+         edTextCol="ff000000" edBkgCol="0" labelText="1" editableSingleClick="0"
+         editableDoubleClick="0" focusDiscardsChanges="0" fontname="Default font"
+         fontsize="15" bold="0" italic="0" justification="36"/>
+  <IMAGEBUTTON name="new button" id="a96b833c1358f969" memberName="btn_solo_reset"
+               virtualName="" explicitFocusOrder="0" pos="597 254 20 20" tooltip="Reset all solos"
+               buttonText="new button" connectedEdges="0" needsCallback="1"
+               radioGroupId="0" keepProportions="1" resourceNormal="solo_symbol_png"
+               opacityNormal="1" colourNormal="0" resourceOver="solo_symbol_over_png"
+               opacityOver="1" colourOver="0" resourceDown="solo_symbol_act_png"
+               opacityDown="1" colourDown="0"/>
 </JUCER_COMPONENT>
 
 END_JUCER_METADATA

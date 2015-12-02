@@ -28,7 +28,7 @@
 #endif
 
 #ifndef NUM_FILTERS
-    #define NUM_FILTERS 2 // number of directional filters that can be controlled
+    #define NUM_FILTERS 8 // number of directional filters that can be controlled
 #endif
 
 

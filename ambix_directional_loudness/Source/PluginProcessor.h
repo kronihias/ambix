@@ -177,6 +177,9 @@ public:
         WindowParam
 	};
     
+    int filter_sel_id_1;
+    int filter_sel_id_2;
+    
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:

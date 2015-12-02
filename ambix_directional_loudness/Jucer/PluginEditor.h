@@ -92,6 +92,10 @@ private:
     ScopedPointer<Slider> sld_h_2;
     ScopedPointer<ImageButton> btn_solo_2;
     ScopedPointer<Slider> sld_gain_2;
+    ScopedPointer<TabbedComponent> tabbedComponent;
+    ScopedPointer<TabbedComponent> tabbedComponent2;
+    ScopedPointer<Label> lbl_drag;
+    ScopedPointer<ImageButton> btn_solo_reset;
 
 
     //==============================================================================
