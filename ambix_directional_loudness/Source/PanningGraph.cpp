@@ -44,7 +44,6 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
     {
         btn_drag.add(new ImageButton (String(i)));
         
-        addAndMakeVisible(btn_drag.getLast());
         btn_drag.getLast()->addListener(this);
         btn_drag.getLast()->setImages (false, true, true,
                                        ImageCache::getFromMemory (drag_off_png, drag_off_pngSize), 1.000f, Colour (0x00000000),
@@ -67,8 +66,14 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
         lbl_drag.getLast()->setColour (Label::textColourId, Colours::white);
         lbl_drag.getLast()->setColour (TextEditor::textColourId, Colours::black);
         lbl_drag.getLast()->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
-        addAndMakeVisible(lbl_drag.getLast());
         
+    }
+    
+    // add to the parent component in reverse order...
+    for (int i=NUM_FILTERS-1; i >= 0; i--)
+    {
+        addAndMakeVisible(btn_drag.getUnchecked(i));
+        addAndMakeVisible(lbl_drag.getUnchecked(i));
     }
     
 }
@@ -270,7 +275,6 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
         filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
         
         // check if area goes beyond +-180
-        // wrapping about the poles is not done yet!
         if (az+width > 180)
         {
             int x = degtoxpos(az-360);

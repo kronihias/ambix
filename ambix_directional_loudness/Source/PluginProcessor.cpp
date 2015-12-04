@@ -521,18 +521,15 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
                 {
                     double newmult = (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), window(k), transition(k));
                     
-                    if (window(k) && multipl == 0.f)
+                    if (window(k) && newmult > -1.f)
                     {
-                        multipl = newmult;
-                    } else if (newmult != 0.f){
-                        // don't override other soloed filters...
-                        multipl *= newmult;
+                        if (multipl == 0.f)
+                            multipl = newmult;
+                        else
+                            multipl *= newmult;
                     }
-                    
                 } else {
-                    
                     multipl *= (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), window(k), transition(k));
-                    
                 }
             }
             
