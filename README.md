@@ -145,6 +145,13 @@ http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_st
 
 changelog
 -----------
+* v0.2.5 (2015-12-06) liblo dependencies removed
+encoder: improved gui performance
+decoder: fixed binaural swap l-r impulse responses bug, added volume control, indicate loaded preset in menu
+directional_loudness: gui and different solo/window behavior (multiple filters are now passed through if soloed), 8 filters by default
+rotator: gui, osc rewrite
+vmic: gui, 8 outputs by default
+
 * v0.2.4 (2015-07-19) improved efficiency for binaural decoder
 
 * v0.2.3 (2014-12-27) multichannel encoder display actual source positions, compatibility with audiomulch for saving settings

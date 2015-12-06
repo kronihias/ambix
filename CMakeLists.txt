@@ -15,8 +15,8 @@ SET(AMBI_ORDER 5 CACHE STRING "Ambisonic Order")
 SET(WITH_ADVANCED_CONTROL TRUE CACHE BOOL "movement speed automation control for encoders")
 SET(WITH_OSC TRUE CACHE BOOL "build in OSC functionallity")
 SET(NUM_OUTPUTS_DECODER 48 CACHE STRING "output channels for decoder")
-SET(NUM_FILTERS 2 CACHE STRING "number of directional filters that can be controlled for directional_loudness")
-SET(NUM_FILTERS_VMIC 4 CACHE STRING "number of directional filters (==outputs) for vmic")
+SET(NUM_FILTERS 8 CACHE STRING "number of directional filters that can be controlled for directional_loudness")
+SET(NUM_FILTERS_VMIC 8 CACHE STRING "number of directional filters (==outputs) for vmic")
 SET(BUILD_STANDALONE TRUE CACHE BOOL "build standalone application (for those with editor)")
 
 SET(BUILD_VST TRUE CACHE BOOL "build VST plugins")
@@ -47,6 +47,9 @@ ENDIF(BUILD_STANDALONE)
 # preprocessor flags
 
 ADD_DEFINITIONS(-DAMBI_ORDER=${AMBI_ORDER})
+
+# standalone filter 1 to avoid warning
+ADD_DEFINITIONS(-DJUCE_STANDALONE_APPLICATION=1)
 
 # boolean need to be treated special
 IF(WITH_ADVANCED_CONTROL)
