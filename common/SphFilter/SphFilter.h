@@ -20,6 +20,9 @@
 #ifndef __ambix_directional_loudness__SphFilter__
 #define __ambix_directional_loudness__SphFilter__
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include <iostream>
 #include <Eigen/Eigen>
 
