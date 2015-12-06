@@ -28,7 +28,7 @@
 #endif
 
 #ifndef NUM_FILTERS_VMIC
-    #define NUM_FILTERS_VMIC 4 // number of directional filters that can be controlled
+    #define NUM_FILTERS_VMIC 8 // number of directional filters that can be controlled
 #endif
 
 

@@ -22,25 +22,25 @@
 
 #include "Ressources/t_design.h"
 
-const float _180_PI = 180.f/(float)M_PI;
+
 //==============================================================================
 Ambix_vmicAudioProcessor::Ambix_vmicAudioProcessor() :
 _initialized(false),
 _param_changed(false),
 output_buffer(AMBI_CHANNELS,256)
 {
-   // init parameters
-    shape.setConstant(0.f);
+    // init parameters
+    shape.setConstant(0.f); // circular
     
-    width.setConstant(0.f);
+    width.setConstant(0.1f); // +-18°
     
-    height.setConstant(0.f);
+    height.setConstant(0.1f); // +-18°
     
     gain.setConstant(0.5f); // 0 dB
     
-    window.setConstant(0.f);
+    window.setConstant(0.f); // not used
     
-    transition.setConstant(0.f);
+    transition.setConstant(0.f); // not used yet
     
     center_sph.setConstant(0.5f); // 0 deg
     
@@ -159,7 +159,7 @@ void Ambix_vmicAudioProcessor::setParameter (int index, float newValue)
         }
         
     }
-    
+    sendChangeMessage();
 }
 
 const String Ambix_vmicAudioProcessor::getParameterName (int index)
@@ -479,12 +479,15 @@ void Ambix_vmicAudioProcessor::calcParams()
             // iterate over all sample points
             for (int i=0; i < Sh_matrix_temp.rows(); i++)
             {
-                double multipl = 1.f;
                 
                 Eigen::Vector2d Sph_coord_vec = Sph_coord.row(i);
                 Eigen::Vector2d _center_sph_vec = _center_sph.row(k);
                 
-                multipl *= sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)floor(shape(k)+0.5f), _width(k), _height(k), 1, true, transition(k)); // apply gain later
+                
+                double multipl = sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)floor(shape(k)+0.5f), _width(k), _height(k), 1, true, transition(k));
+                
+                if (multipl < 0.f) // -1.f in case of outside region
+                    multipl = 0.f;
                 
                 Sh_matrix_temp.row(i) *= multipl;
             }
@@ -560,13 +563,12 @@ void Ambix_vmicAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
 //==============================================================================
 bool Ambix_vmicAudioProcessor::hasEditor() const
 {
-    return false; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 AudioProcessorEditor* Ambix_vmicAudioProcessor::createEditor()
 {
-    //return new Ambix_vmicAudioProcessorEditor (this);
-    return nullptr;
+    return new Ambix_vmicAudioProcessorEditor (this);
 }
 
 //==============================================================================
