@@ -190,7 +190,7 @@ private:
                      AudioSampleBuffer *inbuf,
                      AudioSampleBuffer *outbuf );
     
-    void SetBufsize ( int bufsize );
+    void SetBufsize ( int bufsize, int blocksize );
     
     bool AddFilter ( int in,
                      int out,

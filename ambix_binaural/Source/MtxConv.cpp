@@ -258,7 +258,7 @@ bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsiz
     // set the actual buffersize and compute correct offsets!
     for (int i=0; i < numpartitions_; i++) {
         MtxConvSlave *partition = partitions_.getUnchecked(i);
-        partition->SetBufsize(bufsize_);
+        partition->SetBufsize(bufsize_, blocksize_);
     }
     
     
@@ -397,7 +397,7 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
     return true;
 }
 
-void MtxConvSlave::SetBufsize(int bufsize)
+void MtxConvSlave::SetBufsize(int bufsize, int blocksize)
 {
     bufsize_ = bufsize;
 
@@ -405,30 +405,9 @@ void MtxConvSlave::SetBufsize(int bufsize)
     std::cout << "Slave::SETBUFSIZE: " << bufsize_ << "offset_: " << offset_ << std::endl;
 #endif
     
-    //inoffset_ = bufsize_ - partitionsize_ - offset_ + 1; // this works!!
+    inoffset_ = bufsize_ - partitionsize_ + 1; // offset due to overlap/save
     
-    inoffset_ = bufsize_ - partitionsize_ + 1;
-    
-    outoffset_ = 0;
-    
-    // outoffset_ = partitionsize_ - 512;
-    
-    
-    // outoffset_ = bufsize_ - 512;
-    
-    // outoffset_ = 0;
-    // outoffset_ = partitionsize_ - 512;
-    // outoffset_ = partitionsize_;
-    // outoffset_ = bufsize_ - partitionsize_;
-    
-    // inoffset_ = bufsize_ - 512; // this does not work!
-    
-    // should the offset be included here?! -> yes!
-    
-    // inoffset_ = bufsize_ - partitionsize_; // overlap save -> should it be +1? YES!
-    
-    // if (inoffset_ > bufsize_)
-    //    inoffset_ -= bufsize_;
+    outoffset_ = offset_ - partitionsize_ + blocksize;
 }
 
 
@@ -889,58 +868,51 @@ void MtxConvSlave::ReadOutput(int numsamples)
     std::cout << "ReadOutput, outnodeoffset_: " << outnodeoffset_ << " outoffset_: " << outoffset_ << std::endl;
 #endif
     
-    if (outnodeoffset_ < partitionsize_) // new data is available
+    
+    //int smplstowrite_end = partitionsize_; // write to the end
+    int smplstowrite_end = numsamples; // write to the end
+    int smplstowrite_start = 0; // write to the start
+    
+    if (smplstowrite_end + outoffset_ >= bufsize_)
     {
-            
-        //int smplstowrite_end = partitionsize_; // write to the end
-        int smplstowrite_end = numsamples; // write to the end
-        int smplstowrite_start = 0; // write to the start
+        smplstowrite_end = bufsize_ - outoffset_;
+        // smplstowrite_start = partitionsize_ - smplstowrite_end;
+        smplstowrite_start = numsamples - smplstowrite_end;
+    }
+    
+    // std::cout << "outoffset: " << outoffset_ << " end: " << smplstowrite_end << " start: " << smplstowrite_start << " pingpong: " << (int)pingpong_ << std::endl;
+    
+    
+    int numouts = outnodes_.size();
+    
+    // std::cout << "numoutnodes: " << numouts << std::endl;
+    
+    for (int i=0; i < numouts; i++) {
         
-        if (smplstowrite_end + outoffset_ >= bufsize_)
-        {
-            smplstowrite_end = bufsize_ - outoffset_;
-            // smplstowrite_start = partitionsize_ - smplstowrite_end;
-            smplstowrite_start = numsamples - smplstowrite_end;
-        }
+        OutNode *outnode = outnodes_.getUnchecked(i);
         
-        // std::cout << "outoffset: " << outoffset_ << " end: " << smplstowrite_end << " start: " << smplstowrite_start << " pingpong: " << (int)pingpong_ << std::endl;
-        
-        
-        int numouts = outnodes_.size();
-        
-        // std::cout << "numoutnodes: " << numouts << std::endl;
-        
-        for (int i=0; i < numouts; i++) {
-            
-            OutNode *outnode = outnodes_.getUnchecked(i);
-            
-            if (smplstowrite_end)
-                outbuf_->addFrom(outnode->out_, outoffset_, outnode->outbuf_, (int)pingpong_, outnodeoffset_, smplstowrite_end);
-            
-            if (smplstowrite_start)
-                outbuf_->addFrom(outnode->out_, 0, outnode->outbuf_, (int)pingpong_, outnodeoffset_+smplstowrite_end, smplstowrite_start);
-            
-            
-        }
-        
-        // std::cout << "outbuf ch1 rms: " << outbuf_->getRMSLevel(0, 0, bufsize_) << "outbuf ch2 rms: " << outbuf_->getRMSLevel(1, 0, bufsize_) << std::endl;
-        
+        if (smplstowrite_end)
+            outbuf_->addFrom(outnode->out_, outoffset_, outnode->outbuf_, (int)pingpong_, outnodeoffset_, smplstowrite_end);
         
         if (smplstowrite_start)
-            outoffset_ = smplstowrite_start;
-        else
-            outoffset_ += smplstowrite_end;
+            outbuf_->addFrom(outnode->out_, 0, outnode->outbuf_, (int)pingpong_, outnodeoffset_+smplstowrite_end, smplstowrite_start);
         
-        if (outoffset_ >= bufsize_)
-            outoffset_ -= bufsize_;
         
-        outnodeoffset_ += numsamples;
     }
-    else // no new data -> add nothing but continue counting..
-    {
-        outnodeoffset_ += numsamples;
-        outoffset_ += numsamples;
-    }
+    
+    // std::cout << "outbuf ch1 rms: " << outbuf_->getRMSLevel(0, 0, bufsize_) << "outbuf ch2 rms: " << outbuf_->getRMSLevel(1, 0, bufsize_) << std::endl;
+    
+    
+    if (smplstowrite_start)
+        outoffset_ = smplstowrite_start;
+    else
+        outoffset_ += smplstowrite_end;
+    
+    if (outoffset_ >= bufsize_)
+        outoffset_ -= bufsize_;
+    
+    outnodeoffset_ += numsamples;
+    
     
     // reset is done in the processing methode
     // if (outnodeoffset_ >= partitionsize_)
