@@ -869,50 +869,60 @@ void MtxConvSlave::ReadOutput(int numsamples)
 #endif
     
     
-    //int smplstowrite_end = partitionsize_; // write to the end
-    int smplstowrite_end = numsamples; // write to the end
-    int smplstowrite_start = 0; // write to the start
-    
-    if (smplstowrite_end + outoffset_ >= bufsize_)
+    if (outnodeoffset_ < partitionsize_) // new data is available
     {
-        smplstowrite_end = bufsize_ - outoffset_;
-        // smplstowrite_start = partitionsize_ - smplstowrite_end;
-        smplstowrite_start = numsamples - smplstowrite_end;
-    }
-    
-    // std::cout << "outoffset: " << outoffset_ << " end: " << smplstowrite_end << " start: " << smplstowrite_start << " pingpong: " << (int)pingpong_ << std::endl;
-    
-    
-    int numouts = outnodes_.size();
-    
-    // std::cout << "numoutnodes: " << numouts << std::endl;
-    
-    for (int i=0; i < numouts; i++) {
         
-        OutNode *outnode = outnodes_.getUnchecked(i);
         
-        if (smplstowrite_end)
-            outbuf_->addFrom(outnode->out_, outoffset_, outnode->outbuf_, (int)pingpong_, outnodeoffset_, smplstowrite_end);
+        //int smplstowrite_end = partitionsize_; // write to the end
+        int smplstowrite_end = numsamples; // write to the end
+        int smplstowrite_start = 0; // write to the start
+        
+        if (smplstowrite_end + outoffset_ >= bufsize_)
+        {
+            smplstowrite_end = bufsize_ - outoffset_;
+            // smplstowrite_start = partitionsize_ - smplstowrite_end;
+            smplstowrite_start = numsamples - smplstowrite_end;
+        }
+        
+        // std::cout << "outoffset: " << outoffset_ << " end: " << smplstowrite_end << " start: " << smplstowrite_start << " pingpong: " << (int)pingpong_ << std::endl;
+        
+        
+        int numouts = outnodes_.size();
+        
+        // std::cout << "numoutnodes: " << numouts << std::endl;
+        
+        for (int i=0; i < numouts; i++) {
+            
+            OutNode *outnode = outnodes_.getUnchecked(i);
+            
+            if (smplstowrite_end)
+                outbuf_->addFrom(outnode->out_, outoffset_, outnode->outbuf_, (int)pingpong_, outnodeoffset_, smplstowrite_end);
+            
+            if (smplstowrite_start)
+                outbuf_->addFrom(outnode->out_, 0, outnode->outbuf_, (int)pingpong_, outnodeoffset_+smplstowrite_end, smplstowrite_start);
+            
+            
+        }
+        
+        // std::cout << "outbuf ch1 rms: " << outbuf_->getRMSLevel(0, 0, bufsize_) << "outbuf ch2 rms: " << outbuf_->getRMSLevel(1, 0, bufsize_) << std::endl;
+        
         
         if (smplstowrite_start)
-            outbuf_->addFrom(outnode->out_, 0, outnode->outbuf_, (int)pingpong_, outnodeoffset_+smplstowrite_end, smplstowrite_start);
+            outoffset_ = smplstowrite_start;
+        else
+            outoffset_ += smplstowrite_end;
         
+        if (outoffset_ >= bufsize_)
+            outoffset_ -= bufsize_;
         
+        outnodeoffset_ += numsamples;
     }
-    
-    // std::cout << "outbuf ch1 rms: " << outbuf_->getRMSLevel(0, 0, bufsize_) << "outbuf ch2 rms: " << outbuf_->getRMSLevel(1, 0, bufsize_) << std::endl;
-    
-    
-    if (smplstowrite_start)
-        outoffset_ = smplstowrite_start;
-    else
-        outoffset_ += smplstowrite_end;
-    
-    if (outoffset_ >= bufsize_)
-        outoffset_ -= bufsize_;
-    
-    outnodeoffset_ += numsamples;
-    
+    else // no new data -> add nothing but continue counting..
+    {
+        // this happens if a smaller buffer is sent -> eg. when looping in reaper -> prevents crash or clicks
+        outnodeoffset_ += numsamples;
+        outoffset_ += numsamples;
+    }
     
     // reset is done in the processing methode
     // if (outnodeoffset_ >= partitionsize_)
