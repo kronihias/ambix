@@ -331,7 +331,7 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
     
     box_conv_buffer->clear(dontSendNotification);
     
-    unsigned int buf = ourProcessor->getBufferSize();
+    unsigned int buf = jmax(ourProcessor->getBufferSize(), (unsigned int)1);
     unsigned int conv_buf = ourProcessor->getConvBufferSize();
     
     int sel = 0;
