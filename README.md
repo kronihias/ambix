@@ -13,8 +13,8 @@ More information: http://www.juce.com
 
 > other libraries being used:
 > Eigen (MPL2, http://eigen.tuxfamily.org), 
-> FFTConvolver (GPL, http://github.com/HiFi-LoFi/FFTConvolver),
 > libsoxr (LGPL, http://soxr.sourceforge.net)
+> fftw under Linux and Windows (GPL, http://www.fftw.org)
 
 this software package goes well together with the mcfx - multichannel cross plattform audio plug-in suite: http://www.matthiaskronlachner.com/?p=1910
 
@@ -64,22 +64,18 @@ prerequisites for building
 
 Install LINUX dependencies (Debian, Ubuntu):
 --------------
-*$ sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libeigen3-dev freeglut3-dev libxmu-dev libxi-dev*
+*$ sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libeigen3-dev freeglut3-dev libxmu-dev libxi-dev libsoxr-dev libfftw3-dev*
 
-currently not as developer package available: http://soxr.sourceforge.net
-
-optional: libfftw3-dev
 
 Install MacOSX dependencies (through MacPorts):
 --------------
 
-*$ sudo port install eigen3-devel*
+*$ sudo port install eigen3-devel soxr*
 
-optional: fftw-3-single
 
 Install Windows dependencies
 --------------
-*getting the dependencies for Windows is a little bit more tricky. you have to get pthreads, libsoxr and Eigen.*
+*getting the dependencies for Windows is a little bit more tricky. you have to get fftw3, libsoxr and Eigen.*
 
 
 howto build ambix yourself:
