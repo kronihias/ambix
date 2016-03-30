@@ -1060,15 +1060,15 @@ void Ambix_binauralAudioProcessor::setStateInformation (const void* data, int si
             
             _gain = jlimit(0.f, 1.f, (float)xmlState->getDoubleAttribute("Gain", 0.5f));
         }
-        
-        if (activePreset.isNotEmpty()) {
-            LoadPresetByName(activePreset);
-        }
-        
+      
         File tempDir(newPresetDir);
         if (tempDir.exists()) {
             presetDir = tempDir;
             SearchPresets(presetDir);
+        }
+      
+        if (activePreset.isNotEmpty()) {
+          LoadPresetByName(activePreset);
         }
     }
     
