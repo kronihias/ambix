@@ -106,6 +106,15 @@ void Ambix_vmicAudioProcessorEditor::paint (Graphics& g)
     g.fillAll (Colour (0xff1a1a1a));
 
     
+    /* Version text */
+    g.setColour (Colours::white);
+    g.setFont (Font (10.00f, Font::plain));
+    String version_string;
+    version_string << "v" << QUOTE(VERSION);
+    g.drawText (version_string,
+                getWidth()-51, getHeight()-11, 50, 10,
+                Justification::bottomRight, true);
+    
 }
 
 void Ambix_vmicAudioProcessorEditor::resized()

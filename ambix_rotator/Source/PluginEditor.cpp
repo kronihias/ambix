@@ -175,7 +175,16 @@ void Ambix_rotatorAudioProcessorEditor::paint (Graphics& g)
 
     g.setColour (Colour (0x93691d1d));
     g.fillRoundedRectangle (9.0f, 183.0f, 383.0f, 48.0f, 10.000f);
-
+    
+    /* Version text */
+    g.setColour (Colours::white);
+    g.setFont (Font (10.00f, Font::plain));
+    String version_string;
+    version_string << "v" << QUOTE(VERSION);
+    g.drawText (version_string,
+                getWidth()-51, getHeight()-11, 50, 10,
+                Justification::bottomRight, true);
+    
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
 }

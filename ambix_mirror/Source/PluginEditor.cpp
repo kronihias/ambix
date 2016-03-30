@@ -438,6 +438,16 @@ void Ambix_mirrorAudioProcessorEditor::paint (Graphics& g)
                        312, 5, 91, 89,
                        RectanglePlacement::centred | RectanglePlacement::onlyReduceInSize,
                        false);
+    
+    
+    /* Version text */
+    g.setColour (Colours::white);
+    g.setFont (Font (10.00f, Font::plain));
+    String version_string;
+    version_string << "v" << QUOTE(VERSION);
+    g.drawText (version_string,
+                getWidth()-51, getHeight()-11, 50, 10,
+                Justification::bottomRight, true);
 }
 
 void Ambix_mirrorAudioProcessorEditor::resized()
