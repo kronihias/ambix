@@ -24,8 +24,34 @@
 #include "PluginEditor.h"
 
 
-//[MiscUserDefs] You can add your own user definitions and misc code here...
-//[/MiscUserDefs]
+// Sliders are slightly longer than needed,
+// to account for overshooting (so we can easily wrap the values).
+// On my Debian/xfce4 system, the mouse-wheel increment is
+// about 11.3 (less than 12)
+#define SLIDER_MAX (180+12)
+
+namespace {
+    double sliderWrap (Slider* sld)
+    {
+        double v = sld->getValue();
+        double v0=v;
+        
+        if (sld->isMouseButtonDown())
+        {
+            v = jlimit(-180., 180., v);
+        } else {
+            // wrap out-of-bound values back into -180..+180 range
+            while(v < -180.) v += 360.;
+            while(v >  180.) v -= 360.;
+        }
+        
+        // avoid unneeded calls to setValue()
+        if (v0 != v) {
+            sld->setValue(v);
+        }
+        return v;
+    }
+}
 
 //==============================================================================
 Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rotatorAudioProcessor* ownerFilter)
@@ -37,13 +63,12 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible (sld_yaw = new Slider ("new slider"));
     sld_yaw->setTooltip (TRANS("yaw (left-right)"));
-    sld_yaw->setRange (-180, 180, 0.1);
+    sld_yaw->setRange (-SLIDER_MAX, SLIDER_MAX, 0.1);
     sld_yaw->setSliderStyle (Slider::LinearHorizontal);
     sld_yaw->setTextBoxStyle (Slider::TextBoxLeft, false, 60, 20);
     sld_yaw->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
     sld_yaw->addListener (this);
     sld_yaw->setDoubleClickReturnValue(true, 0.f);
-    sld_yaw->setScrollWheelEndless(true);
     
     addAndMakeVisible (label2 = new Label ("new label",
                                            TRANS("Yaw")));
@@ -65,13 +90,12 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible (sld_pitch = new Slider ("new slider"));
     sld_pitch->setTooltip (TRANS("pitch (up-down)"));
-    sld_pitch->setRange (-180, 180, 0.1);
+    sld_pitch->setRange (-SLIDER_MAX, SLIDER_MAX, 0.1);
     sld_pitch->setSliderStyle (Slider::LinearHorizontal);
     sld_pitch->setTextBoxStyle (Slider::TextBoxLeft, false, 60, 20);
     sld_pitch->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
     sld_pitch->addListener (this);
     sld_pitch->setDoubleClickReturnValue(true, 0.f);
-    sld_pitch->setScrollWheelEndless(true);
     
     addAndMakeVisible (label4 = new Label ("new label",
                                            TRANS("Roll")));
@@ -83,13 +107,12 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
     label4->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
 
     addAndMakeVisible (sld_roll = new Slider ("new slider"));
-    sld_roll->setRange (-180, 180, 0.1);
+    sld_roll->setRange (-SLIDER_MAX, SLIDER_MAX, 0.1);
     sld_roll->setSliderStyle (Slider::LinearHorizontal);
     sld_roll->setTextBoxStyle (Slider::TextBoxLeft, false, 60, 20);
     sld_roll->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
     sld_roll->addListener (this);
     sld_roll->setDoubleClickReturnValue(true, 0.f);
-    sld_roll->setScrollWheelEndless(true);
     
     addAndMakeVisible (label5 = new Label ("new label",
                                            TRANS("Rotation order:")));
@@ -245,15 +268,15 @@ void Ambix_rotatorAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWa
     
     if (sliderThatWasMoved == sld_yaw)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::YawParam, (sld_yaw->getValue()+180.f)/360.f);
+        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::YawParam, (sliderWrap(sld_yaw)+180.f)/360.f);
     }
     else if (sliderThatWasMoved == sld_pitch)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::PitchParam, (sld_pitch->getValue()+180.f)/360.f);
+        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::PitchParam, (sliderWrap(sld_pitch)+180.f)/360.f);
     }
     else if (sliderThatWasMoved == sld_roll)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RollParam, (sld_roll->getValue()+180.f)/360.f);
+        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RollParam, (sliderWrap(sld_roll)+180.f)/360.f);
     }
 
 }

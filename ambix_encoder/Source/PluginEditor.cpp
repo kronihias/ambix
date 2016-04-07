@@ -19,6 +19,34 @@
 
 #include "PluginEditor.h"
 
+// Sliders are slightly longer than needed,
+// to account for overshooting (so we can easily wrap the values).
+// On my Debian/xfce4 system, the mouse-wheel increment is
+// about 11.3 (less than 12)
+#define SLIDER_MAX (180+12)
+
+namespace {
+    double sliderWrap (Slider* sld)
+    {
+        double v = sld->getValue();
+        double v0=v;
+        
+        if (sld->isMouseButtonDown())
+        {
+            v = jlimit(-180., 180., v);
+        } else {
+            // wrap out-of-bound values back into -180..+180 range
+            while(v < -180.) v += 360.;
+            while(v >  180.) v -= 360.;
+        }
+        
+        // avoid unneeded calls to setValue()
+        if (v0 != v) {
+            sld->setValue(v);
+        }
+        return v;
+    }
+}
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
 #include "Graphics.h"
@@ -45,26 +73,24 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     
     addAndMakeVisible (sld_el = new Slider ("new slider"));
     sld_el->setTooltip ("elevation");
-    sld_el->setRange (-180, 180, 1);
+    sld_el->setRange (-SLIDER_MAX, SLIDER_MAX, 1);
     sld_el->setSliderStyle (Slider::LinearVertical);
     sld_el->setTextBoxStyle (Slider::TextBoxBelow, false, 41, 20);
     sld_el->setColour (Slider::thumbColourId, Colours::grey);
     sld_el->setColour (Slider::textBoxTextColourId, Colours::black);
     sld_el->setColour (Slider::textBoxBackgroundColourId, Colours::white);
     sld_el->addListener (this);
-    sld_el->setScrollWheelEndless(true); // added manually
     
     
     addAndMakeVisible (sld_az = new Slider ("new slider"));
     sld_az->setTooltip ("azimuth");
-    sld_az->setRange (-180, 180, 1);
+    sld_az->setRange (-SLIDER_MAX, SLIDER_MAX, 1);
     sld_az->setSliderStyle (Slider::LinearHorizontal);
     sld_az->setTextBoxStyle (Slider::TextBoxRight, false, 40, 20);
     sld_az->setColour (Slider::thumbColourId, Colours::grey);
     sld_az->setColour (Slider::textBoxTextColourId, Colours::black);
     sld_az->setColour (Slider::textBoxBackgroundColourId, Colours::white);
     sld_az->addListener (this);
-    sld_az->setScrollWheelEndless(true); // added manually
     
     addAndMakeVisible (sld_size = new Slider ("new slider"));
     sld_size->setTooltip ("higher order scaling - decrease spatial sharpness");
@@ -306,6 +332,16 @@ void Ambix_encoderAudioProcessorEditor::paint (Graphics& g)
                 59, 338, 81, 16,
                 Justification::centredRight, true);
 
+    
+    /* Version text */
+    g.setColour (Colours::white);
+    g.setFont (Font (10.00f, Font::plain));
+    String version_string;
+    version_string << "v" << QUOTE(VERSION);
+    g.drawText (version_string,
+                getWidth()-51, getHeight()-11, 50, 10,
+                Justification::bottomRight, true);
+    
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
 }
@@ -337,14 +373,14 @@ void Ambix_encoderAudioProcessorEditor::resized()
 void Ambix_encoderAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWasMoved)
 {
     Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
-
+    
     if (sliderThatWasMoved == sld_el)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::ElevationParam, ((float)sld_el->getValue() + 180) / 360.f);
+        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::ElevationParam, (sliderWrap(sld_el) + 180) / 360.f);
     }
     else if (sliderThatWasMoved == sld_az)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::AzimuthParam, ((float)sld_az->getValue() + 180) / 360.f);
+        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::AzimuthParam, (sliderWrap(sld_az) + 180) / 360.f);
     }
     else if (sliderThatWasMoved == sld_size)
     {

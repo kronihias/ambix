@@ -1,4 +1,0 @@
-changes to the original JUCE source have been made to 
-modules/juce_gui_basics/widgets/juce_Slider.*
-
-Matthias Kronlachner
