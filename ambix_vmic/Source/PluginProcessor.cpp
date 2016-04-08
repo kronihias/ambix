@@ -25,6 +25,8 @@
 
 //==============================================================================
 Ambix_vmicAudioProcessor::Ambix_vmicAudioProcessor() :
+filter_sel_id_1(0),
+filter_sel_id_2(0),
 _initialized(false),
 _param_changed(false),
 output_buffer(AMBI_CHANNELS,256)
@@ -586,7 +588,9 @@ void Ambix_vmicAudioProcessor::getStateInformation (MemoryBlock& destData)
     {
         xml.setAttribute (String(i), getParameter(i));
     }
-    
+    xml.setAttribute("filter_sel_id_1", filter_sel_id_1);
+    xml.setAttribute("filter_sel_id_2", filter_sel_id_2);
+  
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
 }
@@ -606,6 +610,8 @@ void Ambix_vmicAudioProcessor::setStateInformation (const void* data, int sizeIn
             for (int i=0; i < getNumParameters(); i++) {
                 setParameter(i, xmlState->getDoubleAttribute(String(i)));
             }
+            filter_sel_id_1 = xmlState->getIntAttribute("filter_sel_id_1", 0);
+            filter_sel_id_2 = xmlState->getIntAttribute("filter_sel_id_2", 0);
         }
         
     }
