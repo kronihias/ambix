@@ -141,6 +141,8 @@ http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_st
 
 changelog
 -----------
+* v0.2.6 (2016-04-08) converter: fixed scaling of "O" channel when converting from/to FuMa; binaural: convolution engine fix, preset dir save fix; vmic: gui fix
+
 * v0.2.5 (2015-12-06) liblo dependencies removed
 encoder: improved gui performance
 decoder: fixed binaural swap l-r impulse responses bug, added volume control, indicate loaded preset in menu
@@ -174,7 +176,7 @@ several people and institutions contributed to this software in one or another w
 
 author
 -----------
-2013-2015 Matthias Kronlachner
+2013-2016 Matthias Kronlachner
 
 m.kronlachner@gmail.com
 www.matthiaskronlachner.com
