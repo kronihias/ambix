@@ -7,18 +7,18 @@
   the "//[xyz]" and "//[/xyz]" sections will be retained when the file is loaded
   and re-saved.
 
-  Created with Introjucer version: 4.0.1
+  Created with Introjucer version: 3.1.0
 
   ------------------------------------------------------------------------------
 
   The Introjucer is part of the JUCE library - "Jules' Utility Class Extensions"
-  Copyright (c) 2015 - ROLI Ltd.
+  Copyright 2004-13 by Raw Material Software Ltd.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_HEADER_4A9AC0213502B6A5__
-#define __JUCE_HEADER_4A9AC0213502B6A5__
+#ifndef __JUCE_HEADER_647002131C011257__
+#define __JUCE_HEADER_647002131C011257__
 
 //[Headers]     -- You can add your own extra header files here --
 #include "JuceHeader.h"
@@ -35,15 +35,14 @@
     Describe your class and how it works here!
                                                                     //[/Comments]
 */
-class Ambix_binauralAudioProcessorEditor  : public AudioProcessorEditor,
-                                            public ComboBoxListener,
-                                            public ButtonListener,
-                                            public SliderListener
+class Ambix_encoderAudioProcessorEditor  : public AudioProcessorEditor,
+                                           public SliderListener,
+                                           public ButtonListener
 {
 public:
     //==============================================================================
-    Ambix_binauralAudioProcessorEditor (Ambix_binauralAudioProcessor* ownerFilter);
-    ~Ambix_binauralAudioProcessorEditor();
+    Ambix_encoderAudioProcessorEditor (Ambix_encoderAudioProcessor* ownerFilter);
+    ~Ambix_encoderAudioProcessorEditor();
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
@@ -51,10 +50,14 @@ public:
 
     void paint (Graphics& g);
     void resized();
-    void comboBoxChanged (ComboBox* comboBoxThatHasChanged);
-    void buttonClicked (Button* buttonThatWasClicked);
     void sliderValueChanged (Slider* sliderThatWasMoved);
+    void buttonClicked (Button* buttonThatWasClicked);
 
+    // Binary resources:
+    static const char* settings_png;
+    static const int settings_pngSize;
+    static const char* settings_white_png;
+    static const int settings_white_pngSize;
 
 
 private:
@@ -62,36 +65,25 @@ private:
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<GroupComponent> gr_hp;
-    ScopedPointer<Label> label;
-    ScopedPointer<ComboBox> box_presets;
-    ScopedPointer<Label> label5;
-    ScopedPointer<TextEditor> txt_debug;
-    ScopedPointer<TextButton> btn_open;
-    ScopedPointer<Label> label2;
-    ScopedPointer<Label> label3;
-    ScopedPointer<Label> label4;
-    ScopedPointer<Label> num_ch;
-    ScopedPointer<Label> num_spk;
-    ScopedPointer<Label> num_hrtf;
-    ScopedPointer<TextButton> btn_preset_folder;
-    ScopedPointer<ToggleButton> tgl_load_irs;
-    ScopedPointer<Slider> sld_hpf;
-    ScopedPointer<ComboBox> box_hp_order;
-    ScopedPointer<GroupComponent> groupComponent2;
-    ScopedPointer<Slider> sld_lpf;
-    ScopedPointer<ComboBox> box_lp_order;
-    ScopedPointer<ComboBox> box_sub_output;
-    ScopedPointer<ComboBox> box_sub_output2;
-    ScopedPointer<Slider> sld_sub_vol;
-    ScopedPointer<Slider> sld_gain;
+    ScopedPointer<Slider> sld_el;
+    ScopedPointer<Component> opengl_component;
+    ScopedPointer<Slider> sld_az;
+    ScopedPointer<Slider> sld_size;
+    ScopedPointer<Slider> sld_width;
+    ScopedPointer<Slider> sld_speed;
+    ScopedPointer<Slider> sld_el_move;
+    ScopedPointer<Slider> sld_az_move;
+    ScopedPointer<TextEditor> txt_az_move;
+    ScopedPointer<TextEditor> txt_el_move;
+    ScopedPointer<Label> lbl_id;
+    ScopedPointer<ImageButton> btn_settings;
 
 
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_binauralAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_encoderAudioProcessorEditor)
 };
 
 //[EndFile] You can add extra defines here...
 //[/EndFile]
 
-#endif   // __JUCE_HEADER_4A9AC0213502B6A5__
+#endif   // __JUCE_HEADER_647002131C011257__

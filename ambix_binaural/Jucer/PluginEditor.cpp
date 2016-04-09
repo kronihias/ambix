@@ -7,12 +7,12 @@
   the "//[xyz]" and "//[/xyz]" sections will be retained when the file is loaded
   and re-saved.
 
-  Created with Introjucer version: 3.1.0
+  Created with Introjucer version: 4.0.1
 
   ------------------------------------------------------------------------------
 
   The Introjucer is part of the JUCE library - "Jules' Utility Class Extensions"
-  Copyright 2004-13 by Raw Material Software Ltd.
+  Copyright (c) 2015 - ROLI Ltd.
 
   ==============================================================================
 */
@@ -30,11 +30,13 @@
 Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_binauralAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter)
 {
-    addAndMakeVisible (hyperlinkButton = new HyperlinkButton (TRANS("(C) 2013 Matthias Kronlachner"),
-                                                              URL ("http://www.matthiaskronlachner.com")));
-    hyperlinkButton->setTooltip (TRANS("http://www.matthiaskronlachner.com"));
-    hyperlinkButton->setButtonText (TRANS("(C) 2013 Matthias Kronlachner"));
-    hyperlinkButton->setColour (HyperlinkButton::textColourId, Colour (0xccffffff));
+    //[Constructor_pre] You can add your own custom stuff here..
+    //[/Constructor_pre]
+
+    addAndMakeVisible (gr_hp = new GroupComponent ("new group",
+                                                   TRANS("high pass")));
+    gr_hp->setColour (GroupComponent::outlineColourId, Colour (0x66ffffff));
+    gr_hp->setColour (GroupComponent::textColourId, Colours::white);
 
     addAndMakeVisible (label = new Label ("new label",
                                           TRANS("Ambisonics input channels: ")));
@@ -145,11 +147,97 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     tgl_load_irs->addListener (this);
     tgl_load_irs->setColour (ToggleButton::textColourId, Colours::white);
 
+    addAndMakeVisible (sld_hpf = new Slider ("new slider"));
+    sld_hpf->setTooltip (TRANS("loudspeaker high pass cut off frequency"));
+    sld_hpf->setRange (0, 200, 1);
+    sld_hpf->setSliderStyle (Slider::RotaryHorizontalVerticalDrag);
+    sld_hpf->setTextBoxStyle (Slider::TextBoxLeft, false, 80, 20);
+    sld_hpf->setColour (Slider::rotarySliderFillColourId, Colour (0x7fffffff));
+    sld_hpf->setColour (Slider::rotarySliderOutlineColourId, Colour (0x66ffffff));
+    sld_hpf->addListener (this);
+
+    addAndMakeVisible (box_hp_order = new ComboBox ("new combo box"));
+    box_hp_order->setTooltip (TRANS("high pass order"));
+    box_hp_order->setEditableText (false);
+    box_hp_order->setJustificationType (Justification::centredLeft);
+    box_hp_order->setTextWhenNothingSelected (TRANS("HP OFF"));
+    box_hp_order->setTextWhenNoChoicesAvailable (TRANS("HP OFF"));
+    box_hp_order->addItem (TRANS("HP OFF"), 1);
+    box_hp_order->addItem (TRANS("2nd"), 2);
+    box_hp_order->addItem (TRANS("4th"), 3);
+    box_hp_order->addListener (this);
+
+    addAndMakeVisible (groupComponent2 = new GroupComponent ("new group",
+                                                             TRANS("sub out")));
+    groupComponent2->setColour (GroupComponent::outlineColourId, Colour (0x66ffffff));
+    groupComponent2->setColour (GroupComponent::textColourId, Colours::white);
+
+    addAndMakeVisible (sld_lpf = new Slider ("new slider"));
+    sld_lpf->setTooltip (TRANS("sub low-pass cut off frequency"));
+    sld_lpf->setRange (0, 200, 1);
+    sld_lpf->setSliderStyle (Slider::RotaryHorizontalVerticalDrag);
+    sld_lpf->setTextBoxStyle (Slider::TextBoxLeft, false, 80, 20);
+    sld_lpf->setColour (Slider::rotarySliderFillColourId, Colour (0x7fffffff));
+    sld_lpf->setColour (Slider::rotarySliderOutlineColourId, Colour (0x66ffffff));
+    sld_lpf->addListener (this);
+
+    addAndMakeVisible (box_lp_order = new ComboBox ("new combo box"));
+    box_lp_order->setTooltip (TRANS("sub low-pass order"));
+    box_lp_order->setEditableText (false);
+    box_lp_order->setJustificationType (Justification::centredLeft);
+    box_lp_order->setTextWhenNothingSelected (TRANS("LP OFF"));
+    box_lp_order->setTextWhenNoChoicesAvailable (TRANS("LP OFF"));
+    box_lp_order->addItem (TRANS("LP OFF"), 1);
+    box_lp_order->addItem (TRANS("2nd"), 2);
+    box_lp_order->addItem (TRANS("4th"), 3);
+    box_lp_order->addListener (this);
+
+    addAndMakeVisible (box_sub_output = new ComboBox ("new combo box"));
+    box_sub_output->setTooltip (TRANS("sub output channel"));
+    box_sub_output->setEditableText (false);
+    box_sub_output->setJustificationType (Justification::centredLeft);
+    box_sub_output->setTextWhenNothingSelected (TRANS("4"));
+    box_sub_output->setTextWhenNoChoicesAvailable (TRANS("4"));
+    box_sub_output->addItem (TRANS("1"), 1);
+    box_sub_output->addItem (TRANS("2"), 2);
+    box_sub_output->addItem (TRANS("3"), 3);
+    box_sub_output->addListener (this);
+
+    addAndMakeVisible (box_sub_output2 = new ComboBox ("new combo box"));
+    box_sub_output2->setTooltip (TRANS("sub signal origin"));
+    box_sub_output2->setEditableText (false);
+    box_sub_output2->setJustificationType (Justification::centredLeft);
+    box_sub_output2->setTextWhenNothingSelected (TRANS("SUB SEND OFF"));
+    box_sub_output2->setTextWhenNoChoicesAvailable (TRANS("SUB SEND OFF"));
+    box_sub_output2->addItem (TRANS("SUB SEND OFF"), 1);
+    box_sub_output2->addItem (TRANS("omni (W)"), 2);
+    box_sub_output2->addItem (TRANS("sum of all LS"), 3);
+    box_sub_output2->addListener (this);
+
+    addAndMakeVisible (sld_sub_vol = new Slider ("new slider"));
+    sld_sub_vol->setTooltip (TRANS("sub volume"));
+    sld_sub_vol->setRange (-99, 6, 1);
+    sld_sub_vol->setSliderStyle (Slider::LinearHorizontal);
+    sld_sub_vol->setTextBoxStyle (Slider::TextBoxLeft, false, 50, 20);
+    sld_sub_vol->setColour (Slider::thumbColourId, Colour (0xff949494));
+    sld_sub_vol->setColour (Slider::rotarySliderFillColourId, Colour (0x7fffffff));
+    sld_sub_vol->setColour (Slider::rotarySliderOutlineColourId, Colour (0x66ffffff));
+    sld_sub_vol->addListener (this);
+
+    addAndMakeVisible (sld_gain = new Slider ("new slider"));
+    sld_gain->setTooltip (TRANS("Output Volume"));
+    sld_gain->setRange (-99, 20, 0.1);
+    sld_gain->setSliderStyle (Slider::LinearVertical);
+    sld_gain->setTextBoxStyle (Slider::TextBoxBelow, false, 48, 20);
+    sld_gain->setColour (Slider::thumbColourId, Colours::white);
+    sld_gain->addListener (this);
+    sld_gain->setSkewFactor (0.8);
+
 
     //[UserPreSize]
     //[/UserPreSize]
 
-    setSize (350, 300);
+    setSize (650, 300);
 
 
     //[Constructor] You can add your own custom stuff here..
@@ -161,7 +249,7 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
     //[Destructor_pre]. You can add your own custom destruction code here..
     //[/Destructor_pre]
 
-    hyperlinkButton = nullptr;
+    gr_hp = nullptr;
     label = nullptr;
     box_presets = nullptr;
     label5 = nullptr;
@@ -175,6 +263,15 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
     num_hrtf = nullptr;
     btn_preset_folder = nullptr;
     tgl_load_irs = nullptr;
+    sld_hpf = nullptr;
+    box_hp_order = nullptr;
+    groupComponent2 = nullptr;
+    sld_lpf = nullptr;
+    box_lp_order = nullptr;
+    box_sub_output = nullptr;
+    box_sub_output2 = nullptr;
+    sld_sub_vol = nullptr;
+    sld_gain = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -194,10 +291,10 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
                                        Colours::black,
                                        static_cast<float> (proportionOfWidth (0.1143f)), static_cast<float> (proportionOfHeight (0.0800f)),
                                        true));
-    g.fillRect (0, 0, 350, 300);
+    g.fillRect (0, 0, 650, 300);
 
     g.setColour (Colours::black);
-    g.drawRect (0, 0, 350, 300, 1);
+    g.drawRect (0, 0, 650, 300, 1);
 
     g.setColour (Colour (0x410000ff));
     g.fillRoundedRectangle (18.0f, 100.0f, 222.0f, 76.0f, 10.000f);
@@ -214,13 +311,32 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
                 1, 28, 343, 30,
                 Justification::centred, true);
 
+    g.setColour (Colours::white);
+    g.setFont (Font (12.40f, Font::plain));
+    g.drawText (TRANS("Volume [dB]"),
+                338, 276, 65, 23,
+                Justification::centred, true);
+
+    
+    /* Version text */
+    g.setColour (Colours::white);
+    g.setFont (Font (10.00f, Font::plain));
+    String version_string;
+    version_string << "v" << QUOTE(VERSION);
+    g.drawText (version_string,
+                getWidth()-51, getHeight()-11, 50, 10,
+                Justification::bottomRight, true);
+    
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
 }
 
 void Ambix_binauralAudioProcessorEditor::resized()
 {
-    hyperlinkButton->setBounds (152, 280, 192, 20);
+    //[UserPreResize] Add your own custom resize code here..
+    //[/UserPreResize]
+
+    gr_hp->setBounds (407, 195, 96, 72);
     label->setBounds (16, 104, 184, 24);
     box_presets->setBounds (72, 64, 200, 24);
     label5->setBounds (8, 64, 56, 24);
@@ -234,6 +350,15 @@ void Ambix_binauralAudioProcessorEditor::resized()
     num_hrtf->setBounds (192, 152, 40, 24);
     btn_preset_folder->setBounds (248, 96, 94, 24);
     tgl_load_irs->setBounds (256, 152, 80, 24);
+    sld_hpf->setBounds (415, 211, 88, 22);
+    box_hp_order->setBounds (415, 235, 80, 24);
+    groupComponent2->setBounds (511, 195, 184, 96);
+    sld_lpf->setBounds (519, 211, 88, 22);
+    box_lp_order->setBounds (615, 211, 64, 22);
+    box_sub_output->setBounds (631, 235, 48, 22);
+    box_sub_output2->setBounds (519, 235, 104, 24);
+    sld_sub_vol->setBounds (519, 259, 160, 24);
+    sld_gain->setBounds (343, 18, 48, 254);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -247,6 +372,26 @@ void Ambix_binauralAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxThat
     {
         //[UserComboBoxCode_box_presets] -- add your combo box handling code here..
         //[/UserComboBoxCode_box_presets]
+    }
+    else if (comboBoxThatHasChanged == box_hp_order)
+    {
+        //[UserComboBoxCode_box_hp_order] -- add your combo box handling code here..
+        //[/UserComboBoxCode_box_hp_order]
+    }
+    else if (comboBoxThatHasChanged == box_lp_order)
+    {
+        //[UserComboBoxCode_box_lp_order] -- add your combo box handling code here..
+        //[/UserComboBoxCode_box_lp_order]
+    }
+    else if (comboBoxThatHasChanged == box_sub_output)
+    {
+        //[UserComboBoxCode_box_sub_output] -- add your combo box handling code here..
+        //[/UserComboBoxCode_box_sub_output]
+    }
+    else if (comboBoxThatHasChanged == box_sub_output2)
+    {
+        //[UserComboBoxCode_box_sub_output2] -- add your combo box handling code here..
+        //[/UserComboBoxCode_box_sub_output2]
     }
 
     //[UsercomboBoxChanged_Post]
@@ -278,6 +423,36 @@ void Ambix_binauralAudioProcessorEditor::buttonClicked (Button* buttonThatWasCli
     //[/UserbuttonClicked_Post]
 }
 
+void Ambix_binauralAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWasMoved)
+{
+    //[UsersliderValueChanged_Pre]
+    //[/UsersliderValueChanged_Pre]
+
+    if (sliderThatWasMoved == sld_hpf)
+    {
+        //[UserSliderCode_sld_hpf] -- add your slider handling code here..
+        //[/UserSliderCode_sld_hpf]
+    }
+    else if (sliderThatWasMoved == sld_lpf)
+    {
+        //[UserSliderCode_sld_lpf] -- add your slider handling code here..
+        //[/UserSliderCode_sld_lpf]
+    }
+    else if (sliderThatWasMoved == sld_sub_vol)
+    {
+        //[UserSliderCode_sld_sub_vol] -- add your slider handling code here..
+        //[/UserSliderCode_sld_sub_vol]
+    }
+    else if (sliderThatWasMoved == sld_gain)
+    {
+        //[UserSliderCode_sld_gain] -- add your slider handling code here..
+        //[/UserSliderCode_sld_gain]
+    }
+
+    //[UsersliderValueChanged_Post]
+    //[/UsersliderValueChanged_Post]
+}
+
 
 
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
@@ -297,10 +472,10 @@ BEGIN_JUCER_METADATA
                  componentName="" parentClasses="public AudioProcessorEditor"
                  constructorParams="Ambix_binauralAudioProcessor* ownerFilter"
                  variableInitialisers="AudioProcessorEditor (ownerFilter)" snapPixels="8"
-                 snapActive="1" snapShown="1" overlayOpacity="0.330" fixedSize="1"
-                 initialWidth="350" initialHeight="300">
+                 snapActive="0" snapShown="1" overlayOpacity="0.330" fixedSize="1"
+                 initialWidth="650" initialHeight="300">
   <BACKGROUND backgroundColour="ffffffff">
-    <RECT pos="0 0 350 300" fill=" radial: 64% 69.333%, 11.429% 8%, 0=ff4e4e4e, 1=ff000000"
+    <RECT pos="0 0 650 300" fill=" radial: 64% 69.333%, 11.429% 8%, 0=ff4e4e4e, 1=ff000000"
           hasStroke="1" stroke="1, mitered, butt" strokeColour="solid: ff000000"/>
     <ROUNDRECT pos="18 100 222 76" cornerSize="10" fill="solid: 410000ff" hasStroke="0"/>
     <TEXT pos="1 4 343 30" fill="solid: ffffffff" hasStroke="0" text="AMBIX-BINAURAL-DECODER"
@@ -309,11 +484,13 @@ BEGIN_JUCER_METADATA
     <TEXT pos="1 28 343 30" fill="solid: ffffffff" hasStroke="0" text="listening to Ambisonics with headphones"
           fontname="Default font" fontsize="12.400000000000000355" bold="0"
           italic="0" justification="36"/>
+    <TEXT pos="338 276 65 23" fill="solid: ffffffff" hasStroke="0" text="Volume [dB]"
+          fontname="Default font" fontsize="12.400000000000000355" bold="0"
+          italic="0" justification="36"/>
   </BACKGROUND>
-  <HYPERLINKBUTTON name="new hyperlink" id="529bec77f5596b3c" memberName="hyperlinkButton"
-                   virtualName="" explicitFocusOrder="0" pos="152 280 192 20" tooltip="http://www.matthiaskronlachner.com"
-                   textCol="ccffffff" buttonText="(C) 2013 Matthias Kronlachner"
-                   connectedEdges="0" needsCallback="0" radioGroupId="0" url="http://www.matthiaskronlachner.com"/>
+  <GROUPCOMPONENT name="new group" id="93b72dd4e7eb70f2" memberName="gr_hp" virtualName=""
+                  explicitFocusOrder="0" pos="407 195 96 72" outlinecol="66ffffff"
+                  textcol="ffffffff" title="high pass"/>
   <LABEL name="new label" id="18d53e308ddb22b0" memberName="label" virtualName=""
          explicitFocusOrder="0" pos="16 104 184 24" textCol="ffffffff"
          edTextCol="ff000000" edBkgCol="0" labelText="Ambisonics input channels: "
@@ -374,6 +551,45 @@ BEGIN_JUCER_METADATA
                 virtualName="" explicitFocusOrder="0" pos="256 152 80 24" tooltip="load impulse responses if new preset being loaded - deactivate if IRs already loaded - for fast decoder matrix switching"
                 txtcol="ffffffff" buttonText="load IRs" connectedEdges="0" needsCallback="1"
                 radioGroupId="0" state="0"/>
+  <SLIDER name="new slider" id="93c06746c73b55e6" memberName="sld_hpf"
+          virtualName="" explicitFocusOrder="0" pos="415 211 88 22" tooltip="loudspeaker high pass cut off frequency"
+          rotarysliderfill="7fffffff" rotaryslideroutline="66ffffff" min="0"
+          max="200" int="1" style="RotaryHorizontalVerticalDrag" textBoxPos="TextBoxLeft"
+          textBoxEditable="1" textBoxWidth="80" textBoxHeight="20" skewFactor="1"/>
+  <COMBOBOX name="new combo box" id="4355679e656fdcb6" memberName="box_hp_order"
+            virtualName="" explicitFocusOrder="0" pos="415 235 80 24" tooltip="high pass order"
+            editable="0" layout="33" items="HP OFF&#10;2nd&#10;4th" textWhenNonSelected="HP OFF"
+            textWhenNoItems="HP OFF"/>
+  <GROUPCOMPONENT name="new group" id="f2a608de1e2dcc2f" memberName="groupComponent2"
+                  virtualName="" explicitFocusOrder="0" pos="511 195 184 96" outlinecol="66ffffff"
+                  textcol="ffffffff" title="sub out"/>
+  <SLIDER name="new slider" id="887c3af75adba9d7" memberName="sld_lpf"
+          virtualName="" explicitFocusOrder="0" pos="519 211 88 22" tooltip="sub low-pass cut off frequency"
+          rotarysliderfill="7fffffff" rotaryslideroutline="66ffffff" min="0"
+          max="200" int="1" style="RotaryHorizontalVerticalDrag" textBoxPos="TextBoxLeft"
+          textBoxEditable="1" textBoxWidth="80" textBoxHeight="20" skewFactor="1"/>
+  <COMBOBOX name="new combo box" id="bddf00b0dabff700" memberName="box_lp_order"
+            virtualName="" explicitFocusOrder="0" pos="615 211 64 22" tooltip="sub low-pass order"
+            editable="0" layout="33" items="LP OFF&#10;2nd&#10;4th" textWhenNonSelected="LP OFF"
+            textWhenNoItems="LP OFF"/>
+  <COMBOBOX name="new combo box" id="82e9180ea7c9d1a3" memberName="box_sub_output"
+            virtualName="" explicitFocusOrder="0" pos="631 235 48 22" tooltip="sub output channel"
+            editable="0" layout="33" items="1&#10;2&#10;3" textWhenNonSelected="4"
+            textWhenNoItems="4"/>
+  <COMBOBOX name="new combo box" id="5bcc5f10478e7389" memberName="box_sub_output2"
+            virtualName="" explicitFocusOrder="0" pos="519 235 104 24" tooltip="sub signal origin"
+            editable="0" layout="33" items="SUB SEND OFF&#10;omni (W)&#10;sum of all LS"
+            textWhenNonSelected="SUB SEND OFF" textWhenNoItems="SUB SEND OFF"/>
+  <SLIDER name="new slider" id="6c2fc8e1fc0081ff" memberName="sld_sub_vol"
+          virtualName="" explicitFocusOrder="0" pos="519 259 160 24" tooltip="sub volume"
+          thumbcol="ff949494" rotarysliderfill="7fffffff" rotaryslideroutline="66ffffff"
+          min="-99" max="6" int="1" style="LinearHorizontal" textBoxPos="TextBoxLeft"
+          textBoxEditable="1" textBoxWidth="50" textBoxHeight="20" skewFactor="1"/>
+  <SLIDER name="new slider" id="26fc90b8b12b56a0" memberName="sld_gain"
+          virtualName="" explicitFocusOrder="0" pos="343 18 48 254" tooltip="Output Volume"
+          thumbcol="ffffffff" min="-99" max="20" int="0.10000000000000000555"
+          style="LinearVertical" textBoxPos="TextBoxBelow" textBoxEditable="1"
+          textBoxWidth="48" textBoxHeight="20" skewFactor="0.80000000000000004441"/>
 </JUCER_COMPONENT>
 
 END_JUCER_METADATA

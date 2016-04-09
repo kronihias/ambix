@@ -373,6 +373,16 @@ void Ambix_directional_loudnessAudioProcessorEditor::paint (Graphics& g)
     g.setColour (Colour (0xff2f2866));
     g.fillRoundedRectangle (0.0f, 0.0f, 234.0f, 110.0f, 10.000f);
 
+    
+    /* Version text */
+    g.setColour (Colours::white);
+    g.setFont (Font (10.00f, Font::plain));
+    String version_string;
+    version_string << "v" << QUOTE(VERSION);
+    g.drawText (version_string,
+                getWidth()-51, getHeight()-11, 50, 10,
+                Justification::bottomRight, true);
+    
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
 }
