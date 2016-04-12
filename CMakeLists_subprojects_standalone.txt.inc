@@ -113,11 +113,6 @@ IF (WIN32)
     ADD_EXECUTABLE(${SUBPROJECT_NAME} WIN32 ${SOURCE} ${JUCE_STANDALONE_SOURCE})
 ENDIF (WIN32)
 
-
-#########
-# dependency on JUCE_STATIC_LIB
-ADD_DEPENDENCIES (${SUBPROJECT_NAME} ${JUCE_STATIC_LIB})
-
 ####################
 # additional libs (FFTW3F, Eigen3 is header only)
 

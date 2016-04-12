@@ -87,10 +87,6 @@ LIST ( SORT SOURCE )
 
 ADD_LIBRARY(${SUBPROJECT_NAME} MODULE ${JUCE_PLUGIN_CLIENT_SOURCE} ${SOURCE} )
 
-#########
-# dependency on JUCE_STATIC_LIB
-ADD_DEPENDENCIES (${SUBPROJECT_NAME} ${JUCE_STATIC_LIB})
-
 ####################
 # additional libs (FFTW3F, Eigen3 is header only)
 
