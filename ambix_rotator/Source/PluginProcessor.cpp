@@ -103,14 +103,11 @@ void Ambix_rotatorAudioProcessor::oscMessageReceived (const OSCMessage& message)
 //==============================================================================
 Ambix_rotatorAudioProcessor::Ambix_rotatorAudioProcessor() :
 yaw_param(0.5f),
-_yaw_param(0.5f),
 pitch_param(0.5f),
-_pitch_param(0.5f),
 roll_param(0.5f),
-_roll_param(0.5f),
 rot_order_param(0.f),
-_rot_order_param(0.f),
 _initialized(false),
+_new_params(true),
 output_buffer(AMBI_CHANNELS,256)
 {
     // set transformation matrix to identity matrix
@@ -178,6 +175,8 @@ void Ambix_rotatorAudioProcessor::setParameter (int index, float newValue)
 		default:
             break;
 	}
+    _new_params = true;
+  
     sendChangeMessage();
 }
 
@@ -394,129 +393,119 @@ void Ambix_rotatorAudioProcessor::calcParams()
         _initialized = true;
     }
     
-    if  (
-        (yaw_param != _yaw_param) ||
-        (pitch_param != _pitch_param) ||
-         (roll_param != _roll_param) ||
-         (rot_order_param != _rot_order_param)
-        )
+    Eigen::MatrixXd Sh_matrix_mod(Sph_coord.rows(),AMBI_CHANNELS);
+    
+    // rotation parameters in radiants
+    // use mathematical negative angles for yaw
+    
+    double yaw = -((double)yaw_param*2*M_PI - M_PI); // z
+    double pitch = (double)pitch_param*2*M_PI - M_PI; // y
+    double roll = (double)roll_param*2*M_PI - M_PI; // x
+    
+    Eigen::Matrix3d RotX, RotY, RotZ, Rot;
+    
+    RotX = RotY = RotZ = Eigen::Matrix3d::Zero(3,3);
+    
+    RotX(0,0) = 1.f;
+    RotX(1,1) = RotX(2,2) = cos(roll);
+    RotX(1,2) = -sin(roll);
+    RotX(2,1) = -RotX(1,2);
+    
+    RotY(0,0) = RotY(2,2) = cos(pitch);
+    RotY(0,2) = sin(pitch);
+    RotY(2,0) = -RotY(0,2);
+    RotY(1,1) = 1.f;
+    
+    RotZ(0,0) = RotZ(1,1) = cos(yaw);
+    RotZ(0,1) = -sin(yaw);
+    RotZ(1,0) = -RotZ(0,1);
+    RotZ(2,2) = 1.f;
+    
+    // multiply individual rotation matrices
+    if (rot_order_param < 0.5f)
     {
-
-        Eigen::MatrixXd Sh_matrix_mod(Sph_coord.rows(),AMBI_CHANNELS);
-        
-        // rotation parameters in radiants
-        // use mathematical negative angles for yaw
-        
-        double yaw = -((double)yaw_param*2*M_PI - M_PI); // z
-        double pitch = (double)pitch_param*2*M_PI - M_PI; // y
-        double roll = (double)roll_param*2*M_PI - M_PI; // x
-        
-        Eigen::Matrix3d RotX, RotY, RotZ, Rot;
-        
-        RotX = RotY = RotZ = Eigen::Matrix3d::Zero(3,3);
-        
-        RotX(0,0) = 1.f;
-        RotX(1,1) = RotX(2,2) = cos(roll);
-        RotX(1,2) = -sin(roll);
-        RotX(2,1) = -RotX(1,2);
-        
-        RotY(0,0) = RotY(2,2) = cos(pitch);
-        RotY(0,2) = sin(pitch);
-        RotY(2,0) = -RotY(0,2);
-        RotY(1,1) = 1.f;
-        
-        RotZ(0,0) = RotZ(1,1) = cos(yaw);
-        RotZ(0,1) = -sin(yaw);
-        RotZ(1,0) = -RotZ(0,1);
-        RotZ(2,2) = 1.f;
-        
-        // multiply individual rotation matrices
-        if (rot_order_param < 0.5f)
-        {
-            // ypr order zyx -> mutliply inverse!
-            Rot = RotX * RotY * RotZ;
-        } else {
-            // rpy order xyz -> mutliply inverse!
-            Rot = RotZ * RotY * RotX;
-        }
-        
-        // combined roll-pitch-yaw rotation matrix would be here
-        // http://planning.cs.uiuc.edu/node102.html
-        
-        for (int i=0; i < Carth_coord.rows(); i++)
-        {
-            // rotate carthesian coordinates
-            Eigen::Vector3d Carth_coord_mod = Carth_coord.row(i)*Rot;
-            
-            Eigen::Vector2d Sph_coord_mod;
-            
-            // convert to spherical coordinates
-            Sph_coord_mod(0) = atan2(Carth_coord_mod(1),Carth_coord_mod(0)); // azimuth
-            Sph_coord_mod(1) = atan2(Carth_coord_mod(2),sqrt(Carth_coord_mod(0)*Carth_coord_mod(0) + Carth_coord_mod(1)*Carth_coord_mod(1))); // elevation
-            
-            Eigen::VectorXd Ymn(AMBI_CHANNELS); // Ymn result
-            
-            // calc spherical harmonic
-            sph_h.Calc(Sph_coord_mod(0),Sph_coord_mod(1)); // phi theta
-            sph_h.Get(Ymn);
-            
-            // save to sh matrix
-            Sh_matrix_mod.row(i) = Ymn;
-        }
-        
-        // calculate new transformation matrix
-        
-        Sh_transf = Sh_matrix_inv * Sh_matrix_mod;
-        
-        
-        // threshold coefficients
-        // maybe not needed here...
-        for (int i = 0; i < Sh_transf.size(); i++)
-        {
-            if (abs(Sh_transf(i)) < 0.00001f)
-                Sh_transf(i) = 0.f;
-        }
-        
-        _yaw_param = yaw_param;
-        _pitch_param = pitch_param;
-        _roll_param = roll_param;
-        _rot_order_param = rot_order_param;
+        // ypr order zyx -> mutliply inverse!
+        Rot = RotX * RotY * RotZ;
+    } else {
+        // rpy order xyz -> mutliply inverse!
+        Rot = RotZ * RotY * RotX;
     }
     
+    // combined roll-pitch-yaw rotation matrix would be here
+    // http://planning.cs.uiuc.edu/node102.html
+    
+    for (int i=0; i < Carth_coord.rows(); i++)
+    {
+        // rotate carthesian coordinates
+        Eigen::Vector3d Carth_coord_mod = Carth_coord.row(i)*Rot;
+        
+        Eigen::Vector2d Sph_coord_mod;
+        
+        // convert to spherical coordinates
+        Sph_coord_mod(0) = atan2(Carth_coord_mod(1),Carth_coord_mod(0)); // azimuth
+        Sph_coord_mod(1) = atan2(Carth_coord_mod(2),sqrt(Carth_coord_mod(0)*Carth_coord_mod(0) + Carth_coord_mod(1)*Carth_coord_mod(1))); // elevation
+        
+        Eigen::VectorXd Ymn(AMBI_CHANNELS); // Ymn result
+        
+        // calc spherical harmonic
+        sph_h.Calc(Sph_coord_mod(0),Sph_coord_mod(1)); // phi theta
+        sph_h.Get(Ymn);
+        
+        // save to sh matrix
+        Sh_matrix_mod.row(i) = Ymn;
+    }
+    
+    // calculate new transformation matrix
+    
+    Sh_transf = Sh_matrix_inv * Sh_matrix_mod;
     
     
+    // threshold coefficients
+    // maybe not needed here...
+    for (int i = 0; i < Sh_transf.size(); i++)
+    {
+        if (abs(Sh_transf(i)) < 0.00001f)
+            Sh_transf(i) = 0.f;
+    }
+  
 }
 
 void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)
 {
-    _Sh_transf = Sh_transf; // buffer old values
-    
-    calcParams(); // calc new transformation matrix
-    
+    if (_new_params)
+    {
+        _Sh_transf = Sh_transf; // buffer old values
+        calcParams(); // calc new transformation matrix
+    }
+  
     int NumSamples = buffer.getNumSamples();
     
     output_buffer.setSize(buffer.getNumChannels(), NumSamples);
     output_buffer.clear();
     
-    // this could be optimized because matrix is sparse!
+    int num_out_ch = std::min(AMBI_CHANNELS,getNumOutputChannels());
+    int num_in_ch = std::min(AMBI_CHANNELS,getNumInputChannels());
     
-    for (int out = 0; out < std::min(AMBI_CHANNELS,getNumOutputChannels()); out++)
+    for (int out = 0; out < num_out_ch; out++)
     {
-        for (int in = 0; in < std::min(AMBI_CHANNELS,getNumInputChannels()); in++)
+        int n = (int)sqrtf(out);// order
+        int in_start = n*n;
+        int in_end = std::min((n+1)*(n+1)-1, num_in_ch);
+        for (int in = in_start; in < in_end; in++)
         {
-            if (_Sh_transf(in, out) != 0.f || Sh_transf(in, out) != 0.f)
+            if (!_new_params)
             {
-                if (_Sh_transf(in, out) == Sh_transf(in, out))
-                {
+                if (Sh_transf(in, out) != 0.f)
                     output_buffer.addFrom(out, 0, buffer, in, 0, NumSamples, (float)Sh_transf(in, out));
-                } else {
+            } else {
+                if (_Sh_transf(in, out) != 0.f || Sh_transf(in, out) != 0.f)
                     output_buffer.addFromWithRamp(out, 0, buffer.getReadPointer(in), NumSamples, (float)_Sh_transf(in, out), (float)Sh_transf(in, out));
-                }
-                
             }
         }
     }
-    
+  
+    if (_new_params)
+        _new_params = false;
     
     buffer = output_buffer;
     

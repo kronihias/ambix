@@ -102,19 +102,19 @@ private:
     void calcParams();
     
     // yaw (z)
-    float yaw_param, _yaw_param;
+    float yaw_param;
     
     // pitch (y)
-    float pitch_param, _pitch_param;
+    float pitch_param;
     
     // roll (x)
-    float roll_param, _roll_param;
+    float roll_param;
     
     // rotation order :  < 0.5: ypr; >=0.5 rpy
-    float rot_order_param, _rot_order_param;
+    float rot_order_param;
     
     bool _initialized;
-    
+    bool _new_params;
     
     AudioSampleBuffer output_buffer;
     
