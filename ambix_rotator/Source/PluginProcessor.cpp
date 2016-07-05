@@ -316,8 +316,95 @@ void Ambix_rotatorAudioProcessor::releaseResources()
     // spare memory, etc.
 }
 
+
+// functions to compute terms U, V, W of Eq.8.1 (Table II)
+// function to compute term P of U,V,W (Table II)
+double P(int i, int l, int mu, int m_, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
+{
+	double ret = 0.;
+	
+	double ri1 = R_1(i+1,2);
+	double rim1 = R_1(i+1,0);
+	double ri0 = R_1(i+1,1);
+  
+	if (m_ == -l)
+    ret = ri1*R_lm1(mu+l-1,0) + rim1*R_lm1(mu+l-1, 2*l-2);
+	else
+	{
+    if (m_ == l)
+      ret = ri1*R_lm1(mu+l-1,2*l-2) - rim1*R_lm1(mu+l-1, 0);
+    else
+      ret = ri0*R_lm1(mu+l-1,m_+l-1);
+	}
+	return ret;
+}
+
+double U(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
+{
+	return P(0, l, m, n, R_1, R_lm1);
+}
+
+double V(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
+{
+	double ret = 0.;
+	
+	if (m == 0)
+	{
+    double p0 = P(1,l,1,n,R_1,R_lm1);
+    double p1 = P(-1,l,-1,n,R_1,R_lm1);
+    ret = p0+p1;
+	}
+	else
+	{
+    if (m > 0)
+		{
+      int d = (m==1) ? 1 : 0; // delta function
+      double p0 = P(1,l,m-1,n,R_1,R_lm1);
+      double p1 = P(-1,l,-m+1,n,R_1,R_lm1);
+      ret = p0*sqrt(1+d) - p1*(1-d);
+		}
+    else
+		{
+      int d = (m==-1) ? 1 : 0; // delta function
+      double p0 = P(1,l,m+1,n,R_1,R_lm1);
+      double p1 = P(-1,l,-m-1,n,R_1,R_lm1);
+      ret = p0*(1-d) + p1*sqrt(1+d);
+		}
+	}
+	return ret;
+}
+
+double W(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
+{
+	double ret = 0.;
+	
+	if (m == 0)
+	{
+		//
+	}
+	else
+	{
+    if (m>0)
+		{
+      double p0 = P(1,l,m+1,n,R_1,R_lm1);
+      double p1 = P(-1,l,-m-1,n,R_1,R_lm1);
+      ret = p0 + p1;
+		}
+    
+    else
+		{
+      double p0 = P(1,l,m-1,n,R_1,R_lm1);
+      double p1 = P(-1,l,-m+1,n,R_1,R_lm1);
+      ret = p0 - p1;
+		}
+	}
+  return ret;
+}
+
 void Ambix_rotatorAudioProcessor::calcParams()
 {
+// use old sampling method for generating rotation matrix...
+#if 0
     if (!_initialized)
     {
     
@@ -401,7 +488,7 @@ void Ambix_rotatorAudioProcessor::calcParams()
     double yaw = -((double)yaw_param*2*M_PI - M_PI); // z
     double pitch = (double)pitch_param*2*M_PI - M_PI; // y
     double roll = (double)roll_param*2*M_PI - M_PI; // x
-    
+
     Eigen::Matrix3d RotX, RotY, RotZ, Rot;
     
     RotX = RotY = RotZ = Eigen::Matrix3d::Zero(3,3);
@@ -433,7 +520,7 @@ void Ambix_rotatorAudioProcessor::calcParams()
     
     // combined roll-pitch-yaw rotation matrix would be here
     // http://planning.cs.uiuc.edu/node102.html
-    
+
     for (int i=0; i < Carth_coord.rows(); i++)
     {
         // rotate carthesian coordinates
@@ -459,7 +546,102 @@ void Ambix_rotatorAudioProcessor::calcParams()
     
     Sh_transf = Sh_matrix_inv * Sh_matrix_mod;
     
-    
+#else
+  // use
+  // Ivanic, J., Ruedenberg, K. (1996). Rotation Matrices for Real
+  // Spherical Harmonics. Direct Determination by Recursion.
+  // The Journal of Physical Chemistry
+  
+  // rotation parameters in radiants
+  // use mathematical negative angles for yaw
+  
+  double yaw = -((double)yaw_param*2*M_PI - M_PI); // z
+  double pitch = (double)pitch_param*2*M_PI - M_PI; // y
+  double roll = (double)roll_param*2*M_PI - M_PI; // x
+  
+  Eigen::Matrix3d RotX, RotY, RotZ, Rot;
+  
+  RotX = RotY = RotZ = Eigen::Matrix3d::Zero(3,3);
+  
+  RotX(0,0) = 1.f;
+  RotX(1,1) = RotX(2,2) = cos(roll);
+  RotX(1,2) = sin(roll);
+  RotX(2,1) = -RotX(1,2);
+  
+  RotY(0,0) = RotY(2,2) = cos(pitch);
+  RotY(0,2) = sin(pitch);
+  RotY(2,0) = -RotY(0,2);
+  RotY(1,1) = 1.f;
+  
+  RotZ(0,0) = RotZ(1,1) = cos(yaw);
+  RotZ(0,1) = sin(yaw);
+  RotZ(1,0) = -RotZ(0,1);
+  RotZ(2,2) = 1.f;
+  
+  // multiply individual rotation matrices
+  if (rot_order_param < 0.5f)
+  {
+    // ypr order zyx -> mutliply inverse!
+    Rot = RotX * RotY * RotZ;
+  } else {
+    // rpy order xyz -> mutliply inverse!
+    Rot = RotZ * RotY * RotX;
+  }
+  
+  // first order initialization - prototype matrix
+  Eigen::Matrix3d R_1;
+  R_1(0,0) = Rot(1,1);
+  R_1(0,1) = Rot(1,2);
+  R_1(0,2) = Rot(1,0);
+  R_1(1,0) = Rot(2,1);
+  R_1(1,1) = Rot(2,2);
+  R_1(1,2) = Rot(2,0);
+  R_1(2,0) = Rot(0,1);
+  R_1(2,1) = Rot(0,2);
+  R_1(2,2) = Rot(0,0);
+  // zeroth order is invariant
+  Sh_transf(0,0) = 1.;
+  // set first order
+  Sh_transf.block(1, 1, 3, 3) = R_1;
+  
+  Eigen::MatrixXd R_lm1 = R_1;
+  
+  // recursivly generate higher orders
+  for (int l=2; l<=AMBI_ORDER; l++)
+  {
+    Eigen::MatrixXd R_l = Eigen::MatrixXd::Zero(2*l+1, 2*l+1);
+    for (int m=-l;m <= l; m++)
+    {
+      for (int n=-l;n <= l; n++)
+      {
+        // Table I
+        int d = (m==0) ? 1 : 0;
+        double denom = 0.;
+        if (abs(n) == l)
+          denom = (2*l)*(2*l-1);
+        else
+          denom = (l*l-n*n);
+        
+        double u = sqrt((l*l-m*m)/denom);
+        double v = sqrt((1.+d)*(l+abs(m)-1.)*(l+abs(m))/denom)*(1.-2.*d)*0.5;
+        double w = sqrt((l-abs(m)-1.)*(l-abs(m))/denom)*(1.-d)*(-0.5);
+        
+        if (u != 0.)
+          u *= U(l,m,n,R_1,R_lm1);
+        if (v != 0.)
+          v *= V(l,m,n,R_1,R_lm1);
+        if (w != 0.)
+          w *= W(l,m,n,R_1,R_lm1);
+        
+        R_l(m+l,n+l) = u + v + w;
+      }
+    }
+    Sh_transf.block(l*l, l*l, 2*l+1, 2*l+1) = R_l;
+    R_lm1 = R_l;
+  }
+  
+#endif
+  
     // threshold coefficients
     // maybe not needed here...
     for (int i = 0; i < Sh_transf.size(); i++)
@@ -483,14 +665,17 @@ void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     output_buffer.setSize(buffer.getNumChannels(), NumSamples);
     output_buffer.clear();
     
-    int num_out_ch = std::min(AMBI_CHANNELS,getNumOutputChannels());
-    int num_in_ch = std::min(AMBI_CHANNELS,getNumInputChannels());
-    
-    for (int out = 0; out < num_out_ch; out++)
+    int num_out_ch = jmin(AMBI_CHANNELS,getNumOutputChannels());
+    int num_in_ch = jmin(AMBI_CHANNELS,getNumInputChannels());
+  
+    // 0th channel is invariant!
+    output_buffer.addFrom(0, 0, buffer, 0, 0, NumSamples);
+  
+    for (int out = 1; out < num_out_ch; out++)
     {
         int n = (int)sqrtf(out);// order
         int in_start = n*n;
-        int in_end = std::min((n+1)*(n+1)-1, num_in_ch);
+        int in_end = jmin((n+1)*(n+1), num_in_ch);
         for (int in = in_start; in < in_end; in++)
         {
             if (!_new_params)
