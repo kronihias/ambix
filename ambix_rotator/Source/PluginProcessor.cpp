@@ -321,83 +321,78 @@ void Ambix_rotatorAudioProcessor::releaseResources()
 // function to compute term P of U,V,W (Table II)
 double P(int i, int l, int mu, int m_, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
 {
-	double ret = 0.;
-	
-	double ri1 = R_1(i+1,2);
-	double rim1 = R_1(i+1,0);
-	double ri0 = R_1(i+1,1);
+  double ret = 0.;
+
+  double ri1 = R_1(i+1,2);
+  double rim1 = R_1(i+1,0);
+  double ri0 = R_1(i+1,1);
   
-	if (m_ == -l)
+  if (m_ == -l)
     ret = ri1*R_lm1(mu+l-1,0) + rim1*R_lm1(mu+l-1, 2*l-2);
-	else
-	{
+  else
+  {
     if (m_ == l)
       ret = ri1*R_lm1(mu+l-1,2*l-2) - rim1*R_lm1(mu+l-1, 0);
     else
       ret = ri0*R_lm1(mu+l-1,m_+l-1);
-	}
-	return ret;
+  }
+  return ret;
 }
 
 double U(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
 {
-	return P(0, l, m, n, R_1, R_lm1);
+  return P(0, l, m, n, R_1, R_lm1);
 }
 
 double V(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
 {
-	double ret = 0.;
-	
-	if (m == 0)
-	{
+  double ret = 0.;
+  if (m == 0)
+  {
     double p0 = P(1,l,1,n,R_1,R_lm1);
     double p1 = P(-1,l,-1,n,R_1,R_lm1);
     ret = p0+p1;
-	}
-	else
-	{
+  }
+  else
+  {
     if (m > 0)
-		{
+    {
       int d = (m==1) ? 1 : 0; // delta function
       double p0 = P(1,l,m-1,n,R_1,R_lm1);
       double p1 = P(-1,l,-m+1,n,R_1,R_lm1);
       ret = p0*sqrt(1+d) - p1*(1-d);
-		}
+    }
     else
-		{
+    {
       int d = (m==-1) ? 1 : 0; // delta function
       double p0 = P(1,l,m+1,n,R_1,R_lm1);
       double p1 = P(-1,l,-m-1,n,R_1,R_lm1);
       ret = p0*(1-d) + p1*sqrt(1+d);
-		}
-	}
-	return ret;
+    }
+  }
+  return ret;
 }
 
 double W(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
 {
-	double ret = 0.;
+  double ret = 0.;
 	
-	if (m == 0)
-	{
-		//
-	}
-	else
-	{
+  if (m != 0)
+  {
     if (m>0)
 		{
       double p0 = P(1,l,m+1,n,R_1,R_lm1);
       double p1 = P(-1,l,-m-1,n,R_1,R_lm1);
       ret = p0 + p1;
-		}
+    }
     
     else
-		{
+    {
       double p0 = P(1,l,m-1,n,R_1,R_lm1);
       double p1 = P(-1,l,-m+1,n,R_1,R_lm1);
       ret = p0 - p1;
-		}
-	}
+    }
+  }
   return ret;
 }
 
