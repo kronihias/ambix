@@ -160,7 +160,18 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     txt_el_move->setColour (TextEditor::shadowColourId, Colour (0x0));
     txt_el_move->setText ("-180 deg/s");
     
-    
+    addAndMakeVisible (txt_id = new TextEditor ("new text editor"));
+    txt_id->setTooltip (TRANS("ID"));
+    txt_id->setMultiLine (false);
+    txt_id->setReturnKeyStartsNewLine (false);
+    txt_id->setReadOnly (false);
+    txt_id->setScrollbarsShown (false);
+    txt_id->setCaretVisible (true);
+    txt_id->setPopupMenuEnabled (true);
+    txt_id->setText (TRANS("11"));
+    txt_id->setInputRestrictions(4, "1234567890");
+    txt_id->addListener(this);
+  
     addAndMakeVisible (sphere_opengl = new SphereOpenGL());
     sphere_opengl->setName ("new OpenGl");
     // sphere_opengl->setBounds(10, 30, 240, 240);
@@ -174,7 +185,7 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     sld_el_move->setDoubleClickReturnValue(true, 0.5f);
   
     addAndMakeVisible (lbl_id = new Label ("new label",
-                                           TRANS("ID: 1")));
+                                           TRANS("ID:")));
     lbl_id->setFont (Font (15.00f, Font::plain));
     lbl_id->setJustificationType (Justification::centredRight);
     lbl_id->setEditable (false, false, false);
@@ -219,9 +230,9 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     ownerFilter->addChangeListener(this);
     ownerFilter->sendChangeMessage(); // get status from dsp
     
-    String str_id = "ID: ";
+    String str_id = "";
     str_id << ownerFilter->m_id;
-    lbl_id->setText(str_id, dontSendNotification);
+    txt_id->setText(str_id, dontSendNotification);
     
     timerCallback(); // get status from dsp
     startTimer(45); // update display rate
@@ -246,6 +257,7 @@ Ambix_encoderAudioProcessorEditor::~Ambix_encoderAudioProcessorEditor()
     txt_az_move = nullptr;
     txt_el_move = nullptr;
     lbl_id = nullptr;
+    txt_id = nullptr;
     sphere_opengl = nullptr;
     
 #if INPUT_CHANNELS > 1
@@ -360,7 +372,8 @@ void Ambix_encoderAudioProcessorEditor::resized()
     txt_az_move->setBounds (37, 316, 78, 22);
     txt_el_move->setBounds (191, 316, 78, 22);
   
-    lbl_id->setBounds (271, 0, 57, 24);
+    lbl_id->setBounds (250, 2, 39, 24);
+    txt_id->setBounds (289, 5, 33, 19);
   
     btn_settings->setBounds (3, 3, 26, 25);
     
@@ -554,5 +567,22 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (Button* buttonThatWasClic
         }
     }
     
+}
+
+void Ambix_encoderAudioProcessorEditor::textEditorFocusLost (TextEditor& ed)
+{
+  updateID();
+}
+
+void Ambix_encoderAudioProcessorEditor::textEditorReturnKeyPressed (TextEditor& ed)
+{
+  updateID();
+}
+
+void Ambix_encoderAudioProcessorEditor::updateID()
+{
+  Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
+  
+  ourProcessor->m_id = txt_id->getText().getIntValue();
 }
 

@@ -516,7 +516,9 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
     {
         xml.setAttribute (String(i), getParameter(i));
     }
-    
+  
+    xml.setAttribute ("mID", m_id);
+  
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
 }
@@ -536,6 +538,8 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
             for (int i=0; i < getNumParameters(); i++) {
                 setParameter(i, xmlState->getDoubleAttribute(String(i)));
             }
+            if (xmlState->hasAttribute("mID"))
+              m_id  = xmlState->getIntAttribute("mID", m_id);
         }
         
     }

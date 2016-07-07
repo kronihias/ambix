@@ -1,18 +1,18 @@
 /*
   ==============================================================================
 
-  This is an automatically generated GUI class created by the Introjucer!
+  This is an automatically generated GUI class created by the Projucer!
 
   Be careful when adding custom code to these files, as only the code within
   the "//[xyz]" and "//[/xyz]" sections will be retained when the file is loaded
   and re-saved.
 
-  Created with Introjucer version: 3.1.0
+  Created with Projucer version: 4.2.1
 
   ------------------------------------------------------------------------------
 
-  The Introjucer is part of the JUCE library - "Jules' Utility Class Extensions"
-  Copyright 2004-13 by Raw Material Software Ltd.
+  The Projucer is part of the JUCE library - "Jules' Utility Class Extensions"
+  Copyright (c) 2015 - ROLI Ltd.
 
   ==============================================================================
 */
@@ -30,6 +30,9 @@
 Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_encoderAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter)
 {
+    //[Constructor_pre] You can add your own custom stuff here..
+    //[/Constructor_pre]
+
     addAndMakeVisible (sld_el = new Slider ("new slider"));
     sld_el->setTooltip (TRANS("elevation"));
     sld_el->setRange (-180, 180, 1);
@@ -133,13 +136,25 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     txt_el_move->setText (TRANS("-180 deg/s"));
 
     addAndMakeVisible (lbl_id = new Label ("new label",
-                                           TRANS("ID: 1")));
+                                           TRANS("ID:")));
     lbl_id->setFont (Font (15.00f, Font::plain));
     lbl_id->setJustificationType (Justification::centredRight);
     lbl_id->setEditable (false, false, false);
     lbl_id->setColour (Label::textColourId, Colour (0xff888888));
     lbl_id->setColour (TextEditor::textColourId, Colours::black);
     lbl_id->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+
+    addAndMakeVisible (txt_id = new TextEditor ("new text editor"));
+    txt_id->setTooltip (TRANS("identifier of the encoder - for OSC send/receive"));
+    txt_id->setMultiLine (false);
+    txt_id->setReturnKeyStartsNewLine (false);
+    txt_id->setReadOnly (false);
+    txt_id->setScrollbarsShown (false);
+    txt_id->setCaretVisible (true);
+    txt_id->setPopupMenuEnabled (true);
+    txt_id->setColour (TextEditor::textColourId, Colours::black);
+    txt_id->setColour (TextEditor::backgroundColourId, Colour (0xff888888));
+    txt_id->setText (TRANS("999"));
 
 
     //[UserPreSize]
@@ -168,6 +183,7 @@ Ambix_encoderAudioProcessorEditor::~Ambix_encoderAudioProcessorEditor()
     txt_az_move = nullptr;
     txt_el_move = nullptr;
     lbl_id = nullptr;
+    txt_id = nullptr;
 
 
     //[Destructor]. You can add your own custom destruction code here..
@@ -245,22 +261,16 @@ void Ambix_encoderAudioProcessorEditor::paint (Graphics& g)
     g.drawText (TRANS("azimuth move"),
                 59, 338, 81, 16,
                 Justification::centredRight, true);
-    
-    /* Version text */
-    g.setColour (Colours::white);
-    g.setFont (Font (10.00f, Font::plain));
-    String version_string;
-    version_string << "v" << QUOTE(VERSION);
-    g.drawText (version_string,
-                getWidth()-51, getHeight()-11, 50, 10,
-                Justification::bottomRight, true);
-    
+
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
 }
 
 void Ambix_encoderAudioProcessorEditor::resized()
 {
+    //[UserPreResize] Add your own custom resize code here..
+    //[/UserPreResize]
+
     sld_el->setBounds (270, 38, 40, 232);
     opengl_component->setBounds (24, 34, 240, 240);
     sld_az->setBounds (27, 270, 282, 40);
@@ -271,7 +281,8 @@ void Ambix_encoderAudioProcessorEditor::resized()
     sld_az_move->setBounds (118, 312, 29, 29);
     txt_az_move->setBounds (37, 316, 78, 22);
     txt_el_move->setBounds (191, 316, 78, 22);
-    lbl_id->setBounds (271, 0, 57, 24);
+    lbl_id->setBounds (250, 2, 39, 24);
+    txt_id->setBounds (289, 5, 33, 19);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -329,9 +340,9 @@ void Ambix_encoderAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWa
 
 //==============================================================================
 #if 0
-/*  -- Introjucer information section --
+/*  -- Projucer information section --
 
-    This is where the Introjucer stores the metadata that describe this GUI layout, so
+    This is where the Projucer stores the metadata that describe this GUI layout, so
     make changes in here at your peril!
 
 BEGIN_JUCER_METADATA
@@ -369,7 +380,8 @@ BEGIN_JUCER_METADATA
           explicitFocusOrder="0" pos="270 38 40 232" tooltip="elevation"
           thumbcol="ff808080" textboxtext="ff000000" textboxbkgd="ffffffff"
           min="-180" max="180" int="1" style="LinearVertical" textBoxPos="TextBoxBelow"
-          textBoxEditable="1" textBoxWidth="41" textBoxHeight="20" skewFactor="1"/>
+          textBoxEditable="1" textBoxWidth="41" textBoxHeight="20" skewFactor="1"
+          needsCallback="1"/>
   <GENERICCOMPONENT name="new component" id="3391b824ef1c7ad9" memberName="opengl_component"
                     virtualName="" explicitFocusOrder="0" pos="24 34 240 240" class="Component"
                     params=""/>
@@ -377,37 +389,40 @@ BEGIN_JUCER_METADATA
           explicitFocusOrder="0" pos="27 270 282 40" tooltip="azimuth"
           thumbcol="ff808080" textboxtext="ff000000" textboxbkgd="ffffffff"
           min="-180" max="180" int="1" style="LinearHorizontal" textBoxPos="TextBoxRight"
-          textBoxEditable="1" textBoxWidth="40" textBoxHeight="20" skewFactor="1"/>
+          textBoxEditable="1" textBoxWidth="40" textBoxHeight="20" skewFactor="1"
+          needsCallback="1"/>
   <SLIDER name="new slider" id="9fc511daef4de98d" memberName="sld_size"
           virtualName="" explicitFocusOrder="0" pos="32 355 29 29" tooltip="higher order scaling - decrease spatial sharpness"
           thumbcol="ffffffff" trackcol="ffffffff" rotarysliderfill="ffffffff"
           rotaryslideroutline="ffffffff" textboxtext="ffffffff" textboxbkgd="ffffffff"
           textboxhighlight="ffffffff" min="0" max="1" int="0.010000000000000000208"
           style="RotaryHorizontalVerticalDrag" textBoxPos="NoTextBox" textBoxEditable="1"
-          textBoxWidth="40" textBoxHeight="20" skewFactor="1"/>
+          textBoxWidth="40" textBoxHeight="20" skewFactor="1" needsCallback="1"/>
   <SLIDER name="new slider" id="823f23e392d249dc" memberName="sld_width"
           virtualName="" explicitFocusOrder="0" pos="93 355 29 29" tooltip="multiple input sources are equally spread along this range"
           thumbcol="ffe982cd" rotarysliderfill="ffffffff" rotaryslideroutline="ffffffff"
           textboxtext="ff000000" textboxbkgd="ffffffff" min="0" max="360"
           int="1" style="RotaryHorizontalVerticalDrag" textBoxPos="NoTextBox"
-          textBoxEditable="1" textBoxWidth="41" textBoxHeight="20" skewFactor="1"/>
+          textBoxEditable="1" textBoxWidth="41" textBoxHeight="20" skewFactor="1"
+          needsCallback="1"/>
   <SLIDER name="new slider" id="7299b2ca93f14e38" memberName="sld_speed"
           virtualName="" explicitFocusOrder="0" pos="169 347 140 40" tooltip="movement speed in deg/sec"
           thumbcol="ffe98273" textboxtext="ff000000" textboxbkgd="ffffffff"
           min="0" max="360" int="1" style="LinearHorizontal" textBoxPos="TextBoxRight"
-          textBoxEditable="1" textBoxWidth="40" textBoxHeight="20" skewFactor="1"/>
+          textBoxEditable="1" textBoxWidth="40" textBoxHeight="20" skewFactor="1"
+          needsCallback="1"/>
   <SLIDER name="new slider" id="945d76eb6afdfcca" memberName="sld_el_move"
           virtualName="" explicitFocusOrder="0" pos="275 312 29 29" tooltip="elevation movement speed"
           trackcol="ff2d7dff" rotarysliderfill="ffffffff" rotaryslideroutline="fff0ffff"
           min="0" max="1" int="0.010000000000000000208" style="RotaryHorizontalVerticalDrag"
           textBoxPos="NoTextBox" textBoxEditable="1" textBoxWidth="80"
-          textBoxHeight="20" skewFactor="1"/>
+          textBoxHeight="20" skewFactor="1" needsCallback="1"/>
   <SLIDER name="new slider" id="e8bf968ebd3f72b7" memberName="sld_az_move"
           virtualName="" explicitFocusOrder="0" pos="118 312 29 29" tooltip="azimuth movement speed"
           trackcol="ff2d7dff" rotarysliderfill="ffffffff" rotaryslideroutline="fff0ffff"
           min="0" max="1" int="0.010000000000000000208" style="RotaryHorizontalVerticalDrag"
           textBoxPos="NoTextBox" textBoxEditable="1" textBoxWidth="80"
-          textBoxHeight="20" skewFactor="1"/>
+          textBoxHeight="20" skewFactor="1" needsCallback="1"/>
   <TEXTEDITOR name="new text editor" id="5e5851601ca3b525" memberName="txt_az_move"
               virtualName="" explicitFocusOrder="0" pos="37 316 78 22" outlinecol="706884ff"
               shadowcol="0" initialText="-180 deg/s" multiline="0" retKeyStartsLine="0"
@@ -418,10 +433,14 @@ BEGIN_JUCER_METADATA
               multiline="0" retKeyStartsLine="0" readonly="1" scrollbars="0"
               caret="0" popupmenu="0"/>
   <LABEL name="new label" id="4f5581a62d8489b1" memberName="lbl_id" virtualName=""
-         explicitFocusOrder="0" pos="271 0 57 24" textCol="ff888888" edTextCol="ff000000"
-         edBkgCol="0" labelText="ID: 1" editableSingleClick="0" editableDoubleClick="0"
+         explicitFocusOrder="0" pos="250 2 39 24" textCol="ff888888" edTextCol="ff000000"
+         edBkgCol="0" labelText="ID:" editableSingleClick="0" editableDoubleClick="0"
          focusDiscardsChanges="0" fontname="Default font" fontsize="15"
          bold="0" italic="0" justification="34"/>
+  <TEXTEDITOR name="new text editor" id="7f0ee8e1a64d5ab0" memberName="txt_id"
+              virtualName="" explicitFocusOrder="0" pos="289 5 33 19" tooltip="identifier of the encoder - for OSC send/receive"
+              textcol="ff000000" bkgcol="ff888888" initialText="999" multiline="0"
+              retKeyStartsLine="0" readonly="0" scrollbars="0" caret="1" popupmenu="1"/>
 </JUCER_COMPONENT>
 
 END_JUCER_METADATA

@@ -41,7 +41,8 @@ class Ambix_encoderAudioProcessorEditor  : public AudioProcessorEditor,
                                            public SliderListener,
                                            public ChangeListener,
                                            public ButtonListener,
-                                           public Timer
+                                           public Timer,
+                                           public TextEditorListener
 {
 public:
     //==============================================================================
@@ -56,13 +57,17 @@ public:
     void resized();
     void sliderValueChanged (Slider* sliderThatWasMoved);
     void buttonClicked (Button* buttonThatWasClicked);
-    
+  
+    void textEditorFocusLost (TextEditor& ed);
+    void textEditorReturnKeyPressed (TextEditor& ed);
+  
     void changeListenerCallback (ChangeBroadcaster *source);
     
     void modifierKeysChanged (const ModifierKeys &modifiers );
     
     void timerCallback();
-    
+  
+    void updateID();
     // Binary resources:
     static const char* settings_png;
     static const int settings_pngSize;
@@ -87,6 +92,7 @@ private:
     ScopedPointer<TextEditor> txt_el_move;
     ScopedPointer<Label> lbl_id;
     ScopedPointer<ImageButton> btn_settings;
+    ScopedPointer<TextEditor> txt_id;
   
     ScopedPointer<SphereOpenGL> sphere_opengl;
     
