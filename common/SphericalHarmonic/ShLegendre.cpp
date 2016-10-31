@@ -63,13 +63,7 @@ void ShLegendre::Calc(int n_max, double arg, double arg_2)
         {
             for (int m=0; m <= n-2; m++)
             {
-                if (m+2 <= n) {
-                    Legendre(n*(n+1)+m) = ((2*n-1)*arg*Legendre((n)*(n-1)+m)-(n+m-1)*Legendre((n-2)*(n-1)+m))/(n-m);
-                } else
-                {
-                    Legendre(n*(n+1)+m) = ((2*n-1)*arg*Legendre((n)*(n-1)+m))/(n-m);
-                }
-                
+                Legendre(n*(n+1)+m) = ((2*n-1)*arg*Legendre((n)*(n-1)+m)-(n+m-1)*Legendre((n-2)*(n-1)+m))/(n-m);
             }
         }
         
