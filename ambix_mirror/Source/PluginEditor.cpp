@@ -49,7 +49,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
     label9 (nullptr),
     tgl_z_even_inv (nullptr),
     sld_z_odd (nullptr),
-    label1nullptr (nullptr),
+    label10 (nullptr),
     tgl_z_odd_inv (nullptr),
     lbl_x_even (nullptr),
     lbl_x_odd (nullptr),
