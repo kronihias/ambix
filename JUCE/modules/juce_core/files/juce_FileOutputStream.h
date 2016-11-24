@@ -51,6 +51,10 @@ public:
         use File::deleteFile() before opening the stream, or use setPosition(0)
         after it's opened (although this won't truncate the file).
 
+        Destroying a FileOutputStream object does not force the operating system
+        to write the buffered data to disk immediately. If this is required you
+        should call flush() before triggering the destructor.
+
         @see TemporaryFile
     */
     FileOutputStream (const File& fileToWriteTo,
@@ -101,7 +105,7 @@ private:
     Result status;
     int64 currentPosition;
     size_t bufferSize, bytesInBuffer;
-    HeapBlock <char> buffer;
+    HeapBlock<char> buffer;
 
     void openHandle();
     void closeHandle();

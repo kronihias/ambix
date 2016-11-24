@@ -22,7 +22,7 @@
   ==============================================================================
 */
 
-#if defined (JUCE_TRACKTION_MARKETPLACE_H_INCLUDED) && ! JUCE_AMALGAMATED_INCLUDE
+#ifdef JUCE_TRACKTION_MARKETPLACE_H_INCLUDED
  /* When you add this cpp file to your project, you mustn't include it in a file where you've
     already included any other headers - just put it inside a file on its own, possibly with your config
     flags preceding it, but don't include anything else. That also includes avoiding any automatic prefix
@@ -31,16 +31,15 @@
  #error "Incorrect use of JUCE cpp file"
 #endif
 
-// Your project must contain an AppConfig.h file with your project-specific settings in it,
-// and your header search path must make it accessible to the module's files.
-#include "AppConfig.h"
-
 #include "juce_tracktion_marketplace.h"
 
 namespace juce
 {
     #include "marketplace/juce_OnlineUnlockStatus.cpp"
+
+   #if JUCE_MODULE_AVAILABLE_juce_data_structures
     #include "marketplace/juce_TracktionMarketplaceStatus.cpp"
+   #endif
 
    #if JUCE_MODULE_AVAILABLE_juce_gui_extra
     #include "marketplace/juce_OnlineUnlockForm.cpp"

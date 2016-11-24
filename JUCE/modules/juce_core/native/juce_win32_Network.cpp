@@ -53,7 +53,7 @@ public:
             if (! isError())
             {
                 DWORD bufferSizeBytes = 4096;
-                StringPairArray dataHeaders (false);
+                StringPairArray dataHeaders;
 
                 for (;;)
                 {
@@ -505,7 +505,7 @@ bool JUCE_CALLTYPE Process::openEmailWithAttachments (const String& targetEmailA
     message.nRecipCount = 1;
     message.lpRecips = &recip;
 
-    HeapBlock <MapiFileDesc> files;
+    HeapBlock<MapiFileDesc> files;
     files.calloc ((size_t) filesToAttach.size());
 
     message.nFileCount = (ULONG) filesToAttach.size();

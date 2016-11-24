@@ -168,13 +168,33 @@ public:
         }
         else
         {
-					
             juce::jack_set_error_function (errorCallback);
-					
-						// add ports when clear how much we need!
-            
+
+            // open input ports
+            const StringArray inputChannels (getInputChannelNames());
+            for (int i = 0; i < inputChannels.size(); ++i)
+            {
+                String inputName;
+                inputName << "in_" << ++totalNumberOfInputChannels;
+
+                inputPorts.add (juce::jack_port_register (client, inputName.toUTF8(),
+                                                          JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0));
+            }
+
+            // open output ports
+            const StringArray outputChannels (getOutputChannelNames());
+            for (int i = 0; i < outputChannels.size(); ++i)
+            {
+                String outputName;
+                outputName << "out_" << ++totalNumberOfOutputChannels;
+
+                outputPorts.add (juce::jack_port_register (client, outputName.toUTF8(),
+                                                           JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0));
+            }
+
+            inChans.calloc (totalNumberOfInputChannels + 2);
+            outChans.calloc (totalNumberOfOutputChannels + 2);
         }
-       
     }
 
     ~JackAudioIODevice()
@@ -237,38 +257,13 @@ public:
 
         lastError.clear();
         close();
-				// std::cout << "Num Ins: " << inputChannels.getHighestBit()+1 << " Outputs: " << outputChannels.getHighestBit()+1 << std::endl;
-				// open input ports
-            for (int i = 0; i < inputChannels.getHighestBit()+1; ++i)
-            {
-                String inputName;
-                inputName << "in_" << ++totalNumberOfInputChannels;
 
-                inputPorts.add (juce::jack_port_register (client, inputName.toUTF8(),
-                                                          JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0));
-            }
-
-            // open output ports
-            for (int i = 0; i < outputChannels.getHighestBit()+1; ++i)
-            {
-                String outputName;
-                outputName << "out_" << ++totalNumberOfOutputChannels;
-
-                outputPorts.add (juce::jack_port_register (client, outputName.toUTF8(),
-                                                           JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0));
-            }
-
-            inChans.calloc (totalNumberOfInputChannels + 2);
-            outChans.calloc (totalNumberOfOutputChannels + 2);
-            
         juce::jack_set_process_callback (client, processCallback, this);
         juce::jack_set_port_connect_callback (client, portConnectCallback, this);
         juce::jack_on_shutdown (client, shutdownCallback, this);
         juce::jack_activate (client);
         deviceIsOpen = true;
-				
-				// do not auto connect!
-				/*
+
         if (! inputChannels.isZero())
         {
             for (JackPortIterator i (client, true); i.next();)
@@ -294,7 +289,8 @@ public:
                 }
             }
         }
-        */
+
+        updateActivePorts();
 
         return lastError;
     }
@@ -394,7 +390,7 @@ private:
         if (callback != nullptr)
         {
             if ((numActiveInChans + numActiveOutChans) > 0)
-                callback->audioDeviceIOCallback (const_cast <const float**> (inChans.getData()), numActiveInChans,
+                callback->audioDeviceIOCallback (const_cast<const float**> (inChans.getData()), numActiveInChans,
                                                  outChans, numActiveOutChans, numSamples);
         }
         else
@@ -443,7 +439,7 @@ private:
 
     static void portConnectCallback (jack_port_id_t, jack_port_id_t, int, void* arg)
     {
-        if (JackAudioIODevice* device = static_cast <JackAudioIODevice*> (arg))
+        if (JackAudioIODevice* device = static_cast<JackAudioIODevice*> (arg))
             device->updateActivePorts();
     }
 
@@ -476,7 +472,7 @@ private:
     AudioIODeviceCallback* callback;
     CriticalSection callbackLock;
 
-    HeapBlock <float*> inChans, outChans;
+    HeapBlock<float*> inChans, outChans;
     int totalNumberOfInputChannels;
     int totalNumberOfOutputChannels;
     Array<void*> inputPorts, outputPorts;
@@ -563,7 +559,7 @@ public:
     {
         jassert (hasScanned); // need to call scanForDevices() before doing this
 
-        if (JackAudioIODevice* d = dynamic_cast <JackAudioIODevice*> (device))
+        if (JackAudioIODevice* d = dynamic_cast<JackAudioIODevice*> (device))
             return asInput ? inputIds.indexOf (d->inputId)
                            : outputIds.indexOf (d->outputId);
 

@@ -253,7 +253,7 @@ public:
         bounds will no longer be a direct reflection of the position at which it appears within
         its parent, as the transform will be applied to its bounding box.
     */
-    int getX() const noexcept                               { return bounds.getX(); }
+    int getX() const noexcept                               { return boundsRelativeToParent.getX(); }
 
     /** Returns the y coordinate of the top of this component.
         This is a distance in pixels from the top edge of the component's parent.
@@ -262,13 +262,13 @@ public:
         bounds will no longer be a direct reflection of the position at which it appears within
         its parent, as the transform will be applied to its bounding box.
     */
-    int getY() const noexcept                               { return bounds.getY(); }
+    int getY() const noexcept                               { return boundsRelativeToParent.getY(); }
 
     /** Returns the component's width in pixels. */
-    int getWidth() const noexcept                           { return bounds.getWidth(); }
+    int getWidth() const noexcept                           { return boundsRelativeToParent.getWidth(); }
 
     /** Returns the component's height in pixels. */
-    int getHeight() const noexcept                          { return bounds.getHeight(); }
+    int getHeight() const noexcept                          { return boundsRelativeToParent.getHeight(); }
 
     /** Returns the x coordinate of the component's right-hand edge.
         This is a distance in pixels from the left edge of the component's parent.
@@ -277,10 +277,10 @@ public:
         bounds will no longer be a direct reflection of the position at which it appears within
         its parent, as the transform will be applied to its bounding box.
     */
-    int getRight() const noexcept                           { return bounds.getRight(); }
+    int getRight() const noexcept                           { return boundsRelativeToParent.getRight(); }
 
     /** Returns the component's top-left position as a Point. */
-    Point<int> getPosition() const noexcept                 { return bounds.getPosition(); }
+    Point<int> getPosition() const noexcept                 { return boundsRelativeToParent.getPosition(); }
 
     /** Returns the y coordinate of the bottom edge of this component.
         This is a distance in pixels from the top edge of the component's parent.
@@ -289,7 +289,7 @@ public:
         bounds will no longer be a direct reflection of the position at which it appears within
         its parent, as the transform will be applied to its bounding box.
     */
-    int getBottom() const noexcept                          { return bounds.getBottom(); }
+    int getBottom() const noexcept                          { return boundsRelativeToParent.getBottom(); }
 
     /** Returns this component's bounding box.
         The rectangle returned is relative to the top-left of the component's parent.
@@ -298,7 +298,7 @@ public:
         bounds will no longer be a direct reflection of the position at which it appears within
         its parent, as the transform will be applied to its bounding box.
     */
-    const Rectangle<int>& getBounds() const noexcept        { return bounds; }
+    const Rectangle<int>& getBounds() const noexcept        { return boundsRelativeToParent; }
 
     /** Returns the component's bounds, relative to its own origin.
         This is like getBounds(), but returns the rectangle in local coordinates, In practice, it'll
@@ -544,9 +544,8 @@ public:
 
     /** Changes the position of the component's centre.
 
-        Leaves the position unchanged, but positions its centre relative to its
-        parent's size. E.g. setCentreRelative (0.5f, 0.5f) would place it centrally in
-        its parent.
+        Leaves the size unchanged, but positions its centre relative to its parent's size.
+        E.g. setCentreRelative (0.5f, 0.5f) would place it centrally in its parent.
     */
     void setCentreRelative (float x, float y);
 
@@ -574,7 +573,7 @@ public:
         Currently, transforms are not supported for desktop windows, so the transform will be ignored if you
         put a component on the desktop.
 
-        To remove a component's transform, simply pass AffineTransform::identity as the parameter to this method.
+        To remove a component's transform, simply pass AffineTransform() as the parameter to this method.
     */
     void setTransform (const AffineTransform& transform);
 
@@ -1768,7 +1767,7 @@ public:
         This is a handy equivalent to (isMouseOver() || isMouseButtonDown()).
         @see isMouseOver, isMouseButtonDown, isMouseButtonDownAnywhere
     */
-    bool isMouseOverOrDragging() const;
+    bool isMouseOverOrDragging (bool includeChildren = false) const;
 
     /** Returns true if a mouse button is currently down.
 
@@ -1953,12 +1952,14 @@ public:
     /** Returns true if this component is the modal one.
 
         It's possible to have nested modal components, e.g. a pop-up dialog box
-        that launches another pop-up, but this will only return true for
-        the one at the top of the stack.
+        that launches another pop-up. If onlyConsiderForemostModalComponent is
+        true then isCurrentlyModal will only return true for the one at the top
+        of the stack. If onlyConsiderForemostModalComponent is false then
+        isCurrentlyModal will return true for any modal component in the stack.
 
         @see getCurrentlyModalComponent
     */
-    bool isCurrentlyModal() const noexcept;
+    bool isCurrentlyModal (bool onlyConsiderForemostModalComponent = true) const noexcept;
 
     /** Returns the number of components that are currently in a modal state.
         @see getCurrentlyModalComponent
@@ -2037,7 +2038,7 @@ public:
         look-and-feel either, it will just return black.
 
         The colour IDs for various purposes are stored as enums in the components that
-        they are relevent to - for an example, see Slider::ColourIds,
+        they are relevant to - for an example, see Slider::ColourIds,
         Label::ColourIds, TextEditor::ColourIds, TreeView::ColourIds, etc.
 
         @see setColour, isColourSpecified, colourChanged, LookAndFeel::findColour, LookAndFeel::setColour
@@ -2243,7 +2244,7 @@ private:
     //==============================================================================
     String componentName, componentID;
     Component* parentComponent;
-    Rectangle<int> bounds;
+    Rectangle<int> boundsRelativeToParent;
     ScopedPointer<Positioner> positioner;
     ScopedPointer<AffineTransform> affineTransform;
     Array<Component*> childComponentList;
@@ -2277,7 +2278,6 @@ private:
         bool bufferToImageFlag          : 1;
         bool bringToFrontOnClickFlag    : 1;
         bool repaintOnMouseActivityFlag : 1;
-        bool currentlyModalFlag         : 1;
         bool isDisabledFlag             : 1;
         bool childCompFocusedFlag       : 1;
         bool dontClipGraphicsFlag       : 1;
@@ -2301,7 +2301,7 @@ private:
     void internalMouseEnter (MouseInputSource, Point<float>, Time);
     void internalMouseExit  (MouseInputSource, Point<float>, Time);
     void internalMouseDown  (MouseInputSource, Point<float>, Time, float);
-    void internalMouseUp    (MouseInputSource, Point<float>, Time, const ModifierKeys oldModifiers);
+    void internalMouseUp    (MouseInputSource, Point<float>, Time, const ModifierKeys oldModifiers, float);
     void internalMouseDrag  (MouseInputSource, Point<float>, Time, float);
     void internalMouseMove  (MouseInputSource, Point<float>, Time);
     void internalMouseWheel (MouseInputSource, Point<float>, Time, const MouseWheelDetails&);

@@ -35,7 +35,7 @@ public:
 
         The returned value is a block of text containing an RSA-encoded block, followed
         by some human-readable details. If you pass this block of text to
-        OnlineUnlockStatus::applyKeyFile(), it will decrpyt it, and if the
+        OnlineUnlockStatus::applyKeyFile(), it will decrypt it, and if the
         key matches and the machine numbers match, it will unlock that machine.
 
         Typically the way you'd use this on a server would be to build a small executable
@@ -50,6 +50,22 @@ public:
                                                  const String& userName,
                                                  const String& machineNumbers,
                                                  const RSAKey& privateKey);
+
+    /** Similar to the above key file generation method but with an expiry time.
+        You must supply a Time after which this key file should no longer be considered as active.
+
+        N.B. when an app is unlocked with an expiring key file, OnlineUnlockStatus::isUnlocked will
+        still return false. You must then check OnlineUnlockStatus::getExpiryTime to see if this
+        expiring key file is still in date and act accordingly.
+
+        @see OnlineUnlockStatus
+    */
+    static String JUCE_CALLTYPE generateExpiringKeyFile (const String& appName,
+                                                         const String& userEmail,
+                                                         const String& userName,
+                                                         const String& machineNumbers,
+                                                         const Time expiryTime,
+                                                         const RSAKey& privateKey);
 
     //==============================================================================
     /** This is a simple implementation of a key-generator that you could easily wrap in

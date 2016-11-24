@@ -172,7 +172,7 @@ String XmlDocument::getFileContents (const String& filename) const
             return in->readEntireStreamAsString();
     }
 
-    return String::empty;
+    return String();
 }
 
 juce_wchar XmlDocument::readNextChar() noexcept
@@ -617,9 +617,17 @@ void XmlDocument::readChildElements (XmlElement& parent)
                 }
                 else
                 {
-                    for (;;)
+                    for (;; ++input)
                     {
-                        const juce_wchar nextChar = *input;
+                        juce_wchar nextChar = *input;
+
+                        if (nextChar == '\r')
+                        {
+                            nextChar = '\n';
+
+                            if (input[1] == '\n')
+                                continue;
+                        }
 
                         if (nextChar == '<' || nextChar == '&')
                             break;
@@ -633,7 +641,6 @@ void XmlDocument::readChildElements (XmlElement& parent)
 
                         textElementContent.appendUTF8Char (nextChar);
                         contentShouldBeUsed = contentShouldBeUsed || ! CharacterFunctions::isWhitespace (nextChar);
-                        ++input;
                     }
                 }
             }
@@ -759,10 +766,10 @@ String XmlDocument::expandEntity (const String& ent)
         const juce_wchar char1 = ent[1];
 
         if (char1 == 'x' || char1 == 'X')
-            return String::charToString (static_cast <juce_wchar> (ent.substring (2).getHexValue32()));
+            return String::charToString (static_cast<juce_wchar> (ent.substring (2).getHexValue32()));
 
         if (char1 >= '0' && char1 <= '9')
-            return String::charToString (static_cast <juce_wchar> (ent.substring (1).getIntValue()));
+            return String::charToString (static_cast<juce_wchar> (ent.substring (1).getIntValue()));
 
         setLastError ("illegal escape sequence", false);
         return String::charToString ('&');

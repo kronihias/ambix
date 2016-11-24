@@ -88,6 +88,7 @@ Synthesiser::Synthesiser()
     : sampleRate (0),
       lastNoteOnCounter (0),
       minimumSubBlockSize (32),
+      subBlockSubdivisionIsStrict (false),
       shouldStealNotes (true)
 {
     for (int i = 0; i < numElementsInArray (lastPitchWheelValues); ++i)
@@ -114,6 +115,7 @@ void Synthesiser::clearVoices()
 SynthesiserVoice* Synthesiser::addVoice (SynthesiserVoice* const newVoice)
 {
     const ScopedLock sl (lock);
+    newVoice->setCurrentPlaybackSampleRate (sampleRate);
     return voices.add (newVoice);
 }
 
@@ -146,10 +148,11 @@ void Synthesiser::setNoteStealingEnabled (const bool shouldSteal)
     shouldStealNotes = shouldSteal;
 }
 
-void Synthesiser::setMinimumRenderingSubdivisionSize (int numSamples) noexcept
+void Synthesiser::setMinimumRenderingSubdivisionSize (int numSamples, bool shouldBeStrict) noexcept
 {
     jassert (numSamples > 0); // it wouldn't make much sense for this to be less than 1
     minimumSubBlockSize = numSamples;
+    subBlockSubdivisionIsStrict = shouldBeStrict;
 }
 
 //==============================================================================
@@ -176,10 +179,12 @@ void Synthesiser::processNextBlock (AudioBuffer<floatType>& outputAudio,
 {
     // must set the sample rate before using this!
     jassert (sampleRate != 0);
+    const int targetChannels = outputAudio.getNumChannels();
 
     MidiBuffer::Iterator midiIterator (midiData);
     midiIterator.setNextSamplePosition (startSample);
 
+    bool firstEvent = true;
     int midiEventPos;
     MidiMessage m;
 
@@ -189,7 +194,9 @@ void Synthesiser::processNextBlock (AudioBuffer<floatType>& outputAudio,
     {
         if (! midiIterator.getNextEvent (m, midiEventPos))
         {
-            renderVoices (outputAudio, startSample, numSamples);
+            if (targetChannels > 0)
+                renderVoices (outputAudio, startSample, numSamples);
+
             return;
         }
 
@@ -197,18 +204,24 @@ void Synthesiser::processNextBlock (AudioBuffer<floatType>& outputAudio,
 
         if (samplesToNextMidiMessage >= numSamples)
         {
-            renderVoices (outputAudio, startSample, numSamples);
+            if (targetChannels > 0)
+                renderVoices (outputAudio, startSample, numSamples);
+
             handleMidiEvent (m);
             break;
         }
 
-        if (samplesToNextMidiMessage < minimumSubBlockSize)
+        if (samplesToNextMidiMessage < ((firstEvent && ! subBlockSubdivisionIsStrict) ? 1 : minimumSubBlockSize))
         {
             handleMidiEvent (m);
             continue;
         }
 
-        renderVoices (outputAudio, startSample, samplesToNextMidiMessage);
+        firstEvent = false;
+
+        if (targetChannels > 0)
+            renderVoices (outputAudio, startSample, samplesToNextMidiMessage);
+
         handleMidiEvent (m);
         startSample += samplesToNextMidiMessage;
         numSamples  -= samplesToNextMidiMessage;
@@ -511,13 +524,13 @@ void Synthesiser::handleSostenutoPedal (int midiChannel, bool isDown)
 
 void Synthesiser::handleSoftPedal (int midiChannel, bool /*isDown*/)
 {
-    (void) midiChannel;
+    ignoreUnused (midiChannel);
     jassert (midiChannel > 0 && midiChannel <= 16);
 }
 
 void Synthesiser::handleProgramChange (int midiChannel, int programNumber)
 {
-    (void) midiChannel; (void) programNumber;
+    ignoreUnused (midiChannel, programNumber);
     jassert (midiChannel > 0 && midiChannel <= 16);
 }
 
@@ -556,6 +569,9 @@ SynthesiserVoice* Synthesiser::findVoiceToSteal (SynthesiserSound* soundToPlay,
     // This voice-stealing algorithm applies the following heuristics:
     // - Re-use the oldest notes first
     // - Protect the lowest & topmost notes, even if sustained, but not if they've been released.
+
+    // apparently you are trying to render audio without having any voices...
+    jassert (voices.size() > 0);
 
     // These are the voices we want to protect (ie: only steal if unavoidable)
     SynthesiserVoice* low = nullptr; // Lowest sounding note, might be sustained, but NOT in release phase

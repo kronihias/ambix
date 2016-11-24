@@ -74,7 +74,7 @@ public:
 
    #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
     OwnedArray (OwnedArray&& other) noexcept
-        : data (static_cast <ArrayAllocationBase <ObjectClass*, TypeOfCriticalSectionToUse>&&> (other.data)),
+        : data (static_cast<ArrayAllocationBase <ObjectClass*, TypeOfCriticalSectionToUse>&&> (other.data)),
           numUsed (other.numUsed)
     {
         other.numUsed = 0;
@@ -85,7 +85,7 @@ public:
         const ScopedLockType lock (getLock());
         deleteAllObjects();
 
-        data = static_cast <ArrayAllocationBase <ObjectClass*, TypeOfCriticalSectionToUse>&&> (other.data);
+        data = static_cast<ArrayAllocationBase <ObjectClass*, TypeOfCriticalSectionToUse>&&> (other.data);
         numUsed = other.numUsed;
         other.numUsed = 0;
         return *this;
@@ -124,6 +124,12 @@ public:
     inline int size() const noexcept
     {
         return numUsed;
+    }
+
+    /** Returns true if the array is empty, false otherwise. */
+    inline bool isEmpty() const noexcept
+    {
+        return size() == 0;
     }
 
     /** Returns a pointer to the object at this index in the array.
@@ -239,7 +245,7 @@ public:
 
         for (; e != end_; ++e)
             if (objectToLookFor == *e)
-                return static_cast <int> (e - data.elements.getData());
+                return static_cast<int> (e - data.elements.getData());
 
         return -1;
     }
@@ -372,16 +378,17 @@ public:
         If the array already contains a matching object, nothing will be done.
 
         @param newObject   the new object to add to the array
-        @returns           the new object that was added
+        @returns           true if the new object was added, false otherwise
     */
-    ObjectClass* addIfNotAlreadyThere (ObjectClass* newObject) noexcept
+    bool addIfNotAlreadyThere (ObjectClass* newObject) noexcept
     {
         const ScopedLockType lock (getLock());
 
-        if (! contains (newObject))
-            add (newObject);
+        if (contains (newObject))
+            return false;
 
-        return newObject;
+        add (newObject);
+        return true;
     }
 
     /** Replaces an object in the array with a different one.
@@ -523,8 +530,8 @@ public:
     template <class ElementComparator>
     int addSorted (ElementComparator& comparator, ObjectClass* const newObject) noexcept
     {
-        (void) comparator;  // if you pass in an object with a static compareElements() method, this
-                            // avoids getting warning messages about the parameter being unused
+        ignoreUnused (comparator); // if you pass in an object with a static compareElements() method, this
+                                   // avoids getting warning messages about the parameter being unused
         const ScopedLockType lock (getLock());
         const int index = findInsertIndexInSortedArray (comparator, data.elements.getData(), newObject, 0, numUsed);
         insert (index, newObject);
@@ -546,7 +553,7 @@ public:
     template <typename ElementComparator>
     int indexOfSorted (ElementComparator& comparator, const ObjectClass* const objectToLookFor) const noexcept
     {
-        (void) comparator;
+        ignoreUnused (comparator);
         const ScopedLockType lock (getLock());
         int s = 0, e = numUsed;
 
@@ -854,8 +861,8 @@ public:
     void sort (ElementComparator& comparator,
                bool retainOrderOfEquivalentItems = false) const noexcept
     {
-        (void) comparator;  // if you pass in an object with a static compareElements() method, this
-                            // avoids getting warning messages about the parameter being unused
+        ignoreUnused (comparator); // if you pass in an object with a static compareElements() method, this
+                                   // avoids getting warning messages about the parameter being unused
 
         const ScopedLockType lock (getLock());
         sortArray (comparator, data.elements.getData(), 0, size() - 1, retainOrderOfEquivalentItems);

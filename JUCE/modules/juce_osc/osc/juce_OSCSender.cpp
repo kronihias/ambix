@@ -2,7 +2,7 @@
   ==============================================================================
 
    This file is part of the JUCE library.
-   Copyright (c) 2013 - Raw Material Software Ltd.
+   Copyright (c) 2015 - ROLI Ltd.
 
    Permission is granted to use this software under the terms of either:
    a) the GPL v2 (or any later version)
@@ -35,13 +35,15 @@ namespace
      */
     struct OSCOutputStream
     {
+        OSCOutputStream() noexcept {}
+
         /** Returns a pointer to the data that has been written to the stream. */
         const void* getData() const noexcept    { return output.getData(); }
 
         /** Returns the number of bytes of data that have been written to the stream. */
         size_t getDataSize() const noexcept     { return output.getDataSize(); }
 
-        //==========================================================================
+        //==============================================================================
         bool writeInt32 (int32 value)
         {
             return output.writeIntBigEndian (value);
@@ -124,7 +126,7 @@ namespace
             }
         }
 
-        //==========================================================================
+        //==============================================================================
         bool writeMessage (const OSCMessage& msg)
         {
             if (! writeAddressPattern (msg.getAddressPattern()))
@@ -160,7 +162,7 @@ namespace
             return true;
         }
 
-        //==========================================================================
+        //==============================================================================
         bool writeBundleElement (const OSCBundle::Element& element)
         {
             const int64 startPos = output.getPosition();
@@ -189,6 +191,8 @@ namespace
 
     private:
         MemoryOutputStream output;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OSCOutputStream)
     };
 
 } // namespace
@@ -200,7 +204,7 @@ struct OSCSender::Pimpl
     Pimpl() noexcept : targetPortNumber (0) {}
     ~Pimpl() noexcept { disconnect(); }
 
-    //==========================================================================
+    //==============================================================================
     bool connect (const String& newTargetHost, int newTargetPort)
     {
         if (! disconnect())
@@ -223,33 +227,35 @@ struct OSCSender::Pimpl
         return true;
     }
 
-    //==========================================================================
-    bool send (const OSCMessage& message)
+    //==============================================================================
+    bool send (const OSCMessage& message, const String& hostName, int portNumber)
     {
         OSCOutputStream outStream;
         outStream.writeMessage (message);
-        return sendOutputStream (outStream);
+        return sendOutputStream (outStream, hostName, portNumber);
     }
 
-    bool send (const OSCBundle& bundle)
+    bool send (const OSCBundle& bundle, const String& hostName, int portNumber)
     {
         OSCOutputStream outStream;
         outStream.writeBundle (bundle);
-        return sendOutputStream (outStream);
+        return sendOutputStream (outStream, hostName, portNumber);
     }
 
+    bool send (const OSCMessage& message)   { return send (message, targetHostName, targetPortNumber); }
+    bool send (const OSCBundle& bundle)     { return send (bundle,  targetHostName, targetPortNumber); }
+
 private:
-    //==========================================================================
-    bool sendOutputStream (OSCOutputStream& outStream)
+    //==============================================================================
+    bool sendOutputStream (OSCOutputStream& outStream, const String& hostName, int portNumber)
     {
         if (socket != nullptr)
         {
-            int bytesWritten = socket->write (targetHostName,
-                                              targetPortNumber,
-                                              outStream.getData(),
-                                              (int) outStream.getDataSize());
+            const int streamSize = (int) outStream.getDataSize();
 
-            return bytesWritten == (int) outStream.getDataSize();
+            const int bytesWritten = socket->write (hostName, portNumber,
+                                                    outStream.getData(), streamSize);
+            return bytesWritten == streamSize;
         }
 
         // if you hit this, you tried to send some OSC data without being
@@ -259,7 +265,7 @@ private:
         return false;
     }
 
-    //==========================================================================
+    //==============================================================================
     ScopedPointer<DatagramSocket> socket;
     String targetHostName;
     int targetPortNumber;
@@ -294,6 +300,8 @@ bool OSCSender::disconnect()
 bool OSCSender::send (const OSCMessage& message)    { return pimpl->send (message); }
 bool OSCSender::send (const OSCBundle& bundle)      { return pimpl->send (bundle); }
 
+bool OSCSender::sendToIPAddress (const String& host, int port, const OSCMessage& message) { return pimpl->send (message, host, port); }
+bool OSCSender::sendToIPAddress (const String& host, int port, const OSCBundle& bundle)   { return pimpl->send (bundle,  host, port); }
 
 //==============================================================================
 //==============================================================================

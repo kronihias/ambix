@@ -218,7 +218,7 @@ File File::getSpecialLocation (const SpecialLocationType type)
 
             case invokedExecutableFile:
                 if (juce_argv != nullptr && juce_argc > 0)
-                    return File (CharPointer_UTF8 (juce_argv[0]));
+                    return File::getCurrentWorkingDirectory().getChildFile (CharPointer_UTF8 (juce_argv[0]));
                 // deliberate fall-through...
 
             case currentExecutableFile:
@@ -229,13 +229,13 @@ File File::getSpecialLocation (const SpecialLocationType type)
                 const File exe (juce_getExecutableFile());
                 const File parent (exe.getParentDirectory());
 
-              #if JUCE_IOS
+               #if JUCE_IOS
                 return parent;
-              #else
+               #else
                 return parent.getFullPathName().endsWithIgnoreCase ("Contents/MacOS")
                         ? parent.getParentDirectory().getParentDirectory()
                         : exe;
-              #endif
+               #endif
             }
 
             case hostApplicationPath:
@@ -277,12 +277,7 @@ String File::getVersion() const
 //==============================================================================
 static NSString* getFileLink (const String& path)
 {
-   #if JUCE_IOS || (defined (MAC_OS_X_VERSION_10_5) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_5)
     return [[NSFileManager defaultManager] destinationOfSymbolicLinkAtPath: juceStringToNS (path) error: nil];
-   #else
-    // (the cast here avoids a deprecation warning)
-    return [((id) [NSFileManager defaultManager]) pathContentOfSymbolicLinkAtPath: juceStringToNS (path)];
-   #endif
 }
 
 bool File::isSymbolicLink() const
@@ -409,14 +404,20 @@ bool JUCE_CALLTYPE Process::openDocument (const String& fileName, const String& 
             filenameAsURL = [NSURL fileURLWithPath: fileNameAsNS];
 
       #if JUCE_IOS
-        (void) parameters;
+        ignoreUnused (parameters);
+
+        if (SystemStats::isRunningInAppExtensionSandbox())
+            return false;
+
         return [[UIApplication sharedApplication] openURL: filenameAsURL];
       #else
         NSWorkspace* workspace = [NSWorkspace sharedWorkspace];
 
         if (parameters.isEmpty())
-            return [workspace openFile: juceStringToNS (fileName)]
-                || [workspace openURL: filenameAsURL];
+            // NB: the length check here is because of strange failures involving long filenames,
+            // probably due to filesystem name length limitations..
+            return (fileName.length() < 1024 && [workspace openFile: juceStringToNS (fileName)])
+                    || [workspace openURL: filenameAsURL];
 
         const File file (fileName);
 
@@ -462,13 +463,7 @@ OSType File::getMacOSType() const
 {
     JUCE_AUTORELEASEPOOL
     {
-       #if JUCE_IOS || (defined (MAC_OS_X_VERSION_10_5) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_5)
         NSDictionary* fileDict = [[NSFileManager defaultManager] attributesOfItemAtPath: juceStringToNS (getFullPathName()) error: nil];
-       #else
-        // (the cast here avoids a deprecation warning)
-        NSDictionary* fileDict = [((id) [NSFileManager defaultManager]) fileAttributesAtPath: juceStringToNS (getFullPathName()) traverseLink: NO];
-       #endif
-
         return [fileDict fileHFSTypeCode];
     }
 }

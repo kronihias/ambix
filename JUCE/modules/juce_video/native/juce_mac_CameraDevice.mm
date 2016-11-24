@@ -30,7 +30,8 @@ extern Image juce_createImageFromCIImage (CIImage*, int w, int h);
 
 struct CameraDevice::Pimpl
 {
-    Pimpl (const String&, const int index, int /*minWidth*/, int /*minHeight*/, int /*maxWidth*/, int /*maxHeight*/)
+    Pimpl (const String&, const int index, int /*minWidth*/, int /*minHeight*/, int /*maxWidth*/, int /*maxHeight*/,
+           bool useHighQuality)
         : input (nil),
           audioDevice (nil),
           audioInput (nil),
@@ -66,8 +67,9 @@ struct CameraDevice::Pimpl
                 if (err == nil)
                 {
                     resetFile();
+                    imageOutput = useHighQuality ? [[QTCaptureDecompressedVideoOutput alloc] init] :
+                                                   [[QTCaptureVideoPreviewOutput alloc] init];
 
-                    imageOutput = [[QTCaptureDecompressedVideoOutput alloc] init];
                     [imageOutput setDelegate: callbackDelegate];
 
                     if (err == nil)
@@ -224,11 +226,7 @@ struct CameraDevice::Pimpl
     {
         const Time now (Time::getCurrentTime());
 
-       #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_5
         NSNumber* hosttime = (NSNumber*) [sampleBuffer attributeForKey: QTSampleBufferHostTimeAttribute];
-       #else
-        NSNumber* hosttime = (NSNumber*) [sampleBuffer attributeForKey: nsStringLiteral ("hostTime")];
-       #endif
 
         int64 presentationTime = (hosttime != nil)
                 ? ((int64) AudioConvertHostTimeToNanos ([hosttime unsignedLongLongValue]) / 1000000 + 40)
@@ -267,7 +265,7 @@ struct CameraDevice::Pimpl
     QTCaptureDeviceInput* audioInput;
     QTCaptureSession* session;
     QTCaptureMovieFileOutput* fileOutput;
-    QTCaptureDecompressedVideoOutput* imageOutput;
+    QTCaptureOutput* imageOutput;
     NSObject* callbackDelegate;
     String openingError;
     int64 firstPresentationTime, averageTimeOffset;

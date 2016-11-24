@@ -429,14 +429,15 @@ private:
         writeValueIfNotPresent (header, userHeaders, "Connection:", "close");
 
         if (isPost)
-        {
             writeValueIfNotPresent (header, userHeaders, "Content-Length:", String ((int) postData.getSize()));
-            header << userHeaders << "\r\n" << postData;
-        }
-        else
-        {
-            header << "\r\n" << userHeaders << "\r\n";
-        }
+
+        if (userHeaders.isNotEmpty())
+            header << "\r\n" << userHeaders;
+
+        header << "\r\n";
+
+        if (isPost)
+            header << postData;
 
         return header.getMemoryBlock();
     }
@@ -453,7 +454,7 @@ private:
 
             const int numToSend = jmin (1024, (int) (requestHeader.getSize() - totalHeaderSent));
 
-            if (send (socketHandle, static_cast <const char*> (requestHeader.getData()) + totalHeaderSent, (size_t) numToSend, 0) != numToSend)
+            if (send (socketHandle, static_cast<const char*> (requestHeader.getData()) + totalHeaderSent, (size_t) numToSend, 0) != numToSend)
                 return false;
 
             totalHeaderSent += (size_t) numToSend;

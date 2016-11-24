@@ -656,7 +656,10 @@ namespace WavFileHelpers
 
                 if (infoLength > 0)
                 {
-                    infoLength = jlimit ((int64) 0, infoLength, (int64) input.readInt());
+                    infoLength = jmin (infoLength, (int64) input.readInt());
+
+                    if (infoLength <= 0)
+                        return;
 
                     for (int i = 0; i < numElementsInArray (types); ++i)
                     {
@@ -664,7 +667,8 @@ namespace WavFileHelpers
                         {
                             MemoryBlock mb;
                             input.readIntoMemoryBlock (mb, (ssize_t) infoLength);
-                            values.set (types[i], mb.toString());
+                            values.set (types[i], String::createStringFromData ((const char*) mb.getData(),
+                                                                                (int) mb.getSize()));
                             break;
                         }
                     }
@@ -845,7 +849,7 @@ namespace WavFileHelpers
 
         static MemoryBlock createFrom (const StringPairArray& values)
         {
-            const String ISRC (values.getValue (WavAudioFormat::ISRC, String::empty));
+            const String ISRC (values.getValue (WavAudioFormat::ISRC, String()));
             MemoryOutputStream xml;
 
             if (ISRC.isNotEmpty())
@@ -1258,7 +1262,7 @@ public:
         if (writeFailed)
             return false;
 
-        const size_t bytes = numChannels * (unsigned int) numSamples * bitsPerSample / 8;
+        const size_t bytes = numChannels * (size_t) numSamples * bitsPerSample / 8;
         tempBlock.ensureSize (bytes, false);
 
         switch (bitsPerSample)
@@ -1606,7 +1610,7 @@ AudioFormatWriter* WavAudioFormat::createWriterFor (OutputStream* out, double sa
                                                     unsigned int numChannels, int bitsPerSample,
                                                     const StringPairArray& metadataValues, int /*qualityOptionIndex*/)
 {
-    if (getPossibleBitDepths().contains (bitsPerSample))
+    if (out != nullptr && getPossibleBitDepths().contains (bitsPerSample))
         return new WavAudioFormatWriter (out, sampleRate, (unsigned int) numChannels,
                                          (unsigned int) bitsPerSample, metadataValues);
 

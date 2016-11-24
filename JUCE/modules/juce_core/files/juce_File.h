@@ -48,9 +48,8 @@ public:
     //==============================================================================
     /** Creates an (invalid) file object.
 
-        The file is initially set to an empty path, so getFullPath() will return
-        an empty string, and comparing the file to File::nonexistent will return
-        true.
+        The file is initially set to an empty path, so getFullPathName() will return
+        an empty string.
 
         You can use its operator= method to point it at a proper file.
     */
@@ -95,8 +94,13 @@ public:
    #endif
 
     //==============================================================================
-    /** This static constant is used for referring to an 'invalid' file. */
+   #if JUCE_ALLOW_STATIC_NULL_VARIABLES
+    /** This static constant is used for referring to an 'invalid' file.
+        Bear in mind that you should avoid this kind of static variable, and always prefer
+        to use File() or {} if you need a default-constructed File object.
+    */
     static const File nonexistent;
+   #endif
 
     //==============================================================================
     /** Checks whether the file actually exists.
@@ -430,7 +434,8 @@ public:
 
         If it already exists or is a directory, this method will do nothing.
 
-        @returns    true if the file has been created (or if it already existed).
+        @returns    a result to indicate whether the file was created successfully,
+                    or an error message if it failed.
         @see createDirectory
     */
     Result create() const;
@@ -501,6 +506,18 @@ public:
         @returns    true if the operation succeeds
     */
     bool copyFileTo (const File& targetLocation) const;
+
+    /** Replaces a file.
+
+        Replace the file in the given location, assuming the replaced files identity.
+        Depending on the file system this will preserve file attributes such as
+        creation date, short file name, etc.
+
+        If replacement succeeds the original file is deleted.
+
+        @returns    true if the operation succeeds
+    */
+    bool replaceFileIn (const File& targetLocation) const;
 
     /** Copies a directory.
 
@@ -981,6 +998,7 @@ private:
     Result createDirectoryInternal (const String&) const;
     bool copyInternal (const File&) const;
     bool moveInternal (const File&) const;
+    bool replaceInternal (const File&) const;
     bool setFileTimesInternal (int64 m, int64 a, int64 c) const;
     void getFileTimesInternal (int64& m, int64& a, int64& c) const;
     bool setFileReadOnlyInternal (bool) const;
