@@ -26,21 +26,21 @@
 //==============================================================================
 Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_binauralAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-      label (0),
-      txt_preset(0),
-      label5 (0),
-      txt_debug (0),
-      btn_open (0),
-      label2 (0),
-      label3 (0),
-      label4 (0),
-      num_ch (0),
-      num_spk (0),
-      num_hrtf (0),
-      btn_preset_folder (0),
+      label (nullptr),
+      txt_preset(nullptr),
+      label5 (nullptr),
+      txt_debug (nullptr),
+      btn_open (nullptr),
+      label2 (nullptr),
+      label3 (nullptr),
+      label4 (nullptr),
+      num_ch (nullptr),
+      num_spk (nullptr),
+      num_hrtf (nullptr),
+      btn_preset_folder (nullptr),
 #if BINAURAL_DECODER
-    tgl_load_irs(0),
-    box_conv_buffer (0),
+    tgl_load_irs(nullptr),
+    box_conv_buffer (nullptr),
 #endif
       _width(0)
 {

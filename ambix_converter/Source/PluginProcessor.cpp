@@ -479,7 +479,7 @@ void Ambix_converterAudioProcessor::prepareToPlay (double sampleRate, int sample
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-    output_buffer.setSize(std::max(getNumOutputChannels(), getNumInputChannels()), samplesPerBlock);
+    output_buffer.setSize(std::max(getTotalNumOutputChannels(), getTotalNumInputChannels()), samplesPerBlock);
 }
 
 void Ambix_converterAudioProcessor::releaseResources()
@@ -496,13 +496,13 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     // resize output buffer if necessare
     int NumSamples = buffer.getNumSamples();
     
-    output_buffer.setSize(std::max(getNumOutputChannels(), getNumInputChannels()), NumSamples);
+    output_buffer.setSize(std::max(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples);
   
     output_buffer.clear(); // in case of 2d where we might throw away some channels
     
-    // std::cout << "NumInputChannels: " << getNumInputChannels() << " Buffersize: " << buffer.getNumChannels() << std::endl;
+    // std::cout << "NumInputChannels: " << getTotalNumInputChannels() << " Buffersize: " << buffer.getNumChannels() << std::endl;
     
-    for (int i = 0; i < getNumInputChannels(); i++) // iterate over acn channel numbering
+    for (int i = 0; i < getTotalNumInputChannels(); i++) // iterate over acn channel numbering
     {
         
         int l = 0; // sometimes called n
@@ -516,7 +516,7 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
         
         // std::cout << "InputCh: " << i << " IN_CHANNEL: " << _in_ch_seq << " OUT_CHANNEL: " << _out_ch_seq << std::endl;
         
-        if (_in_ch_seq < getNumInputChannels() && _out_ch_seq < getNumOutputChannels())
+        if (_in_ch_seq < getTotalNumInputChannels() && _out_ch_seq < getTotalNumOutputChannels())
         {
             // copy input channels to output channels!
             output_buffer.copyFrom(_out_ch_seq, 0, buffer, _in_ch_seq, 0, NumSamples);
@@ -565,7 +565,7 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     // channels that didn't contain input data, (because these aren't
     // guaranteed to be empty - they may contain garbage).
     /*
-    for (int i = getNumInputChannels(); i < getNumOutputChannels(); ++i)
+    for (int i = getTotalNumInputChannels(); i < getTotalNumOutputChannels(); ++i)
     {
         output_buffer.clear (i, 0, buffer.getNumSamples());
     }

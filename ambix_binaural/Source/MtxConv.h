@@ -22,7 +22,9 @@
 #include "JuceHeader.h"
 
 #if JUCE_MAC
-    #include <Accelerate/Accelerate.h>
+   #define VIMAGE_H // avoid namespace clashes
+   #include <Accelerate/Accelerate.h>
+
     #include <vector>
 
     #define SPLIT_COMPLEX 1

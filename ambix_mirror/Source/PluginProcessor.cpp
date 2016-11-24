@@ -547,7 +547,7 @@ void Ambix_mirrorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBu
     calcParams();
     
     
-    for (int acn = 0; acn < getNumInputChannels(); acn++)
+    for (int acn = 0; acn < getTotalNumInputChannels(); acn++)
     {
         buffer.applyGainRamp(acn, 0, NumSamples, _gain_factors.getUnchecked(acn), gain_factors.getUnchecked(acn));
         

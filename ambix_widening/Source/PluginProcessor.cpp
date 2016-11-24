@@ -404,14 +404,14 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
     if (single_sided)
         fir_length = BESSEL_APPR+1;
     
-    for (int acn_out = 0; acn_out < getNumOutputChannels(); acn_out++) // iterate over output channels
+    for (int acn_out = 0; acn_out < getTotalNumOutputChannels(); acn_out++) // iterate over output channels
     {
         int l_out = 0;
         int m_out = 0;
         
         ACNtoLM(acn_out, l_out, m_out);
         
-        for (int acn_in = 0; acn_in < getNumInputChannels(); acn_in++) // iterate over input channels
+        for (int acn_in = 0; acn_in < getTotalNumInputChannels(); acn_in++) // iterate over input channels
         {
             int l_in=0; // degree 0, 1, 2, 3, 4, ...
             int m_in=0; // order ..., -2, -1, 0 , 1, 2, ...

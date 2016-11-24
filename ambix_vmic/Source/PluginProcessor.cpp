@@ -535,9 +535,9 @@ void Ambix_vmicAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
     output_buffer.clear();
     
     
-    for (int out = 0; out < std::min(NUM_FILTERS_VMIC,getNumOutputChannels()); out++)
+    for (int out = 0; out < std::min(NUM_FILTERS_VMIC,getTotalNumOutputChannels()); out++)
     {
-        for (int in = 0; in < std::min(AMBI_CHANNELS,getNumInputChannels()); in++)
+        for (int in = 0; in < std::min(AMBI_CHANNELS,getTotalNumInputChannels()); in++)
         {
             if (_Sh_transf(out, in) != 0.f || Sh_transf(out, in) != 0.f)
             {
@@ -553,7 +553,7 @@ void Ambix_vmicAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
     }
     
     // clear unused channels
-    for (int out = std::min(NUM_FILTERS_VMIC,getNumOutputChannels()); out < output_buffer.getNumChannels(); out++)
+    for (int out = std::min(NUM_FILTERS_VMIC,getTotalNumOutputChannels()); out < output_buffer.getNumChannels(); out++)
     {
         output_buffer.clear(out, 0, NumSamples);
     }

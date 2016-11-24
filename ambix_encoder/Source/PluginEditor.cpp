@@ -55,18 +55,18 @@ namespace {
 //==============================================================================
 Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_encoderAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-    sld_el (0),
-    sld_az (0),
-    sld_size (0),
+    sld_el (nullptr),
+    sld_az (nullptr),
+    sld_size (nullptr),
 #if INPUT_CHANNELS > 1
-    sld_width (0),
+    sld_width (nullptr),
 #endif
-    sld_speed (0),
-    sld_el_move (0),
-    sld_az_move (0),
-    txt_az_move (0),
-    txt_el_move (0),
-	sphere_opengl(0),
+    sld_speed (nullptr),
+    sld_el_move (nullptr),
+    sld_az_move (nullptr),
+    txt_az_move (nullptr),
+    txt_el_move (nullptr),
+	sphere_opengl(nullptr),
     changed_(true)
 {
     tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay

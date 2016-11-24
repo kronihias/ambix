@@ -432,15 +432,15 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
 #endif
 
     // resize input buffer if necessary
-    if (InputBuffer.getNumSamples() != NumSamples || InputBuffer.getNumChannels() != getNumInputChannels()) {
-        InputBuffer.setSize(getNumInputChannels(), NumSamples);
+    if (InputBuffer.getNumSamples() != NumSamples || InputBuffer.getNumChannels() != getTotalNumInputChannels()) {
+        InputBuffer.setSize(getTotalNumInputChannels(), NumSamples);
         // std::cout << "input buffer resized: " << InputBuffer.getNumSamples() << " channels: " << InputBuffer.getNumChannels() << std::endl;
     }
     
     // clear input buffer and copy input samples
     InputBuffer.clear();
     
-    for (int i=0; i < std::min(getNumInputChannels(), INPUT_CHANNELS); i++) {
+    for (int i=0; i < std::min(getTotalNumInputChannels(), INPUT_CHANNELS); i++) {
         InputBuffer.copyFrom(i, 0, buffer, i, 0, NumSamples);
         // std::cout << "copied buffer channel " << i << std::endl;
     }
@@ -453,12 +453,12 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
         AmbiEnc.getUnchecked(i)->calcParams();
     }
     
-    for (int in_ch=0; in_ch < std::min(getNumInputChannels(), INPUT_CHANNELS); in_ch++) {
+    for (int in_ch=0; in_ch < std::min(getTotalNumInputChannels(), INPUT_CHANNELS); in_ch++) {
 				
 				// String debug_output = "Gains: ";
 				const float* in_channel_data = InputBuffer.getReadPointer(in_ch);
 		
-        for (int out_ch = 0; out_ch < getNumOutputChannels(); out_ch++)
+        for (int out_ch = 0; out_ch < getTotalNumOutputChannels(); out_ch++)
         {
 					
 					// std::cout << "copying channel: " << out_ch << std::endl;

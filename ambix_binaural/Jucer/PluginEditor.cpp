@@ -1,17 +1,17 @@
 /*
   ==============================================================================
 
-  This is an automatically generated GUI class created by the Introjucer!
+  This is an automatically generated GUI class created by the Projucer!
 
   Be careful when adding custom code to these files, as only the code within
   the "//[xyz]" and "//[/xyz]" sections will be retained when the file is loaded
   and re-saved.
 
-  Created with Introjucer version: 4.0.1
+  Created with Projucer version: 4.2.1
 
   ------------------------------------------------------------------------------
 
-  The Introjucer is part of the JUCE library - "Jules' Utility Class Extensions"
+  The Projucer is part of the JUCE library - "Jules' Utility Class Extensions"
   Copyright (c) 2015 - ROLI Ltd.
 
   ==============================================================================
@@ -317,16 +317,6 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
                 338, 276, 65, 23,
                 Justification::centred, true);
 
-    
-    /* Version text */
-    g.setColour (Colours::white);
-    g.setFont (Font (10.00f, Font::plain));
-    String version_string;
-    version_string << "v" << QUOTE(VERSION);
-    g.drawText (version_string,
-                getWidth()-51, getHeight()-11, 50, 10,
-                Justification::bottomRight, true);
-    
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
 }
@@ -338,17 +328,17 @@ void Ambix_binauralAudioProcessorEditor::resized()
 
     gr_hp->setBounds (407, 195, 96, 72);
     label->setBounds (16, 104, 184, 24);
-    box_presets->setBounds (72, 64, 200, 24);
-    label5->setBounds (8, 64, 56, 24);
+    box_presets->setBounds (72, 56, 200, 24);
+    label5->setBounds (8, 56, 56, 24);
     txt_debug->setBounds (16, 184, 320, 96);
-    btn_open->setBounds (280, 64, 56, 24);
+    btn_open->setBounds (280, 56, 56, 24);
     label2->setBounds (72, 128, 127, 24);
     label3->setBounds (48, 152, 152, 24);
     label4->setBounds (24, 280, 64, 16);
     num_ch->setBounds (192, 104, 40, 24);
     num_spk->setBounds (192, 128, 40, 24);
     num_hrtf->setBounds (192, 152, 40, 24);
-    btn_preset_folder->setBounds (248, 96, 94, 24);
+    btn_preset_folder->setBounds (248, 88, 94, 24);
     tgl_load_irs->setBounds (256, 152, 80, 24);
     sld_hpf->setBounds (415, 211, 88, 22);
     box_hp_order->setBounds (415, 235, 80, 24);
@@ -461,9 +451,9 @@ void Ambix_binauralAudioProcessorEditor::sliderValueChanged (Slider* sliderThatW
 
 //==============================================================================
 #if 0
-/*  -- Introjucer information section --
+/*  -- Projucer information section --
 
-    This is where the Introjucer stores the metadata that describe this GUI layout, so
+    This is where the Projucer stores the metadata that describe this GUI layout, so
     make changes in here at your peril!
 
 BEGIN_JUCER_METADATA
@@ -497,11 +487,11 @@ BEGIN_JUCER_METADATA
          editableSingleClick="0" editableDoubleClick="0" focusDiscardsChanges="0"
          fontname="Default font" fontsize="15" bold="0" italic="0" justification="34"/>
   <COMBOBOX name="new combo box" id="d106da7f451db4f8" memberName="box_presets"
-            virtualName="" explicitFocusOrder="0" pos="72 64 200 24" tooltip="choose preset to load"
+            virtualName="" explicitFocusOrder="0" pos="72 56 200 24" tooltip="choose preset to load"
             editable="0" layout="33" items="" textWhenNonSelected="no preset loaded"
             textWhenNoItems="(no presets)"/>
   <LABEL name="new label" id="2071080ca9cd2158" memberName="label5" virtualName=""
-         explicitFocusOrder="0" pos="8 64 56 24" textCol="ffffffff" edTextCol="ffffffff"
+         explicitFocusOrder="0" pos="8 56 56 24" textCol="ffffffff" edTextCol="ffffffff"
          edBkgCol="0" labelText="Preset" editableSingleClick="0" editableDoubleClick="0"
          focusDiscardsChanges="0" fontname="Default font" fontsize="15"
          bold="0" italic="0" justification="34"/>
@@ -510,7 +500,7 @@ BEGIN_JUCER_METADATA
               multiline="1" retKeyStartsLine="0" readonly="1" scrollbars="1"
               caret="0" popupmenu="1"/>
   <TEXTBUTTON name="new button" id="49a576a901d98e13" memberName="btn_open"
-              virtualName="" explicitFocusOrder="0" pos="280 64 56 24" tooltip="open a preset from file"
+              virtualName="" explicitFocusOrder="0" pos="280 56 56 24" tooltip="open a preset from file"
               bgColOff="ffffffff" bgColOn="ff0000ff" buttonText="open" connectedEdges="0"
               needsCallback="1" radioGroupId="0"/>
   <LABEL name="new label" id="160ab19ae75e175a" memberName="label2" virtualName=""
@@ -544,7 +534,7 @@ BEGIN_JUCER_METADATA
          editableDoubleClick="0" focusDiscardsChanges="0" fontname="Default font"
          fontsize="15" bold="0" italic="0" justification="34"/>
   <TEXTBUTTON name="new button" id="e6922b75c64169ac" memberName="btn_preset_folder"
-              virtualName="" explicitFocusOrder="0" pos="248 96 94 24" tooltip="choose another preset folder"
+              virtualName="" explicitFocusOrder="0" pos="248 88 94 24" tooltip="choose another preset folder"
               bgColOff="ffffffff" bgColOn="ff0000ff" buttonText="preset folder"
               connectedEdges="0" needsCallback="1" radioGroupId="0"/>
   <TOGGLEBUTTON name="new toggle button" id="5fbf315b518c7f3" memberName="tgl_load_irs"
@@ -555,7 +545,8 @@ BEGIN_JUCER_METADATA
           virtualName="" explicitFocusOrder="0" pos="415 211 88 22" tooltip="loudspeaker high pass cut off frequency"
           rotarysliderfill="7fffffff" rotaryslideroutline="66ffffff" min="0"
           max="200" int="1" style="RotaryHorizontalVerticalDrag" textBoxPos="TextBoxLeft"
-          textBoxEditable="1" textBoxWidth="80" textBoxHeight="20" skewFactor="1"/>
+          textBoxEditable="1" textBoxWidth="80" textBoxHeight="20" skewFactor="1"
+          needsCallback="1"/>
   <COMBOBOX name="new combo box" id="4355679e656fdcb6" memberName="box_hp_order"
             virtualName="" explicitFocusOrder="0" pos="415 235 80 24" tooltip="high pass order"
             editable="0" layout="33" items="HP OFF&#10;2nd&#10;4th" textWhenNonSelected="HP OFF"
@@ -567,7 +558,8 @@ BEGIN_JUCER_METADATA
           virtualName="" explicitFocusOrder="0" pos="519 211 88 22" tooltip="sub low-pass cut off frequency"
           rotarysliderfill="7fffffff" rotaryslideroutline="66ffffff" min="0"
           max="200" int="1" style="RotaryHorizontalVerticalDrag" textBoxPos="TextBoxLeft"
-          textBoxEditable="1" textBoxWidth="80" textBoxHeight="20" skewFactor="1"/>
+          textBoxEditable="1" textBoxWidth="80" textBoxHeight="20" skewFactor="1"
+          needsCallback="1"/>
   <COMBOBOX name="new combo box" id="bddf00b0dabff700" memberName="box_lp_order"
             virtualName="" explicitFocusOrder="0" pos="615 211 64 22" tooltip="sub low-pass order"
             editable="0" layout="33" items="LP OFF&#10;2nd&#10;4th" textWhenNonSelected="LP OFF"
@@ -584,12 +576,14 @@ BEGIN_JUCER_METADATA
           virtualName="" explicitFocusOrder="0" pos="519 259 160 24" tooltip="sub volume"
           thumbcol="ff949494" rotarysliderfill="7fffffff" rotaryslideroutline="66ffffff"
           min="-99" max="6" int="1" style="LinearHorizontal" textBoxPos="TextBoxLeft"
-          textBoxEditable="1" textBoxWidth="50" textBoxHeight="20" skewFactor="1"/>
+          textBoxEditable="1" textBoxWidth="50" textBoxHeight="20" skewFactor="1"
+          needsCallback="1"/>
   <SLIDER name="new slider" id="26fc90b8b12b56a0" memberName="sld_gain"
           virtualName="" explicitFocusOrder="0" pos="343 18 48 254" tooltip="Output Volume"
           thumbcol="ffffffff" min="-99" max="20" int="0.10000000000000000555"
           style="LinearVertical" textBoxPos="TextBoxBelow" textBoxEditable="1"
-          textBoxWidth="48" textBoxHeight="20" skewFactor="0.80000000000000004441"/>
+          textBoxWidth="48" textBoxHeight="20" skewFactor="0.80000000000000004441"
+          needsCallback="1"/>
 </JUCER_COMPONENT>
 
 END_JUCER_METADATA

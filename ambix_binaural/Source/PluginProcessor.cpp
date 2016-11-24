@@ -324,7 +324,7 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
         
         // decoder mode without convolution
         // copy back the ambisonics speaker signals
-        for (int i=0; i < jmin(NumSpeakers, getNumOutputChannels()); i++) {
+        for (int i=0; i < jmin(NumSpeakers, getTotalNumOutputChannels()); i++) {
             
             buffer.copyFrom(i, 0,  ambi_spk_buffer_, i, 0, NumSamples);
         }

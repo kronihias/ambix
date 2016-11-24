@@ -559,9 +559,9 @@ void Ambix_warpAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
     output_buffer.clear();
     
     
-    for (int out = 0; out < std::min(AMBI_CHANNELS,getNumOutputChannels()); out++)
+    for (int out = 0; out < std::min(AMBI_CHANNELS,getTotalNumOutputChannels()); out++)
     {
-        for (int in = 0; in < std::min(AMBI_CHANNELS,getNumInputChannels()); in++)
+        for (int in = 0; in < std::min(AMBI_CHANNELS,getTotalNumInputChannels()); in++)
         {
             if (_Sh_transf(out, in) != 0.f || Sh_transf(out, in) != 0.f)
             {

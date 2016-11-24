@@ -267,7 +267,7 @@ void Ambix_rotator_zAudioProcessor::prepareToPlay (double sampleRate, int sample
     // initialisation that you need..
     
     // resize buffer if necessary
-    output_buffer.setSize((std::max)(getNumOutputChannels(), getNumInputChannels()), samplesPerBlock);
+    output_buffer.setSize((std::max)(getTotalNumOutputChannels(), getTotalNumInputChannels()), samplesPerBlock);
     
     /*
     int l=0;
@@ -311,7 +311,7 @@ void Ambix_rotator_zAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     int NumSamples = buffer.getNumSamples();
     
     // resize buffer if necessary
-    output_buffer.setSize((std::max)(getNumOutputChannels(), getNumInputChannels()), NumSamples);
+    output_buffer.setSize((std::max)(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples);
     
     // clear output buffer
     output_buffer.clear();
@@ -327,14 +327,14 @@ void Ambix_rotator_zAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     // iterate over input and output channels for z axis rotation
     // this should work for arbitary ambisonics orders!
     
-    for (int acn_out = 0; acn_out < getNumOutputChannels(); acn_out++)
+    for (int acn_out = 0; acn_out < getTotalNumOutputChannels(); acn_out++)
     {
         int l_out = 0;
         int m_out = 0;
         
         ACNtoLM(acn_out, l_out, m_out);
         
-        for (int acn_in = 0; acn_in < getNumInputChannels(); acn_in++)
+        for (int acn_in = 0; acn_in < getTotalNumInputChannels(); acn_in++)
         {
             int l_in=0; // degree 0, 1, 2, 3, 4, ......
             int m_in=0; // order ...., -2, -1, 0 , 1, 2, ...

@@ -23,22 +23,22 @@
 //==============================================================================
 Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_converterAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-      hyperlinkButton (0),
-      box_in_ch_seq (0),
-      label (0),
-      label2 (0),
-      label3 (0),
-      box_out_ch_seq (0),
-      label4 (0),
-      box_in_norm (0),
-      box_out_norm (0),
-      tgl_invert_cs (0),
-      box_presets (0),
-      label5 (0),
-      tgl_flip (0),
-      tgl_flop (0),
-      tgl_flap (0),
-      label6 (0)
+      hyperlinkButton (nullptr),
+      box_in_ch_seq (nullptr),
+      label (nullptr),
+      label2 (nullptr),
+      label3 (nullptr),
+      box_out_ch_seq (nullptr),
+      label4 (nullptr),
+      box_in_norm (nullptr),
+      box_out_norm (nullptr),
+      tgl_invert_cs (nullptr),
+      box_presets (nullptr),
+      label5 (nullptr),
+      tgl_flip (nullptr),
+      tgl_flop (nullptr),
+      tgl_flap (nullptr),
+      label6 (nullptr)
 {
     tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
     

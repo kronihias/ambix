@@ -660,8 +660,8 @@ void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     output_buffer.setSize(buffer.getNumChannels(), NumSamples);
     output_buffer.clear();
     
-    int num_out_ch = jmin(AMBI_CHANNELS,getNumOutputChannels());
-    int num_in_ch = jmin(AMBI_CHANNELS,getNumInputChannels());
+    int num_out_ch = jmin(AMBI_CHANNELS,getTotalNumOutputChannels());
+    int num_in_ch = jmin(AMBI_CHANNELS,getTotalNumInputChannels());
   
     // 0th channel is invariant!
     output_buffer.addFrom(0, 0, buffer, 0, 0, NumSamples);
