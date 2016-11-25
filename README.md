@@ -66,6 +66,14 @@ Install LINUX dependencies (Debian, Ubuntu):
 --------------
 *$ sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libeigen3-dev freeglut3-dev libxmu-dev libxi-dev libsoxr-dev libfftw3-dev*
 
+Fedora:
+--------------
+*$ sudo dnf install alsa-lib-devel freetype-devel mesa-libGL-devel libX11-devel libXext-devel libXinerama-devel libXcursor-devel eigen3-devel freeglut-devel libXmu-devel libXi-devel soxr-devel fftw3-devel libXrandr-devel jack-audio-connection-kit-devel*
+
+*$ sudo dnf groupinstall "Development Tools"*
+
+*$ sudo dnf groupinstall "C Development Tools and Libraries"*
+
 
 Install MacOSX dependencies (through MacPorts):
 --------------
@@ -171,7 +179,7 @@ vmic: gui, 8 outputs by default
 
 thanks to
 -----------
-several people and institutions contributed to this software in one or another way, i would like to name them here without particular order: Institute of Electronic Music and Acoustics Graz, Franz Zotter, Winfried Ritsch, Martin Rumori, Florian Hollerweger, Peter Plessas, IOhannes Zmölnig, Thomas Musil, Gerriet K. Sharma, Matthias Frank, Fons Adriaensen, Jörn Nettingsmeier, Filipe Coelho (DISTRHO project), Music Innovation Studies Centre of the Lithuanian Academy of Music and Theatre, Ricardas Kabelis, Mantautas Krukauskas, Tadas Dailyda, the surrsound and linux audio community - to be continued...
+several people and institutions contributed to this software in one or another way, i would like to name them here without particular order: Institute of Electronic Music and Acoustics Graz, Franz Zotter, Winfried Ritsch, Martin Rumori, Florian Hollerweger, Peter Plessas, IOhannes Zmölnig, Thomas Musil, Gerriet K. Sharma, Matthias Frank, Fons Adriaensen, Jörn Nettingsmeier, Filipe Coelho (DISTRHO project), Music Innovation Studies Centre of the Lithuanian Academy of Music and Theatre, Ricardas Kabelis, Mantautas Krukauskas, Tadas Dailyda, Sebastian Grill, the surrsound and linux audio community - to be continued...
 
 
 author
