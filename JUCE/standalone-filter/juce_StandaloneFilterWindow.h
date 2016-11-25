@@ -81,8 +81,8 @@ public:
         if (settings != nullptr)
             savedState = settings->getXmlValue ("audioSetup");
 
-        deviceManager->initialise (filter->getNumInputChannels(),
-                                   filter->getNumOutputChannels(),
+        deviceManager->initialise (filter->getTotalNumInputChannels(),
+                                   filter->getTotalNumOutputChannels(),
                                    savedState,
                                    true);
 
@@ -372,10 +372,10 @@ public:
     {
         DialogWindow::LaunchOptions o;
         o.content.setOwned (new AudioDeviceSelectorComponent (*deviceManager,
-                                                              filter->getNumInputChannels(),
-                                                              filter->getNumInputChannels(),
-                                                              filter->getNumOutputChannels(),
-                                                              filter->getNumOutputChannels(),
+                                                              filter->getTotalNumInputChannels(),
+                                                              filter->getTotalNumInputChannels(),
+                                                              filter->getTotalNumOutputChannels(),
+                                                              filter->getTotalNumOutputChannels(),
                                                               true, false, true, false));
         o.content->setSize (500, 450);
 
