@@ -173,7 +173,6 @@ public:
             // add ports when clear how much we need!
 
         }
-       
     }
 
     ~JackAudioIODevice()
