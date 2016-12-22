@@ -64,7 +64,7 @@ prerequisites for building
 
 Install LINUX dependencies (Debian, Ubuntu):
 --------------
-*$ sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libeigen3-dev freeglut3-dev libxmu-dev libxi-dev libsoxr-dev libfftw3-dev*
+*$ sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libxrandr-dev libeigen3-dev freeglut3-dev libxmu-dev libxi-dev libsoxr-dev libfftw3-dev*
 
 Fedora:
 --------------
