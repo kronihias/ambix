@@ -116,8 +116,8 @@ IF(NOT APPLE)
 	#osx need special treating for creating the bundle...
 	
 	TARGET_LINK_LIBRARIES( ${SUBPROJECT_NAME}
-		${JUCE_LIBRARIES}
 		${JUCE_STATIC_LIB}
+		${JUCE_LIBRARIES}
 	)
 	
 	# get the target folder for later copying it
@@ -146,8 +146,8 @@ IF(APPLE)
 
 	# link libs
 	TARGET_LINK_LIBRARIES( ${SUBPROJECT_NAME}
-		${JUCE_LIBRARIES}
 		${JUCE_STATIC_LIB}
+		${JUCE_LIBRARIES}
 	)
 	
 	# strip it
