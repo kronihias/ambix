@@ -24,14 +24,6 @@
 
 #define DEGTORAD M_PI/180.0
 
-
-#ifdef _WIN32
-inline float round( float d )
-{
-    return floor( d + 0.5f );
-}
-#endif
-
 //==============================================================================
 Ambix_maxreAudioProcessor::Ambix_maxreAudioProcessor() :
 apply_param(0.5f),
