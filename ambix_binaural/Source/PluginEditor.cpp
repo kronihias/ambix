@@ -509,7 +509,7 @@ void Ambix_binauralAudioProcessorEditor::buttonClicked (Button* buttonThatWasCli
     {
         FileChooser myChooser ("Please select the new preset folder...",
                                ourProcessor->presetDir,
-                               "*.config");
+                               "");
         
         if (myChooser.browseForDirectory())
         {
