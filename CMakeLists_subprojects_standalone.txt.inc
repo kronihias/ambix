@@ -23,10 +23,11 @@ ENDIF(DEFINED SPECIFIC_SOURE_DIR)
 #############################
 # add all c, cpp, cc files from the Source directory
 FILE ( GLOB_RECURSE SOURCE Source/*.c* )
+FILE ( GLOB_RECURSE HEADER Source/*.h* )
 
 IF(DEFINED SPECIFIC_SOURE_DIR)
 	FILE ( GLOB_RECURSE SOURCE ${SPECIFIC_SOURE_DIR}/Source/*.c* )
-	# LIST ( APPEND SOURCE ${SOURCE_2})
+	FILE ( GLOB_RECURSE HEADER ${SPECIFIC_SOURE_DIR}/Source/*.h* )
 ENDIF(DEFINED SPECIFIC_SOURE_DIR)
 
 ############################
@@ -58,26 +59,40 @@ IF(WITH_SphericalHarmonic)
 		${SRC_DIR}/common/SphericalHarmonic/ShLegendre.cpp
 		${SRC_DIR}/common/SphericalHarmonic/ShNorm.cpp
 		${SRC_DIR}/common/SphericalHarmonic/SphericalHarmonic.cpp)
+	
+	LIST ( APPEND HEADER ${SRC_DIR}/common/SphericalHarmonic/ShChebyshev.h
+		${SRC_DIR}/common/SphericalHarmonic/ShLegendre.h
+		${SRC_DIR}/common/SphericalHarmonic/ShNorm.h
+		${SRC_DIR}/common/SphericalHarmonic/SphericalHarmonic.h
+		${SRC_DIR}/common/SphericalHarmonic/ch_sequence.h
+		${SRC_DIR}/common/SphericalHarmonic/ch_cs.h
+		${SRC_DIR}/common/SphericalHarmonic/normalization.h
+		${SRC_DIR}/common/SphericalHarmonic/tools.h)
 ENDIF(WITH_SphericalHarmonic)
 
 IF(WITH_SphFilter)
 	LIST ( APPEND SOURCE ${SRC_DIR}/common/SphFilter/SphFilter.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/SphFilter/SphFilter.h)
 ENDIF(WITH_SphFilter)
 
 IF(WITH_MyMeter)
 	LIST ( APPEND SOURCE ${SRC_DIR}/common/MyMeter/MyMeter.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/MyMeter/MyMeter.h)
 ENDIF(WITH_MyMeter)
 
 IF(WITH_MyMeterDsp)
 	LIST ( APPEND SOURCE ${SRC_DIR}/common/MyMeterDsp/MyMeterDsp.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/MyMeterDsp/MyMeterDsp.h)
 ENDIF(WITH_MyMeterDsp)
 
 IF(WITH_T_DESIGN)
 	LIST ( APPEND SOURCE ${SRC_DIR}/common/Ressources/t_design.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/Ressources/t_design.h)
 ENDIF(WITH_T_DESIGN)
 
 IF(WITH_LegendreU)
 	LIST ( APPEND SOURCE ${SRC_DIR}/common/LegendreU/LegendreU.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/LegendreU/LegendreU.h)
 ENDIF(WITH_LegendreU)
 
 ############################
@@ -103,15 +118,15 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR}/_bin/standalone)
 # add exec
 
 IF (APPLE)
-	ADD_EXECUTABLE(${SUBPROJECT_NAME} MACOSX_BUNDLE ${SOURCE} ${JUCE_STANDALONE_SOURCE})
+	ADD_EXECUTABLE(${SUBPROJECT_NAME} MACOSX_BUNDLE ${SOURCE} ${HEADER} ${JUCE_STANDALONE_SOURCE})
 ENDIF(APPLE)
 
 IF(UNIX AND NOT APPLE AND NOT ANDROID)
-    ADD_EXECUTABLE(${SUBPROJECT_NAME} ${SOURCE} ${JUCE_STANDALONE_SOURCE})
+    ADD_EXECUTABLE(${SUBPROJECT_NAME} ${SOURCE} ${HEADER} ${JUCE_STANDALONE_SOURCE})
 ENDIF(UNIX AND NOT APPLE AND NOT ANDROID)
 
 IF (WIN32)
-    ADD_EXECUTABLE(${SUBPROJECT_NAME} WIN32 ${SOURCE} ${JUCE_STANDALONE_SOURCE})
+    ADD_EXECUTABLE(${SUBPROJECT_NAME} WIN32 ${SOURCE} ${HEADER} ${JUCE_STANDALONE_SOURCE})
 ENDIF (WIN32)
 
 ####################
