@@ -81,6 +81,7 @@ void Ambix_binauralAudioProcessor::SearchPresets(File SearchFolder)
     _presetFiles.clear();
     
     SearchFolder.findChildFiles(_presetFiles, File::findFiles, true, "*.config");
+    _presetFiles.sort();
     std::cout << "Found preset files: " << _presetFiles.size() << std::endl;
     
 }
