@@ -81,7 +81,7 @@ void Ambix_binauralAudioProcessor::SearchPresets(File SearchFolder)
     _presetFiles.clear();
     
     SearchFolder.findChildFiles(_presetFiles, File::findFiles, true, "*.config");
-    _presetFiles.sort();
+    _presetFiles.sort();	
     std::cout << "Found preset files: " << _presetFiles.size() << std::endl;
     
 }
@@ -627,20 +627,13 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                         
                         if (loadIr(&TempAudioBuffer, IrFilename, src_samplerate, gain, 0, 0))
                         {
-                            int numspl = TempAudioBuffer.getNumSamples();
-                            
-                            AudioSampleBuffer TempAudioBufferL(1, numspl);
-                            AudioSampleBuffer TempAudioBufferR(1, numspl);
-                            
-                            TempAudioBufferL.copyFrom(0, 0, TempAudioBuffer, 0, 0, numspl);
-                            TempAudioBufferR.copyFrom(0, 0, TempAudioBuffer, 1, 0, numspl);
                             
                             // compute delay in samples
                             int delay_samples = (int) (src_samplerate * (delay/1000.f));
                             
                             // add IR to my convolution data - gain is already done while reading file
-                            conv_data.addIR(num_conv, 0+swapChannels, 0, delay_samples, 0, &TempAudioBufferL, src_samplerate);
-                            conv_data.addIR(num_conv, (1+swapChannels)%2, 0, delay_samples, 0, &TempAudioBufferR, src_samplerate);
+                            conv_data.addIR(num_conv, 0+swapChannels, 0, delay_samples, 0, &TempAudioBuffer, 0, src_samplerate);
+                            conv_data.addIR(num_conv, (1+swapChannels)%2, 0, delay_samples, 0, &TempAudioBuffer, 1, src_samplerate);
                             // addIR(int in_ch, int out_ch, int offset, int delay, int length, AudioSampleBuffer* buffer, double src_samplerate);
                             
                             String debug;
@@ -870,7 +863,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     
     setLatencySamples(ConvBufferSize-BufferSize);
     
-    mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), ConvBufferSize, conv_data.getMaxLength(), 8192);
+    mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192);
     
     // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
     for (int i=0; i < conv_data.getNumIRs(); i++)

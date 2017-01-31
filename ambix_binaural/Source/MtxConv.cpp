@@ -22,7 +22,8 @@
 
 MtxConvMaster::MtxConvMaster() : inbuf_(1,256),
                                  outbuf_(1, 256),
-                                 bufsize_(512),
+                                 inbufsize_(512),
+							     outbufsize_(512),
                                  inoffset_(0),
                                  outoffset_(0),
                                  blocksize_(256),
@@ -30,13 +31,25 @@ MtxConvMaster::MtxConvMaster() : inbuf_(1,256),
                                  numouts_(0),
                                  numpartitions_(0),
                                  isprocessing_(false),
-                                 configuration_(false)
+                                 configuration_(false),
+								 debug_out_(nullptr)
 {
-    
+#ifdef DEBUG_COUT
+	File file;
+	String filename("MtxConvMaster.txt");
+	file = file.getSpecialLocation(File::SpecialLocationType::tempDirectory).getChildFile(filename);
+	debug_out_ = new FileOutputStream(file);
+#endif
 }
 
 MtxConvMaster::~MtxConvMaster()
 {
+}
+
+void MtxConvMaster::WriteLog(String &text)
+{
+	if (debug_out_->openedOk())
+		debug_out_->writeText(text, false, false);
 }
 
 void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf)
@@ -60,9 +73,9 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
         int smplstowrite_end = smplstowrite; // write to the end
         int smplstowrite_start = 0; // write to the start
         
-        if (inoffset_ + smplstowrite >= bufsize_)
+        if (inoffset_ + smplstowrite >= inbufsize_)
         {
-            smplstowrite_end = bufsize_ - inoffset_;
+            smplstowrite_end = inbufsize_ - inoffset_;
             smplstowrite_start = smplstowrite - smplstowrite_end;
         }
         
@@ -84,8 +97,8 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
             inoffset_ = smplstowrite_start;
         }
         
-        if (inoffset_ >= bufsize_)
-            inoffset_ -= bufsize_;
+        if (inoffset_ >= inbufsize_)
+            inoffset_ -= inbufsize_;
         
         
         /////////////////////////
@@ -127,9 +140,9 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
         int smplstoread_end = smplstoread;
         int smplstoread_start = 0;
         
-        if (outoffset_ + smplstoread >= bufsize_)
+        if (outoffset_ + smplstoread >= outbufsize_)
         {
-            smplstowrite_end = bufsize_ - outoffset_;
+            smplstowrite_end = outbufsize_ - outoffset_;
             smplstoread_start = smplstoread - smplstoread_end;
         }
         
@@ -155,8 +168,8 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
             outoffset_ = smplstoread_start;
         }
         
-        if (outoffset_ >= bufsize_)
-            outoffset_ -= bufsize_;
+        if (outoffset_ >= outbufsize_)
+            outoffset_ -= outbufsize_;
         
     } // configured true
     else
@@ -166,22 +179,26 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
     
 }
 
-bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsize, int maxpart)
+bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsize, int minpart, int maxpart)
 {
     if (!numins || !numouts || !blocksize || configuration_)
         return false;
     
+	if (minpart < blocksize)
+		minpart = blocksize;
+
     if (maxpart < blocksize)
-        maxsize = blocksize;
+        maxpart = blocksize;
     
+	minpart_ = minpart;
+	maxpart_ = maxpart;
+
+
     numins_ = numins;
     numouts_ = numouts;
     
     
     blocksize_ = nextPowerOfTwo(blocksize);
-    
-    // std::cout << "Blocksize: " << blocksize << " new Block: " << blocksize_ << " maxsize: " << maxsize << std::endl;
-    
     
     maxsize_ = 0;
     
@@ -244,21 +261,26 @@ bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsiz
 #endif
     
     // resize the in/out buffers
-    bufsize_ = jmax(2*maxsize_, blocksize_);
+	inbufsize_ = 2 * maxpart_;
+
+    outbufsize_ = jmax(2*maxsize_, blocksize_);
     
-    inbuf_.setSize(numins_, bufsize_);
-    outbuf_.setSize(numouts_, bufsize_);
+    inbuf_.setSize(numins_, inbufsize_);
+    outbuf_.setSize(numouts_, outbufsize_);
     
     inbuf_.clear();
     outbuf_.clear();
     
+	// set the outoffset which will be != 0 if minpart_ > blocksize is used
+	outoffset_ = blocksize_ - minpart_;
     
-    
+	if (outoffset_ < 0)
+		outoffset_ += outbufsize_;
     
     // set the actual buffersize and compute correct offsets!
     for (int i=0; i < numpartitions_; i++) {
         MtxConvSlave *partition = partitions_.getUnchecked(i);
-        partition->SetBufsize(bufsize_, blocksize_);
+        partition->SetBufsize(inbufsize_, outbufsize_, blocksize_);
     }
     
     
@@ -329,8 +351,14 @@ bool MtxConvMaster::AddFilter(int in, int out, const juce::AudioSampleBuffer &da
 
 void MtxConvMaster::DebugInfo()
 {
-    std::cout << "Blocksize: " << blocksize_ << " Partitions: " << numpartitions_<< " Maxsize: " << maxsize_  << " Bufsize: " << bufsize_ << std::endl;
-    
+	String dbg_text;
+
+	dbg_text << "Blocksize: " << blocksize_ << " MinPart: " << minpart_ << " MaxPart: " << maxpart_ << " Partitions: " << numpartitions_<< " Maxsize: " << maxsize_  << " InputBufsize: " << inbufsize_ << " OutputBufsize: " << outbufsize_ << " InOffset: " << inoffset_ << " Outoffset: " << outoffset_ << "\n";
+    std::cout << dbg_text << std::endl;
+#ifdef DEBUG_COUT
+	WriteLog(dbg_text);
+#endif
+	
     for (int i=0; i < partitions_.size(); i++) {
         partitions_.getUnchecked(i)->DebugInfo();
     }
@@ -339,6 +367,19 @@ void MtxConvMaster::DebugInfo()
 //////////////////////////////////////
 // SLAVE METHODS
 //////////////////////////////////////
+MtxConvSlave::MtxConvSlave() : Thread("mtx_convolver_slave")
+{
+}
+
+MtxConvSlave::~MtxConvSlave()
+{}
+
+void MtxConvSlave::WriteLog(String &text)
+{
+	if (debug_out_->openedOk())
+		debug_out_->writeText(text, false, false);
+}
+
 bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, int priority, AudioSampleBuffer *inbuf, AudioSampleBuffer *outbuf)
 {
     partitionsize_ = partitionsize;
@@ -394,20 +435,37 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
     waitnewdata_.reset();
     waitprocessing_.reset();
     
+#ifdef DEBUG_COUT
+	// open debug txt
+	
+	if (debug_out_ == nullptr)
+	{
+		File file;
+		// file = file.createTempFile(".txt");
+		String filename("MtxConvSlave");
+		filename << priority;
+		filename << ".txt";
+		file = file.getSpecialLocation(File::SpecialLocationType::tempDirectory).getChildFile(filename);
+		debug_out_ = new FileOutputStream(file);
+	}
+#endif
+
     return true;
 }
 
-void MtxConvSlave::SetBufsize(int bufsize, int blocksize)
+void MtxConvSlave::SetBufsize(int inbufsize, int outbufsize, int blocksize)
 {
-    bufsize_ = bufsize;
+    inbufsize_ = inbufsize;
+	outbufsize_ = outbufsize;
 
 #ifdef DEBUG_COUT
     std::cout << "Slave::SETBUFSIZE: " << bufsize_ << "offset_: " << offset_ << std::endl;
 #endif
     
-    inoffset_ = bufsize_ - partitionsize_ + 1; // offset due to overlap/save
+    inoffset_ = inbufsize_ - partitionsize_ + 1; // offset due to overlap/save
     
-    outoffset_ = offset_ - partitionsize_ + blocksize;
+	outoffset_ = offset_;
+
 }
 
 
@@ -416,9 +474,8 @@ void MtxConvSlave::StartProc()
     int priority = 8 + priority_;
     priority = jmax(priority,0);
     
-    // don't start thread for first partitionsize -> perform inside the callback!
-    if (priority_ < 0)
-        startThread(priority); // priority is negative... juce: 10 is highest...0
+    // start a thread for each partitionsize
+    startThread(priority); // priority is negative... juce: 10 is highest...0
 }
 
 
@@ -586,44 +643,89 @@ bool MtxConvSlave::AddFilter(int in, int out, const juce::AudioSampleBuffer &dat
     
 }
 
-
+// thread function - do the background tasks
 void MtxConvSlave::run()
 {
-    while (true)
-    {
-        waitnewdata_.wait();
-        
-        waitnewdata_.reset();
-        
-        if ( threadShouldExit() )
-            return;
-        
-        Process();
-        
-        waitprocessing_.signal();
-    }
+	// thread function for highest priority
+	// does only process the later partitions - first partition has to be computed immediateley
+	if (priority_ == 0) 
+	{
+		while (true)
+		{
+			waitnewdata_.wait();
+			waitnewdata_.reset();
+			
+			if ( threadShouldExit() )
+				return;
+			
+			for (int i = 1; i < numpartitions_; i++)
+			{
+				Process(i);
+			}
+		}
+	}
+	else // lower priority - do forward/backward transform in the thread!
+	{
+		while(true)
+		{
+			waitnewdata_.wait();
+			waitnewdata_.reset();
+			
+			if ( threadShouldExit() )
+				return;
+			
+			TransformInput();
+			
+			Process(0);
+
+			TransformOutput();
+			WriteToOutbuf(partitionsize_);
+
+			for (int i = 1; i < numpartitions_; i++)
+			{
+				Process(i);
+			}
+			
+		}
+		
+	}
+    
 }
 
-
-void MtxConvSlave::Process()
+// this should be done in the callback
+void MtxConvSlave::TransformInput()
 {
-    
+	// new data is available - increment the partition pointer
+	part_idx_++;
+	if (part_idx_ >= numpartitions_)
+		part_idx_ = 0;
+
 #ifdef DEBUG_COUT
-    std::cout << "Slave Process, numnewsamples: " << numnewinsamples_ << " partsize: " << partitionsize_ << " inoffset: " << inoffset_ << std::endl;
+	if (finished_part_.get() < numpartitions_)
+  {
+    String txt = "Did not finish all partitions\n";
+    WriteLog(txt);
+  }
+	else
+  {
+    String txt = "Finished all partitions\n";
+    WriteLog(txt);
+  }
 #endif
-    
-    bool pingpong = !pingpong_;
-    
-    ////////////////
+
+	// reset the finished counter
+	finished_part_.set(0);
+
+	////////////////
     // do all the inputs
     // copy and transform new time data for each needed input channel
     
-    int smplstoread_end = 2*partitionsize_; // write to the end
-    int smplstoread_start = 0; // write to the start
+    int smplstoread_end = 2*partitionsize_; // read from the end
+    int smplstoread_start = 0; // read from the start
     
-    if (inoffset_+smplstoread_end >= bufsize_)
+    if (inoffset_+smplstoread_end >= inbufsize_)
     {
-        smplstoread_end = bufsize_ - inoffset_;
+        smplstoread_end = inbufsize_ - inoffset_;
         smplstoread_start = 2*partitionsize_ - smplstoread_end;
     }
     
@@ -656,191 +758,228 @@ void MtxConvSlave::Process()
         innode->a_im_[part_idx_][0] = 0.0f;
         // fft_im_[partitionsize_] = 0.0f; // not necessary-> we wont use this value anyway
         
-        // copy the fft filter data to the input node
-        // FloatVectorOperations::copy(innode->a_re_[i], fft_re_, partitionsize_+1);
-        // FloatVectorOperations::copy(innode->a_im_[i], fft_im_, partitionsize_+1);
         
 #else
         fftwf_execute_dft_r2c (fftwf_plan_r2c_, fft_t_, innode->a_c_[part_idx_]);
         
-        // copy the fft filter data to the input node
-        // FloatVectorOperations::copy((float*)innode->a_c_[part_idx_], (float*)fft_c_, 2*(partitionsize_+1));
 #endif
         
-    }
+    } // iterate over number of inputs
     
     inoffset_ += partitionsize_;
+
+    if (inoffset_ >= inbufsize_)
+        inoffset_ = inoffset_ - inbufsize_;
+}
+
+// this should be done in callback thread as well
+void MtxConvSlave::TransformOutput()
+{
+	bool pingpong = !pingpong_;
+
+    int numouts = outnodes_.size();
     
-    if (inoffset_ >= bufsize_)
-        inoffset_ = inoffset_ - bufsize_;
+    for (int i=0; i < numouts; i++)
+    {
+		OutNode *outnode = outnodes_.getUnchecked(i);
+
+#if SPLIT_COMPLEX
+		DSPSplitComplex     splitcomplex;
+		splitcomplex.realp =  outnode->c_re_[part_idx_];
+		splitcomplex.imagp =  outnode->c_im_[part_idx_];
+
+        outnode->c_im_[part_idx_][0] = outnode->c_re_[part_idx_][partitionsize_]; // special vDSP packing
+        vDSP_fft_zrip(vdsp_fft_setup_, &splitcomplex, 1, vdsp_log2_, FFT_INVERSE); // ifft
+        vDSP_ztoc(&splitcomplex, 1, reinterpret_cast<COMPLEX*>(fft_t_), 2, partitionsize_); // reorder
+#else
+        fftwf_execute_dft_c2r (fftwf_plan_c2r_, outnode->c_c_[part_idx_], fft_t_);
+#endif
+        
+        outnode->outbuf_.copyFrom(pingpong, 0, fft_t_+partitionsize_-1, partitionsize_);
+        
+// clear freq accumulation buffers
+#if SPLIT_COMPLEX
+        FloatVectorOperations::clear(outnode->c_re_[part_idx_], partitionsize_+1);
+        FloatVectorOperations::clear(outnode->c_im_[part_idx_], partitionsize_+1);
+#else
+        FloatVectorOperations::clear((float*)outnode->c_c_[part_idx_], 2*(partitionsize_+1));
+#endif
+    } // end iterate over all outputs
+
+	pingpong_ = pingpong;
     
+    outnodeoffset_ = 0;
+
+	// signal that we are done with this partition
+	// waitprocessing_.signal();
+}
+
+void MtxConvSlave::WriteToOutbuf(int numsamples)
+{
+	int smplstowrite_end = numsamples; // write to the end
+	int smplstowrite_start = 0; // write to the start
+
+	if (smplstowrite_end + outoffset_ >= outbufsize_)
+	{
+		smplstowrite_end = outbufsize_ - outoffset_;
+		// smplstowrite_start = partitionsize_ - smplstowrite_end;
+		smplstowrite_start = numsamples - smplstowrite_end;
+	}
+
+	// std::cout << "outoffset: " << outoffset_ << " end: " << smplstowrite_end << " start: " << smplstowrite_start << " pingpong: " << (int)pingpong_ << std::endl;
+
+
+	int numouts = outnodes_.size();
+
+	// std::cout << "numoutnodes: " << numouts << std::endl;
+
+	for (int i = 0; i < numouts; i++) {
+
+		OutNode *outnode = outnodes_.getUnchecked(i);
+
+		if (smplstowrite_end)
+			outbuf_->addFrom(outnode->out_, outoffset_, outnode->outbuf_, (int)pingpong_, outnodeoffset_, smplstowrite_end);
+
+		if (smplstowrite_start)
+			outbuf_->addFrom(outnode->out_, 0, outnode->outbuf_, (int)pingpong_, outnodeoffset_ + smplstowrite_end, smplstowrite_start);
+
+
+	}
+
+	// std::cout << "outbuf ch1 rms: " << outbuf_->getRMSLevel(0, 0, bufsize_) << "outbuf ch2 rms: " << outbuf_->getRMSLevel(1, 0, bufsize_) << std::endl;
+
+
+	if (smplstowrite_start)
+		outoffset_ = smplstowrite_start;
+	else
+		outoffset_ += smplstowrite_end;
+
+	if (outoffset_ >= outbufsize_)
+		outoffset_ -= outbufsize_;
+
+	outnodeoffset_ += numsamples;
+}
+
+
+void MtxConvSlave::Process(int filt_part_idx)
+{
+    
+#ifdef DEBUG_COUT
+    std::cout << "Slave Process, numnewsamples: " << numnewinsamples_ << " partsize: " << partitionsize_ << " inoffset: " << inoffset_ << std::endl;
+#endif
     
     /////////////
     // iterate over all outputs and query filters
     // outputs -> filters -> inputs
     
+	int out_part_idx = part_idx_ + filt_part_idx;
+
+	if (out_part_idx >= numpartitions_)
+		out_part_idx -= numpartitions_;
+
     int numouts = outnodes_.size();
     
     for (int i=0; i < numouts; i++)
     {
         
-        // clear freq accumulation buffers
-#if SPLIT_COMPLEX
-        FloatVectorOperations::clear(fft_re_, partitionsize_+1);
-        FloatVectorOperations::clear(fft_im_, partitionsize_+1);
-#else
-        FloatVectorOperations::clear((float*)fft_c_, 2*(partitionsize_+1));
-#endif
-        
         OutNode *outnode = outnodes_.getUnchecked(i);
         
         int numfilters = outnode->filternodes_.size();
-        
-        int part_idx = part_idx_;
-        
-        // iterate over all sub-partitions
-        for (int p = 0; p < numpartitions_; p++)
-        {
             
-            // std::cout << "NumPartitions: " << numpartitions_ << " Partition: " << part_idx << std::endl;
+		// std::cout << "NumPartitions: " << numpartitions_ << " Partition: " << filt_part_idx << std::endl;
             
-            for (int j=0; j < numfilters; j++)
-            {
+		for (int j=0; j < numfilters; j++)
+		{
                 
-                FilterNode *filternode = outnode->filternodes_.getUnchecked(j);
+			FilterNode *filternode = outnode->filternodes_.getUnchecked(j);
                 
-                // only process if this filter has that many partitions
-                if (p < filternode->numpartitions_)
-                {
+			// only process if this filter has that many partitions
+			if (filt_part_idx < filternode->numpartitions_)
+			{
                     
-#if 1 // deactivate for now..
-#if SPLIT_COMPLEX
-                    float *a_re = filternode->innode_->a_re_[part_idx];
-                    float *a_im = filternode->innode_->a_im_[part_idx];
+	#if SPLIT_COMPLEX
+				float *a_re = filternode->innode_->a_re_[part_idx_];
+				float *a_im = filternode->innode_->a_im_[part_idx_];
                     
-                    float *b_re = filternode->b_re_[p];
-                    float *b_im = filternode->b_im_[p];
+				float *b_re = filternode->b_re_[filt_part_idx];
+				float *b_im = filternode->b_im_[filt_part_idx];
                     
-                    float *c_re = fft_re_;
-                    float *c_im = fft_im_;
+				float *c_re = outnode->c_re_[out_part_idx];
+				float *c_im = outnode->c_im_[out_part_idx];
                     
-                    // this is the SSE convolution version
-                    for (int k=0; k<partitionsize_; k+=4)
-                    {
-                        const __m128 ra = _mm_load_ps(&a_re[k]);
-                        const __m128 rb = _mm_load_ps(&b_re[k]);
-                        const __m128 ia = _mm_load_ps(&a_im[k]);
-                        const __m128 ib = _mm_load_ps(&b_im[k]);
+				// this is the SSE convolution version
+				for (int k=0; k<partitionsize_; k+=4)
+				{
+					const __m128 ra = _mm_load_ps(&a_re[k]);
+					const __m128 rb = _mm_load_ps(&b_re[k]);
+					const __m128 ia = _mm_load_ps(&a_im[k]);
+					const __m128 ib = _mm_load_ps(&b_im[k]);
                         
-                        // destination
-                        __m128 rc = _mm_load_ps(&c_re[k]);
-                        __m128 ic = _mm_load_ps(&c_im[k]);
+					// destination
+					__m128 rc = _mm_load_ps(&c_re[k]);
+					__m128 ic = _mm_load_ps(&c_im[k]);
                         
-                        // real part: real = ra*rb-ia*ib
-                        rc = _mm_add_ps(rc, _mm_mul_ps(ra, rb));
-                        rc = _mm_sub_ps(rc, _mm_mul_ps(ia, ib));
-                        _mm_store_ps(&c_re[k], rc);
+					// real part: real = ra*rb-ia*ib
+					rc = _mm_add_ps(rc, _mm_mul_ps(ra, rb));
+					rc = _mm_sub_ps(rc, _mm_mul_ps(ia, ib));
+					_mm_store_ps(&c_re[k], rc);
                         
-                        // imag part: imag = ra*ib + ia*rb
-                        ic = _mm_add_ps(ic, _mm_mul_ps(ra, ib));
-                        ic = _mm_add_ps(ic, _mm_mul_ps(ia, rb));
-                        _mm_store_ps(&c_im[k], ic);
-                    }
-                    // handle last bin separately
-                    c_re[partitionsize_] += a_re[partitionsize_] * b_re[partitionsize_];
-                    // c_im[partitionsize_] = 0; // should be zero anyway
+					// imag part: imag = ra*ib + ia*rb
+					ic = _mm_add_ps(ic, _mm_mul_ps(ra, ib));
+					ic = _mm_add_ps(ic, _mm_mul_ps(ia, rb));
+					_mm_store_ps(&c_im[k], ic);
+				}
+				// handle last bin separately
+				c_re[partitionsize_] += a_re[partitionsize_] * b_re[partitionsize_];
+				// c_im[partitionsize_] = 0; // should be zero anyway
 #else
-                    // sse 3 from http://yangkunlun.blogspot.de/2011/09/fast-complex-multiply-with-sse.html
+				// sse 3 from http://yangkunlun.blogspot.de/2011/09/fast-complex-multiply-with-sse.html
                     
-                    float *A = (float *) filternode->innode_->a_c_[part_idx];
-                    float *B = (float *) filternode->b_c_[p];
-                    float *D = (float *) fft_c_;
+				float *A = (float *) filternode->innode_->a_c_[part_idx_];
+				float *B = (float *) filternode->b_c_[filt_part_idx];
+				float *D = (float *) outnode->c_c_[out_part_idx];
                     
                     
-                    for (int i=0; i < partitionsize_; i+=2)
-                    {
-                        // complex multiplication
-                        __m128 aa, bb, dc, x0, x1, out;
-                        __m128 ab = _mm_load_ps(A);
-                        __m128 cd = _mm_load_ps(B);
-                        aa = _mm_moveldup_ps(ab); // duplicate A to R1 R1 R2 R2
-                        bb = _mm_movehdup_ps(ab); // duplicate A to I1 I1 I2 I2
+				for (int i=0; i < partitionsize_; i+=2)
+				{
+					// complex multiplication
+					__m128 aa, bb, dc, x0, x1, out;
+					__m128 ab = _mm_load_ps(A);
+					__m128 cd = _mm_load_ps(B);
+					aa = _mm_moveldup_ps(ab); // duplicate A to R1 R1 R2 R2
+					bb = _mm_movehdup_ps(ab); // duplicate A to I1 I1 I2 I2
                         
-                        // the upper part can be done during initialization -> but double the need of space!
+					// the upper part can be done during initialization -> but double the need of space!
                         
-                        x0 = _mm_mul_ps(aa, cd);    //ac ad
-                        dc = _mm_shuffle_ps(cd, cd, _MM_SHUFFLE(2,3,0,1));
-                        x1 = _mm_mul_ps(bb, dc);    //bd bc
+					x0 = _mm_mul_ps(aa, cd);    //ac ad
+					dc = _mm_shuffle_ps(cd, cd, _MM_SHUFFLE(2,3,0,1));
+					x1 = _mm_mul_ps(bb, dc);    //bd bc
                         
                         
-                        // adding result to output
-                        out = _mm_load_ps(D);
-                        out = _mm_add_ps(out, _mm_addsub_ps(x0, x1));
-                        _mm_store_ps(D, out);
+					// adding result to output
+					out = _mm_load_ps(D);
+					out = _mm_add_ps(out, _mm_addsub_ps(x0, x1));
+					_mm_store_ps(D, out);
                         
-                        A += 4;
-                        B += 4;
-                        D += 4;
-                    }
-                    // treat last bin separately
-                    fft_c_ [partitionsize_][0] += filternode->innode_->a_c_[part_idx] [partitionsize_][0] * filternode->b_c_[p] [partitionsize_][0];
-                    // fft_c_ [partitionsize_][1] = 0; // should be zero anyway
+					A += 4;
+					B += 4;
+					D += 4;
+				}
+				// treat last bin separately
+				outnode->c_c_[out_part_idx][partitionsize_][0] += filternode->innode_->a_c_[part_idx_] [partitionsize_][0] * filternode->b_c_[filt_part_idx] [partitionsize_][0];
+				// fft_c_ [partitionsize_][1] = 0; // should be zero anyway
 #endif
-#endif
-                    
-#if 0
-                    // try to bypass the convolution
-                    if (p == 0) {
-#if SPLIT_COMPLEX
-                        FloatVectorOperations::copyWithMultiply(fft_re_, filternode->innode_->a_re_[part_idx], fft_norm_, partitionsize_+1);
-                        FloatVectorOperations::copyWithMultiply(fft_im_, filternode->innode_->a_im_[part_idx], fft_norm_, partitionsize_+1);
-                        
-                        //FloatVectorOperations::copy(fft_re_, filternode->b_re_[part_idx], partitionsize_+1);
-                        //FloatVectorOperations::copy(fft_im_, filternode->b_im_[part_idx], partitionsize_+1);
-#else
-                        FloatVectorOperations::copyWithMultiply((float*)fft_c_, (float*)filternode->innode_->a_c_[part_idx], fft_norm_, 2*(partitionsize_+1));
-#endif
-                        
-                    }
-                    
-#endif
-                }
-            }
+			}
+		}
             
-            
-            part_idx--;
-            if (part_idx < 0)
-                part_idx = numpartitions_-1;
-            
-        } // iterate over all sub-partitions
-        // all filters are computed now do the ifft for this output channel
-        
-#if SPLIT_COMPLEX
-        fft_im_[0] = fft_re_[partitionsize_]; // special vDSP packing
-        vDSP_fft_zrip(vdsp_fft_setup_, &splitcomplex_, 1, vdsp_log2_, FFT_INVERSE); // ifft
-        vDSP_ztoc(&splitcomplex_, 1, reinterpret_cast<COMPLEX*>(fft_t_), 2, partitionsize_); // reorder
-#else
-        fftwf_execute_dft_c2r (fftwf_plan_c2r_, fft_c_, fft_t_);
-#endif
-        
-        outnode->outbuf_.copyFrom(pingpong, 0, fft_t_+partitionsize_-1, partitionsize_);
-        
     } // end iterate over all outputs
     
-    
-    // FloatVectorOperations::fill(fft_t_, 0.1f, partitionsize_);
-    ////////////
-    // FDL
-    part_idx_++;
-    if (part_idx_ >= numpartitions_)
-        part_idx_ = 0;
-    
-    pingpong_ = pingpong;
-    
-    outnodeoffset_ = 0;
+	// increment finished atomic int
+	finished_part_.operator++();
 }
 
 
+// this is called from the master
 void MtxConvSlave::ReadOutput(int numsamples)
 {
     
@@ -849,18 +988,27 @@ void MtxConvSlave::ReadOutput(int numsamples)
     // do processing if enough samples arrived
     if (numnewinsamples_ >= partitionsize_)
     {
-        if (priority_ < 0) {
-            
-            waitprocessing_.reset();
-            waitnewdata_.signal();
-            waitprocessing_.wait();
-            
-        } else {
-            
-            // perform first partition in callback
-            Process();
-        }
-        
+		if (priority_ == 0) // highest priority has to deliver immediateley
+		{
+			TransformInput();
+
+			// compute first partition directly
+			Process(0);
+
+			// signal thread to do the other partitions
+			waitnewdata_.signal();
+			
+			TransformOutput();
+
+			WriteToOutbuf(partitionsize_);
+		}
+		else // lower priority has some time for computations...
+		{
+			// signal thread to do the work...
+			waitnewdata_.signal();
+		}
+		
+
         numnewinsamples_ -= partitionsize_;
     }
     
@@ -868,66 +1016,7 @@ void MtxConvSlave::ReadOutput(int numsamples)
     std::cout << "ReadOutput, outnodeoffset_: " << outnodeoffset_ << " outoffset_: " << outoffset_ << std::endl;
 #endif
     
-    
-    if (outnodeoffset_ < partitionsize_) // new data is available
-    {
-        
-        
-        //int smplstowrite_end = partitionsize_; // write to the end
-        int smplstowrite_end = numsamples; // write to the end
-        int smplstowrite_start = 0; // write to the start
-        
-        if (smplstowrite_end + outoffset_ >= bufsize_)
-        {
-            smplstowrite_end = bufsize_ - outoffset_;
-            // smplstowrite_start = partitionsize_ - smplstowrite_end;
-            smplstowrite_start = numsamples - smplstowrite_end;
-        }
-        
-        // std::cout << "outoffset: " << outoffset_ << " end: " << smplstowrite_end << " start: " << smplstowrite_start << " pingpong: " << (int)pingpong_ << std::endl;
-        
-        
-        int numouts = outnodes_.size();
-        
-        // std::cout << "numoutnodes: " << numouts << std::endl;
-        
-        for (int i=0; i < numouts; i++) {
-            
-            OutNode *outnode = outnodes_.getUnchecked(i);
-            
-            if (smplstowrite_end)
-                outbuf_->addFrom(outnode->out_, outoffset_, outnode->outbuf_, (int)pingpong_, outnodeoffset_, smplstowrite_end);
-            
-            if (smplstowrite_start)
-                outbuf_->addFrom(outnode->out_, 0, outnode->outbuf_, (int)pingpong_, outnodeoffset_+smplstowrite_end, smplstowrite_start);
-            
-            
-        }
-        
-        // std::cout << "outbuf ch1 rms: " << outbuf_->getRMSLevel(0, 0, bufsize_) << "outbuf ch2 rms: " << outbuf_->getRMSLevel(1, 0, bufsize_) << std::endl;
-        
-        
-        if (smplstowrite_start)
-            outoffset_ = smplstowrite_start;
-        else
-            outoffset_ += smplstowrite_end;
-        
-        if (outoffset_ >= bufsize_)
-            outoffset_ -= bufsize_;
-        
-        outnodeoffset_ += numsamples;
-    }
-    else // no new data -> add nothing but continue counting..
-    {
-        // this happens if a smaller buffer is sent -> eg. when looping in reaper -> prevents crash or clicks
-        outnodeoffset_ += numsamples;
-        outoffset_ += numsamples;
-    }
-    
-    // reset is done in the processing methode
-    // if (outnodeoffset_ >= partitionsize_)
-    //    outnodeoffset_ = 0;
-    
+	// what to do with smaller buffers?
 }
 
 
@@ -964,7 +1053,7 @@ int MtxConvSlave::CheckOutNode(int out, bool create)
     // create a node if it does not exist
     if (create && (ret == -1))
     {
-        outnodes_.add(new OutNode(out, partitionsize_));
+        outnodes_.add(new OutNode(out, partitionsize_, numpartitions_));
         ret = outnodes_.size()-1;
     }
     
@@ -973,7 +1062,14 @@ int MtxConvSlave::CheckOutNode(int out, bool create)
 
 void MtxConvSlave::DebugInfo()
 {
-    std::cout << "Partitionsize: " << partitionsize_ << " Subpartitions: " << numpartitions_ << " Offset: " << offset_ << " Inoffset: " << inoffset_ << " Priority: " << priority_ << std::endl;
+	String dbg_text;
+	dbg_text << "Priority: " << priority_ << " Partitionsize: " << partitionsize_ << " Subpartitions: " << numpartitions_ << " Offset: " << offset_ << " Inoffset: " << inoffset_ << " Outoffset: " << outoffset_ << "\n";
+
+#ifdef DEBUG_COUT
+	WriteLog(dbg_text);
+#endif
+	
+	std::cout << dbg_text << std::endl;
 }
 
 /////////////////////////////////

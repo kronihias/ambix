@@ -47,7 +47,8 @@ public:
     
     // delay and length are assumed to be in samples related to the source samplerate!
     // this method does zero padding for delay and cuts the beginning/end for offset/delay
-    void addIR(int in_ch, int out_ch, int offset, int delay, int length, AudioSampleBuffer* buffer, double src_samplerate);
+    // length is the absolute length, not taking into account the offset
+    void addIR(int in_ch, int out_ch, int offset, int delay, int length, AudioSampleBuffer* buffer, int buffer_ch, double src_samplerate);
     
     AudioSampleBuffer* getIR(int id); // get the audio buffer for the corresponding IR
     

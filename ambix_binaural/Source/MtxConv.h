@@ -22,9 +22,8 @@
 #include "JuceHeader.h"
 
 #if JUCE_MAC
-   #define VIMAGE_H // avoid namespace clashes
-   #include <Accelerate/Accelerate.h>
-
+    #define VIMAGE_H // avoid namespace clashes
+    #include <Accelerate/Accelerate.h>
     #include <vector>
 
     #define SPLIT_COMPLEX 1
@@ -126,20 +125,73 @@ private:
 
 ////////////////////////////
 // class which holds time domain output data
+// and the frequency domain output for each partition
 class OutNode
 {
 public:
     
-    OutNode(int out, int partitionsize) // resize buffer
+    OutNode(int out, int partitionsize, int numpartitions) // resize buffer
     {
+        numpartitions_ = numpartitions;
+
         out_ = out;
         outbuf_.setSize(2, partitionsize);
         outbuf_.clear();
+        
+        // allocate complex output for each partition stage
+#if SPLIT_COMPLEX
+        c_re_ = new float* [numpartitions_];
+        c_im_ = new float* [numpartitions_];
+#else
+        c_c_ = new fftwf_complex* [numpartitions_];
+#endif
+
+        for (int i=0; i<numpartitions_; i++)
+        {
+            // allocate memory in constructor
+#if SPLIT_COMPLEX
+            // vdsp framework needs N split complex samples
+            c_re_[i] = reinterpret_cast<float*>( aligned_malloc( (partitionsize+1)*sizeof(float), 16 ) );
+            c_im_[i] = reinterpret_cast<float*>( aligned_malloc( (partitionsize+1)*sizeof(float), 16 ) );
+            
+            
+            FloatVectorOperations::clear(c_re_[i], partitionsize+1);
+            FloatVectorOperations::clear(c_im_[i], partitionsize+1);
+        
+#else
+            // fftw needs N+1 complex samples
+            c_c_[i] = reinterpret_cast<fftwf_complex*>( aligned_malloc( (partitionsize+1)*sizeof(fftwf_complex), 16 ) );
+            
+            FloatVectorOperations::clear((float*)c_c_[i], 2*(partitionsize+1));
+#endif  
+        }
+        
     };
     
     ~OutNode()
     {
         filternodes_.clear();
+        
+        // free memory in destructor
+        for (int i=0; i<numpartitions_; i++)
+        {
+#if SPLIT_COMPLEX
+            if (c_re_[i])
+                aligned_free(c_re_[i]);
+            if (c_im_[i])
+                aligned_free(c_im_[i]);
+#else
+            if (c_c_[i])
+                aligned_free(c_c_[i]);
+#endif
+        }
+
+#if SPLIT_COMPLEX
+        delete[] c_re_;
+        delete[] c_im_;
+#else
+        delete[] c_c_;
+#endif
     };
     
 private:
@@ -151,6 +203,16 @@ private:
     Array<FilterNode*>  filternodes_; // a list of all assigned filternodes
     
     AudioSampleBuffer   outbuf_; // output samples, 2 channels for access
+    
+    int                 numpartitions_;
+    
+        // complex fft data
+#if SPLIT_COMPLEX
+    float               **c_re_; // N/2+1
+    float               **c_im_; // N/2+1
+#else
+    fftwf_complex       **c_c_; // N+1 -> interleaved complex data
+#endif
 };
 
 
@@ -161,12 +223,9 @@ private:
 class MtxConvSlave : public Thread
 {
 public:
-    MtxConvSlave () : Thread("mtx_convolver_slave")
-    {
-        
-    };
+    MtxConvSlave ();
     
-    ~MtxConvSlave () {};
+    ~MtxConvSlave ();
     
 private:
     friend class MtxConvMaster;
@@ -175,9 +234,18 @@ private:
     // threadfunct
     void run ();
     
-    // this is called by the thread to perform convolution
-    void Process ();
-    
+    // this is called by the callback or thread to perform convolution of one input signal partition
+    void Process (int filt_part_idx);
+
+    // transform the new input data
+    void TransformInput();
+
+    // transform the accumulated output
+    void TransformOutput();
+
+    // Write the time data to the master output buffer
+    void WriteToOutbuf(int numsamples);
+
     // this is called to get the time domain output signal
     void ReadOutput(int numsamples);
     
@@ -192,7 +260,7 @@ private:
                      AudioSampleBuffer *inbuf,
                      AudioSampleBuffer *outbuf );
     
-    void SetBufsize ( int bufsize, int blocksize );
+    void SetBufsize ( int inbufsize, int outbufsize, int blocksize );
     
     bool AddFilter ( int in,
                      int out,
@@ -210,9 +278,16 @@ private:
     // print debug info
     void DebugInfo();
     
+	// write to debug file
+	void WriteLog(String &text);
+	
+	
     AudioSampleBuffer   *inbuf_;            // Shared Input Buffer
     AudioSampleBuffer   *outbuf_;           // Shared Output Buffer
-    int                 bufsize_;           // size of the input/output buffer
+	
+	int					inbufsize_;			// size of time domain input buffer (2*maxpart_)
+	int                 outbufsize_;        // size of time domain output buffer (2*maxsize_)
+
     int                 inoffset_;          // current input ring buffer offset
     int                 outoffset_;         // current output ring buffer offset (of shared output buf)
     
@@ -222,15 +297,17 @@ private:
     bool                pingpong_;         // ping pong for output buffer to allow readout without threading problems
     
     int                 part_idx_;          // partition index for Frequency Domain Delay Line
-    
+
+    Atomic<int>         finished_part_;     // counter how many partitions are done
+
     int                 numpartitions_;     // number of partitions within this level (-> with same size)
     int                 partitionsize_;     // size of the partition (fft will be 2x this size!)
     int                 offset_;            // offset in the impulse response for the first partition of this size
     int                 priority_;          // thread priority... short partitions have to deliver first!
-    
+
     WaitableEvent       waitnewdata_;       // this will signal the threads that new work is here!
     WaitableEvent       waitprocessing_;    // this will signal work is done.
-    
+
     float               *fft_t_;             // time data for fft/ifft -> 2*N
     float               fft_norm_;           // normalization for fft
     
@@ -252,6 +329,7 @@ private:
     OwnedArray<FilterNode> filternodes_;    // holds filter nodes
     OwnedArray<OutNode> outnodes_;          // holds output nodes
     
+	ScopedPointer<FileOutputStream>	debug_out_; // Debug output Text File
 };
 
 
@@ -277,6 +355,7 @@ public:
                      int numouts,
                      int blocksize,
                      int maxsize,
+					 int minpart,
                      int maxpart);
     
     // Add an Impulse Response with dedicated Input/Output assignement
@@ -304,18 +383,25 @@ public:
     // print debug info
     void DebugInfo();
     
+	// write to debug file
+	void WriteLog(String &text);
+	
 private:
     
     AudioSampleBuffer   inbuf_;             // Holds the Time Domain Input Samples
     AudioSampleBuffer   outbuf_;            // Hold the Time Domain Output Samples
     
-    int                 bufsize_;           // size of input/output buffer (2*maxsize)
+	int					inbufsize_;			// size of time domain input buffer (2*maxpart_)
+    int                 outbufsize_;        // size of time domain output buffer (2*maxsize_)
     
     int                 inoffset_;          // current ring buffer write offset
     int                 outoffset_;         // current ring buffer read offset
     
-    int                 blocksize_;         // Blocksize of first segment
+    int                 blocksize_;         // Blocksize of host process (how many samples are processed in each callback)
     
+	int					minpart_;			// Size of first partition
+	int					maxpart_;			// Maximum partition size
+	
     int                 numins_;            // Number of Input Channels
     int                 numouts_;           // Number of Output Channels
     
@@ -331,6 +417,7 @@ private:
     
     OwnedArray<MtxConvSlave>    partitions_;// these are my partitions with different size
     
+	ScopedPointer<FileOutputStream>	debug_out_; // Debug output Text File
 };
 
 

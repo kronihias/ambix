@@ -57,15 +57,15 @@ int ConvolverData::getNumIRs()
 }
 
 
-void ConvolverData::addIR(int in_ch, int out_ch, int offset, int delay, int length, AudioSampleBuffer* buffer, double src_samplerate)
+void ConvolverData::addIR(int in_ch, int out_ch, int offset, int delay, int length, AudioSampleBuffer* buffer, int buffer_ch, double src_samplerate)
 {
     if (delay < 0)
         delay = 0;
     if (offset < 0)
         offset = 0;
     
-    if ( (length == 0) || (length > buffer->getNumSamples()) )
-        length = buffer->getNumSamples();
+    if ( (length <= 0) || (length+offset > buffer->getNumSamples()) )
+        length = buffer->getNumSamples()-offset;
     
     
     IR.add(new IR_Data);
@@ -74,18 +74,19 @@ void ConvolverData::addIR(int in_ch, int out_ch, int offset, int delay, int leng
     
     AudioSampleBuffer *IRBuf = &IR.getLast()->Data;
     
-    int size = length + delay - offset;
+    int size = length + delay; // absolute length of ir
     
     IRBuf->setSize(1, size);
     IRBuf->clear();
-    IRBuf->copyFrom(0, delay, (*buffer), 0, offset, length);
+    IRBuf->copyFrom(0, delay, (*buffer), buffer_ch, offset, length); // copy the wanted part
+    
     
     if (src_samplerate != SampleRate)
     {
         // do resampling
         double sr_conv_fact = SampleRate / src_samplerate;
         
-        int newsize = ceil(size*sr_conv_fact);
+        int newsize = (int)ceil(size*sr_conv_fact);
         
         AudioSampleBuffer ResampledBuffer(1, newsize);
         ResampledBuffer.clear();
