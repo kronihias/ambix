@@ -41,7 +41,8 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
                                 _load_ir(true),
                                 SampleRate(44100),
                                 isProcessing(false),
-                                _gain(0.5f)
+                                _gain(0.5f),
+                                Thread("ambix_binaural")
 
 {
     presetDir = presetDir.getSpecialLocation(File::userApplicationDataDirectory).getChildFile("ambix/binaural_presets");
@@ -91,7 +92,7 @@ void Ambix_binauralAudioProcessor::LoadPreset(unsigned int preset)
     if (preset < (unsigned int)_presetFiles.size())
     {
         // ScheduleConfiguration(_presetFiles.getUnchecked(preset));
-        LoadConfiguration(_presetFiles.getUnchecked(preset));
+        LoadConfigurationAsync(_presetFiles.getUnchecked(preset));
     }
 }
 
@@ -102,7 +103,7 @@ void Ambix_binauralAudioProcessor::LoadPresetByName(String presetName)
     
     if (files.size())
     {
-        LoadConfiguration(files.getUnchecked(0)); // Load first result
+        LoadConfigurationAsync(files.getUnchecked(0)); // Load first result
         box_preset_str = files.getUnchecked(0).getFileNameWithoutExtension();
     }
     
@@ -318,7 +319,7 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
             
             }
              */
-            mtxconv_.processBlock(ambi_spk_buffer_, buffer);
+            mtxconv_.processBlock(ambi_spk_buffer_, buffer, buffer.getNumSamples());
         }
 #else
         int NumSamples = buffer.getNumSamples();
@@ -915,10 +916,22 @@ void Ambix_binauralAudioProcessor::UnloadConfiguration()
 
 }
 
+void Ambix_binauralAudioProcessor::run()
+{
+    LoadConfiguration(_desConfigFile);
+}
+
+void Ambix_binauralAudioProcessor::LoadConfigurationAsync(File configFile)
+{
+    DebugPrint("Loading preset...\n\n");
+    _desConfigFile = configFile;
+    startThread(6); // medium priority
+}
+
 void Ambix_binauralAudioProcessor::ReloadConfiguration()
 {
     if (configLoaded)
-        LoadConfiguration(_configFile);
+        LoadConfigurationAsync(_configFile);
 }
 
 #if BINAURAL_DECODER

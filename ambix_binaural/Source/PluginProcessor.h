@@ -95,7 +95,8 @@ inline float DbToParam(float db)
 /**
 */
 class Ambix_binauralAudioProcessor  : public AudioProcessor,
-                                      public ChangeBroadcaster
+                                      public ChangeBroadcaster,
+                                      public Thread
 {
 public:
     //==============================================================================
@@ -144,7 +145,12 @@ public:
     void getStateInformation (MemoryBlock& destData);
     void setStateInformation (const void* data, int sizeInBytes);
 
-    
+    // use a thread to load a configuration
+    void run();
+
+    // do the loading in a background thread
+    void LoadConfigurationAsync(File configFile);
+
     void LoadConfiguration(File configFile); // do the loading
     
     void UnloadConfiguration();
@@ -192,6 +198,8 @@ public:
     
 private:
     
+    File _desConfigFile;
+
     AudioSampleBuffer ambi_spk_buffer_;
     
     
