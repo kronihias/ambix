@@ -58,10 +58,10 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
 
 {
     presetDir = presetDir.getSpecialLocation(File::userApplicationDataDirectory).getChildFile("ambix/binaural_presets");
-    std::cout << "Search dir:" << presetDir.getFullPathName() << std::endl;
+    std::cout << "Recursive search dir:" << presetDir.getFullPathName() << std::endl;
     
 	String debug;
-        debug << "Search dir: " << presetDir.getFullPathName() << "\n\n";
+        debug << "Recursive search dir: " << presetDir.getFullPathName() << "\n\n";
         
         DebugPrint(debug);
 
@@ -117,6 +117,12 @@ void Ambix_binauralAudioProcessor::LoadPresetByName(String presetName)
     {
         LoadConfigurationAsync(files.getUnchecked(0)); // Load first result
         box_preset_str = files.getUnchecked(0).getFileNameWithoutExtension();
+    }
+    else
+    { // preset not found -> post!
+        String debug_msg;
+        debug_msg << "ERROR loading preset: " << presetName << ", Preset not found in search folder!\n\n";
+        DebugPrint(debug_msg);
     }
     
 }
