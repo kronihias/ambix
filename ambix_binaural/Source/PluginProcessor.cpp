@@ -33,6 +33,18 @@
 #define Sleep(x) usleep((x)*1000)
 #endif
 
+enum coeff_scale_enum
+{
+    sn3d_scale,
+    n3d_scale,
+    fuma_scale
+};
+enum coeff_seq_enum
+{
+    acn_seq,
+    fuma_seq,
+    sid_seq
+};
 //==============================================================================
 Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
                                 _AmbiChannels(0),
@@ -399,12 +411,12 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     // global settings
     float dec_mat_gain = 1.f; // dec matrix gain
     float global_hrtf_gain = 1.f; // optional global hrtf gain
-    char coeff_scale[10];
-    char coeff_seq[10];
-    int invert_condon_shortley = 0;
-    int flip_param = 0; // mirror left right
-    int flop_param = 0; // mirror front back
-    int flap_param = 0; // mirror top bottom
+    coeff_scale_enum coeff_scale = coeff_scale_enum::sn3d_scale;
+    coeff_seq_enum coeff_seq = coeff_seq_enum::acn_seq;
+    bool invert_condon_shortley = false;
+    bool flip_param = false; // mirror left right
+    bool flop_param = false; // mirror front back
+    bool flap_param = false; // mirror top bottom
     
     // iterate over all lines
     for (int currentLine = 0; currentLine < myLines.size(); currentLine++)
@@ -427,17 +439,10 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     if (line.contains("#"))
                         break;
                     
-                    String::CharPointerType lineChar = line.getCharPointer();
-                    
-                    char path[100];
-                    
-                    sscanf(lineChar, "%s", path);
-                    
-                    // /debug_msg
-                    if (!strcmp(path, "/debug_msg"))
+                    if (line.startsWithIgnoreCase("/debug_msg"))
                     {
-                        line = line.trimCharactersAtStart("/debug_msg").trim();
-                        
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
                         String debug;
                         debug << "\n" << line << "\n";
                         
@@ -446,11 +451,12 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     } // end /debug_msg
                     
                     // /dec_mat_gain setting
-                    else if (!strcmp(path, "/dec_mat_gain"))
+                    else if (line.startsWithIgnoreCase("/dec_mat_gain"))
                     {
-                        
-                        sscanf(lineChar, "%s%f", path, &dec_mat_gain);
-                        
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
+                        dec_mat_gain = line.getFloatValue();
+
                         if (!dec_mat_gain)
                             dec_mat_gain = 1.f;
                         
@@ -462,10 +468,11 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     } // end /dec_mat_gain
                     
                     // /global_hrtf_gain setting
-                    else if (!strcmp(path, "/global_hrtf_gain"))
+                    else if (line.startsWithIgnoreCase("/global_hrtf_gain"))
                     {
-                        
-                        sscanf(lineChar, "%s%f", path, &global_hrtf_gain);
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
+                        global_hrtf_gain = line.getFloatValue();
                         
                         if (!global_hrtf_gain)
                             global_hrtf_gain = 1.f;
@@ -477,24 +484,26 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                         
                     } // end /global_hrtf_gain
                     
-                    else if (!strcmp(path, "/coeff_scale"))
+                    else if (line.startsWithIgnoreCase("/coeff_scale"))
                     {
-                        
-                        sscanf(lineChar, "%s%s", path, coeff_scale);
-                        
-                        if (strcmp(coeff_scale, "sn3d") && strcmp(coeff_scale, "n3d") && strcmp(coeff_scale, "fuma")) {
-                            
-                            sprintf(coeff_scale, "sn3d"); // fallback to default if unknown
-                            
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
+                        if (line.compareIgnoreCase("sn3d") && line.compareIgnoreCase("n3d") && line.compareIgnoreCase("fuma")) {
                             String debug;
-							debug << "/coeff_scale unknown, falling back to default scaling: ";
-							debug << coeff_scale;
+							debug << "/coeff_scale unknown, falling back to default scaling: sn3d";
                             DebugPrint(debug << "\n");
                             
                         } else {
+                            if (line.startsWithIgnoreCase("n3d"))
+                                coeff_scale = coeff_scale_enum::n3d_scale;
+
+                            if (line.startsWithIgnoreCase("fuma"))
+                                coeff_scale = coeff_scale_enum::fuma_scale;
+
+
                             String debug;
-							debug << "coefficient scaling: " << coeff_scale;
-                            if (!strcmp(coeff_scale, "n3d") || !strcmp(coeff_scale, "fuma"))
+                            debug << "coefficient scaling: " << line;
+                            if (!line.startsWithIgnoreCase("sn3d"))
                                 debug << " (getting rescaled to fit sn3d)";
                             
                             DebugPrint(debug << "\n");
@@ -502,66 +511,75 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                         
                     } // end /coeff_scale
                     
-                    else if (!strcmp(path, "/coeff_seq"))
+                    else if (line.startsWithIgnoreCase("/coeff_seq"))
                     {
-                        
-                        sscanf(lineChar, "%s%s", path, coeff_seq);
-                        
-                        if (strcmp(coeff_seq, "acn") && strcmp(coeff_seq, "fuma") && strcmp(coeff_seq, "sid")) {
-                            
-                            sprintf(coeff_seq, "acn"); // fallback to default if unknown
-                            
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
+                        if (line.compareIgnoreCase("acn") && line.compareIgnoreCase("fuma") && line.compareIgnoreCase("sid")) {
                             String debug;
-							debug << "/coeff_seq unknown, falling back to default sequence: " << coeff_seq;
+                            debug << "/coeff_seq unknown, falling back to default sequence: " << coeff_seq;
                             DebugPrint(debug << "\n");
-                            
-                        } else {
-                            
+                        }
+                        else {
+                            if (line.startsWithIgnoreCase("fuma"))
+                                coeff_seq = coeff_seq_enum::fuma_seq;
+
+                            if (line.startsWithIgnoreCase("sid"))
+                                coeff_seq = coeff_seq_enum::sid_seq;
+
                             String debug;
-							debug << "coefficient sequence: " << coeff_seq;
-                            if (!strcmp(coeff_seq, "sid") || !strcmp(coeff_seq, "fuma"))
+                            debug << "coefficient sequence: " << coeff_seq;
+                            if (!line.startsWithIgnoreCase("acn"))
                                 debug << " (getting adjusted to equal acn)";
-                            
+
                             DebugPrint(debug << "\n");
                         }
                         
                     } // end /coeff_seq
                     
-                    else if (!strcmp(path, "/invert_condon_shortley"))
+                    else if (line.startsWithIgnoreCase("/invert_condon_shortley"))
                     {
-                        
-                        sscanf(lineChar, "%s%i", path, &invert_condon_shortley);
-                        
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
+                        if (line.getIntValue() == 1)
+                            invert_condon_shortley = true;
+
                         if (invert_condon_shortley)
                             DebugPrint("inverting condon shortley phase!\n");
                         
                     } // end /invert_condon_shortley
                     
-                    else if (!strcmp(path, "/flip"))
+                    else if (line.startsWithIgnoreCase("/flip"))
                     {
-                        
-                        sscanf(lineChar, "%s%i", path, &flip_param);
-                        
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
+                        if (line.getIntValue() == 1)
+                            flip_param = true;
+
                         if (flip_param)
                             DebugPrint("flip - mirror left right!\n");
-                        
+
                     } // end /flip
                     
-                    else if (!strcmp(path, "/flop"))
+                    else if (line.startsWithIgnoreCase("/flop"))
                     {
-                        
-                        sscanf(lineChar, "%s%i", path, &flop_param);
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
+                        if (line.getIntValue() == 1)
+                            flop_param = true;
                         
                         if (flop_param)
                             DebugPrint("flop - mirror front back!\n");
                         
                     } // end /flop
                     
-                    else if (!strcmp(path, "/flap"))
+                    else if (line.startsWithIgnoreCase("/flap"))
                     {
-                        
-                        sscanf(lineChar, "%s%i", path, &flap_param);
-                        
+                        line = line.fromFirstOccurrenceOf(" ", false, true);
+
+                        if (line.getIntValue() == 1)
+                            flap_param = true;
+
                         if (flap_param)
                             DebugPrint("flap - mirror top bottom!\n");
                         
@@ -595,18 +613,41 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                         
                         float gain = 1.0f;
                         float delay = 0.f;
-                        int swapChannels = 0;
+                        bool swapChannels = false;
                         
-                        char filename[120];
+                        // parse filename (.wav or .aiff)
+                        String filename("");
                         
-                        String::CharPointerType lineChar = line.getCharPointer();
-                        sscanf(lineChar, "%s%f%f%i", filename, &gain, &delay, &swapChannels);
+                        if (line.containsIgnoreCase(".wav"))
+                        {
+                            filename = line.upToFirstOccurrenceOf(".wav", true, true);
+                            line = line.fromFirstOccurrenceOf(".wav", false, true).trim();
+                        } else if (line.containsIgnoreCase(".aiff"))
+                        {
+                            filename = line.upToFirstOccurrenceOf(".aiff", true, true);
+                            line = line.fromFirstOccurrenceOf(".aiff", false, true).trim();
+                        }
+                        else
+                            break; // no valid filename
+
+                        // parse gain, delay, swapChannels
+                        if (line.length() > 0)
+                        {
+                            gain = line.upToFirstOccurrenceOf(" ", false, true).getFloatValue();
+                            line = line.fromFirstOccurrenceOf(" ", false, true);
+                        }
+                        if (line.length() > 0)
+                        {
+                            delay = line.upToFirstOccurrenceOf(" ", false, true).getFloatValue();
+                            line = line.fromFirstOccurrenceOf(" ", false, true);
+                        }
+                        if (line.length() > 0)
+                        {
+                            swapChannels = line.upToFirstOccurrenceOf(" ", false, true).getIntValue() > 0 ? true : false;
+                        }
+
                         
-                        
-                        if ( (swapChannels != 0 ) && (swapChannels != 1) )
-                            swapChannels = 0;
-                        
-                        File IrFilename = configFile.getParentDirectory().getChildFile(String(filename));
+                        File IrFilename = configFile.getParentDirectory().getChildFile(filename);
                         
                         /*
                         _SpkConv.add(new SpkConv());
@@ -638,7 +679,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                             // addIR(int in_ch, int out_ch, int offset, int delay, int length, AudioSampleBuffer* buffer, double src_samplerate);
                             
                             String debug;
-                            debug << "add conv # " << num_conv+1 << " " << filename << " gain: " << gain << " delay: " << delay << " swap: " << swapChannels;
+                            debug << "add conv # " << num_conv+1 << " " << filename << " gain: " << gain << " delay: " << delay << " swap: " << int(swapChannels);
                             DebugPrint(debug << "\n");
                             
                             num_conv++;
@@ -683,37 +724,30 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     
                     String::CharPointerType lineChar = line.getCharPointer();
                     
-                    int n = 0; // how many characters been read
-                    
-                    int curr_n = 0;
-                    int max_n = lineChar.length();
+                    bool readAllCoeffs = false;
                     
                     for (int j=0; j < AMBI_CHANNELS; j++) { // parse line for numbers
                         
                         double value;
                         
-                        sscanf(lineChar, "%lf%n", &value, &n);
-                      
-                        if (curr_n >= max_n)
-                          break;
-                      
+                        value = CharacterFunctions::readDoubleValue(lineChar);
+
                         DecoderRow.add((float)value);
-                        
-                         // std::cout << "added coefficient " << j << " with " << value << std::endl;
-                        
-                        lineChar += n;
-                        
-                        curr_n += n;
+
+                        if (lineChar.isEmpty())
+                            break;
                                                 
                     } // end parse numbers
                     
-                    
+                    if (lineChar.isEmpty())
+                        readAllCoeffs = true;
+
                     // got my decoder row
                     
                     ///////////////////
                     // now alter sequence if necessary (resort decoder row)
                     
-                    if (!strcmp(coeff_seq, "fuma")) {
+                    if (coeff_seq == coeff_seq_enum::fuma_seq) {
                         
                         Array<float> SortedDecoderRow; // temporary array
                         
@@ -727,7 +761,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                         // std::cout << "reordered decoder row from " << coeff_seq << " to acn!" << std::endl;
                     } // end fuma sequence
                     
-                    else if (!strcmp(coeff_seq, "sid")) {
+                    else if (coeff_seq == coeff_seq_enum::sid_seq) {
                         
                         Array<float> SortedDecoderRow; // temporary array
                         
@@ -756,41 +790,24 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     
                     ///////////////////
                     // scale decoder row if necessary to achieve sn3d normalization!
-                    if (!strcmp(coeff_scale, "fuma")) {
+                    if (coeff_scale == coeff_scale_enum::fuma_scale) {
                         
                         for (int i=0; i < DecoderRow.size(); i++) {
                             
-                            // DecoderRow.set(i, DecoderRow.getUnchecked(i) * conv_norm_fuma_sn3d[i]); // wrong
                             DecoderRow.set(i, DecoderRow.getUnchecked(i) * conv_norm_sn3d_fuma[i]);
                             
                         }
                         // std::cout << "scaled decoder row from " << coeff_scale << " to sn3d!" << std::endl;
                     } // end fuma to sn3d scale
-                    else if (!strcmp(coeff_scale, "n3d")) {
+                    else if (coeff_scale == coeff_scale_enum::n3d_scale) {
                         
                         for (int i=0; i < DecoderRow.size(); i++) {
                             
-                            // DecoderRow.set(i, DecoderRow.getUnchecked(i) * conv_norm_n3d_sn3d[i]); // wrong!
                             DecoderRow.set(i, DecoderRow.getUnchecked(i) * conv_norm_sn3d_n3d[i]);
                             
                         }
                         // std::cout << "scaled decoder row from " << coeff_scale << " to sn3d!" << std::endl;
                     } // end n3d to sn3d scale
-                    
-                    
-#if 0
-                    ///////////////////
-                    // invert condon shortley phase if necessary
-                    if (invert_condon_shortley != 0) {
-                        for (int i=0; i < DecoderRow.size(); i++) {
-                            
-                            DecoderRow.set(i, DecoderRow.getUnchecked(i) * acn_cs_phase[i]);
-                            
-                        }
-                        //std::cout << "inverted cs phase... "  << invert_condon_shortley << std::endl;
-                        
-                    } // end invert cs
-#endif
                     
                     ///////////////////
                     // condon shortley phase, flip flop or flap
@@ -845,7 +862,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     String debug;
 					debug << "speaker # " << _AmbiSpeakers.size() << " with " << DecoderRow.size() << " coefficients";
                     // decoder has higher order than the plugin!! -> report warning
-                    if (curr_n < max_n)
+                    if (!readAllCoeffs)
                     {
                         debug << "\n WARNING: probably you are using a preset inteded to be used at a higher order!";
                     }
