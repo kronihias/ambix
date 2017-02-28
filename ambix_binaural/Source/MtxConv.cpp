@@ -52,7 +52,7 @@ void MtxConvMaster::WriteLog(String &text)
 		debug_out_->writeText(text, false, false);
 }
 
-void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf)
+void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf, int numsamples)
 {
     
     if (configuration_)
@@ -63,7 +63,7 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
         
         /////////////////////////
         // write to input ring buffer
-        int smplstowrite = inbuf.getNumSamples();
+        int smplstowrite = numsamples;
         int numchannels = jmin(numins_, inbuf.getNumChannels());
         
 #ifdef DEBUG_COUT
@@ -134,7 +134,7 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
         
         outbuf.clear();
         
-        int smplstoread = outbuf.getNumSamples();
+        int smplstoread = numsamples;
         numchannels = jmin(outbuf.getNumChannels(), numouts_);
         
         int smplstoread_end = smplstoread;

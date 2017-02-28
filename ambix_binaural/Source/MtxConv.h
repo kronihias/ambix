@@ -370,7 +370,7 @@ public:
     void StopProc();
     
     // Do the processing
-    void processBlock(AudioSampleBuffer& inbuf, juce::AudioSampleBuffer &outbuf);
+    void processBlock(AudioSampleBuffer& inbuf, juce::AudioSampleBuffer &outbuf, int numsamples);
     
     
     // Set all Input/Output Buffers to Zero
