@@ -48,8 +48,6 @@ ENDIF(BUILD_STANDALONE)
 #########
 # preprocessor flags
 
-ADD_DEFINITIONS(-DAMBI_ORDER=${AMBI_ORDER})
-
 # standalone filter 1 to avoid warning
 ADD_DEFINITIONS(-DJUCE_STANDALONE_APPLICATION=1)
 
