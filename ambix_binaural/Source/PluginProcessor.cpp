@@ -428,6 +428,9 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     for (int currentLine = 0; currentLine < myLines.size(); currentLine++)
     {
         
+        if (threadShouldExit())
+            return;
+
         // get the line and remove spaces from start and end
         String line (myLines[currentLine].trim());
         
@@ -609,7 +612,9 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                 
                 for (currentLine = currentLine+1; currentLine < myLines.size(); currentLine++)
                 {
-                    
+                    if (threadShouldExit())
+                        return;
+
                     line = myLines[currentLine].trim();
                     
                     if (line.length() > 0) {
@@ -640,12 +645,12 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                         if (line.length() > 0)
                         {
                             gain = line.upToFirstOccurrenceOf(" ", false, true).getFloatValue();
-                            line = line.fromFirstOccurrenceOf(" ", false, true);
+                            line = line.fromFirstOccurrenceOf(" ", false, true).trim();
                         }
                         if (line.length() > 0)
                         {
                             delay = line.upToFirstOccurrenceOf(" ", false, true).getFloatValue();
-                            line = line.fromFirstOccurrenceOf(" ", false, true);
+                            line = line.fromFirstOccurrenceOf(" ", false, true).trim();
                         }
                         if (line.length() > 0)
                         {
@@ -892,7 +897,9 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
     for (int i=0; i < conv_data.getNumIRs(); i++)
     {
-        
+        if (threadShouldExit())
+            return;
+
         mtxconv_.AddFilter(conv_data.getInCh(i), conv_data.getOutCh(i), *conv_data.getIR(i));
         
     }
