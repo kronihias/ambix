@@ -135,7 +135,7 @@ public:
         numpartitions_ = numpartitions;
 
         out_ = out;
-        outbuf_.setSize(2, partitionsize);
+        outbuf_.setSize(1, partitionsize);
         outbuf_.clear();
         
         // allocate complex output for each partition stage
@@ -202,7 +202,7 @@ private:
     
     Array<FilterNode*>  filternodes_; // a list of all assigned filternodes
     
-    AudioSampleBuffer   outbuf_; // output samples, 2 channels for access
+    AudioSampleBuffer   outbuf_; // output samples, 1 channels (no concur. access problem)
     
     int                 numpartitions_;
     
@@ -238,16 +238,18 @@ private:
     void Process (int filt_part_idx);
 
     // transform the new input data
-    void TransformInput();
+    void TransformInput(bool skip);
 
     // transform the accumulated output
-    void TransformOutput();
+    void TransformOutput(bool skip);
 
     // Write the time data to the master output buffer
-    void WriteToOutbuf(int numsamples);
+    void WriteToOutbuf(int numsamples, bool skip);
 
     // this is called to get the time domain output signal
-    void ReadOutput(int numsamples);
+    // returns true if all partitions finished in time, false if some have been skipped
+    // if forcesync = true this will wait until all partitions are finished
+    bool ReadOutput(int numsamples, bool forcesync);
     
     // start/stop thread
     void StartProc();
@@ -293,12 +295,11 @@ private:
     
     int                 numnewinsamples_;   // number of new samples in the input buffer since last process
     int                 outnodeoffset_;     // offset in the outnode buffer
-    
-    bool                pingpong_;         // ping pong for output buffer to allow readout without threading problems
-    
+
     int                 part_idx_;          // partition index for Frequency Domain Delay Line
 
     Atomic<int>         finished_part_;     // counter how many partitions are done
+    Atomic<int>         skip_cycles_;       // counter of how many cycles should be skipped on next processing cycle...
 
     int                 numpartitions_;     // number of partitions within this level (-> with same size)
     int                 partitionsize_;     // size of the partition (fft will be 2x this size!)
@@ -370,7 +371,8 @@ public:
     void StopProc();
     
     // Do the processing
-    void processBlock(AudioSampleBuffer& inbuf, juce::AudioSampleBuffer &outbuf, int numsamples);
+    // forcesync = true will make sure that all partitions are going to be finished - use this for offline rendering!
+    void processBlock(AudioSampleBuffer& inbuf, juce::AudioSampleBuffer &outbuf, bool forcesync);
     
     
     // Set all Input/Output Buffers to Zero
@@ -386,6 +388,17 @@ public:
 	// write to debug file
 	void WriteLog(String &text);
 	
+    // get the number of skipped cycles due to unfinished partitions
+    int getSkipCount()
+    {
+        return skip_count_;
+    }
+
+    int getMaxSize()
+    {
+        return maxsize_;
+    }
+
 private:
     
     AudioSampleBuffer   inbuf_;             // Holds the Time Domain Input Samples
@@ -407,6 +420,8 @@ private:
     
     int                 numpartitions_;     // Number of Partition Levels (different blocklengths)
     
+    int                 skip_count_;        // The number of skipped partitions
+
     int                 maxsize_;           // maximum filter length
     
     bool                isprocessing_;      // true = Processing is active

@@ -30,6 +30,8 @@ MtxConvMaster::MtxConvMaster() : inbuf_(1,256),
                                  numins_(0),
                                  numouts_(0),
                                  numpartitions_(0),
+                                 maxsize_(0),
+                                 skip_count_(0),
                                  isprocessing_(false),
                                  configuration_(false),
 								 debug_out_(nullptr)
@@ -40,6 +42,7 @@ MtxConvMaster::MtxConvMaster() : inbuf_(1,256),
 	file = file.getSpecialLocation(File::SpecialLocationType::tempDirectory).getChildFile(filename);
 	debug_out_ = new FileOutputStream(file);
 #endif
+    // fftw_make_planner_thread_safe(); // this does currently not work... use system wide lock instead...
 }
 
 MtxConvMaster::~MtxConvMaster()
@@ -52,7 +55,7 @@ void MtxConvMaster::WriteLog(String &text)
 		debug_out_->writeText(text, false, false);
 }
 
-void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf, int numsamples)
+void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf, bool forcesync)
 {
     
     if (configuration_)
@@ -63,7 +66,7 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
         
         /////////////////////////
         // write to input ring buffer
-        int smplstowrite = numsamples;
+        int smplstowrite = inbuf.getNumSamples();
         int numchannels = jmin(numins_, inbuf.getNumChannels());
         
 #ifdef DEBUG_COUT
@@ -100,41 +103,25 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
         if (inoffset_ >= inbufsize_)
             inoffset_ -= inbufsize_;
         
-        
-        /////////////////////////
-        // Process partitions in callback....
-        
-        /*
-        // std::cout << "process partition" << std::endl;
-        for (int i=0; i < numpartitions_; i++) {
-            
-            partitions_.getUnchecked(i)->Process();
-            
-        }
-        */
-        
-        
-        // std::cout << "processed partition! JUHU" << std::endl;
-        
-        
         /////////////////////////
         // collect the output signals from each partitionsize
-        
+
+        bool finished = true; // if false one of the partitions did not finish
+
         for (int i=0; i < numpartitions_; i++) {
             
-            partitions_.getUnchecked(i)->ReadOutput(smplstowrite);
+            finished &= partitions_.getUnchecked(i)->ReadOutput(smplstowrite, forcesync);
         }
-        // std::cout << "READ OUTPUT! JUHU" << std::endl;
         
-        // FINISH!!!
-        // WHEN TO READ/WRITE??!
-        
+        if (!finished)
+            skip_count_++;
+
         /////////////////////////
         // write to output buffer
         
         outbuf.clear();
         
-        int smplstoread = numsamples;
+        int smplstoread = outbuf.getNumSamples();
         numchannels = jmin(outbuf.getNumChannels(), numouts_);
         
         int smplstoread_end = smplstoread;
@@ -190,8 +177,8 @@ bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsiz
     if (maxpart < blocksize)
         maxpart = blocksize;
     
-	minpart_ = minpart;
-	maxpart_ = maxpart;
+	minpart_ = nextPowerOfTwo(minpart);
+	maxpart_ = nextPowerOfTwo(maxpart);
 
 
     numins_ = numins;
@@ -221,7 +208,7 @@ bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsiz
     
     // try bit different...
     
-    blocksize = blocksize_;
+    int partsize = minpart_;
     numpartitions_=0;
     int priority = 0;
     int offset = 0;
@@ -235,33 +222,33 @@ bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsiz
         partitions_.add(new MtxConvSlave());
         
         
-        if (blocksize >= maxpart)
+        if (partsize >= maxpart_)
         {
             // max partition size reached -> put rest into this partition...
-            numpartitions = (int)ceilf((float)maxsize/(float)blocksize);
+            numpartitions = (int)ceilf((float)maxsize/(float)partsize);
             
         } else {
             
-            numpartitions = jmin(numpartitions, (int)ceilf((float)maxsize/(float)blocksize));
+            numpartitions = jmin(numpartitions, (int)ceilf((float)maxsize/(float)partsize));
             
         }
         
-        partitions_.getLast()->Configure(blocksize, numpartitions, offset, priority, &inbuf_, &outbuf_);
+        partitions_.getLast()->Configure(partsize, numpartitions, offset, priority, &inbuf_, &outbuf_);
         
-        maxsize_ += numpartitions*blocksize;
+        maxsize_ += numpartitions*partsize;
         
-        offset += numpartitions*blocksize;
-        maxsize -= numpartitions*blocksize;
+        offset += numpartitions*partsize;
+        maxsize -= numpartitions*partsize;
         
         priority--;
         
-        blocksize *= 2;
+        partsize *= 2;
         
     }
 #endif
     
     // resize the in/out buffers
-	inbufsize_ = 2 * maxpart_;
+	inbufsize_ = 4 * maxpart_;
 
     outbufsize_ = jmax(2*maxsize_, blocksize_);
     
@@ -289,6 +276,8 @@ bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsiz
     
     configuration_ = true;
     
+    skip_count_ = 0;
+
     return true;
 }
 
@@ -338,6 +327,8 @@ void MtxConvMaster::Reset()
     {
         partitions_.getUnchecked(i)->Reset();
     }
+
+    skip_count_ = 0;
 }
 
 bool MtxConvMaster::AddFilter(int in, int out, const juce::AudioSampleBuffer &data)
@@ -393,8 +384,6 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
     numnewinsamples_ = 0;
     outnodeoffset_ = 0;
     
-    pingpong_ = 0;
-    
     part_idx_ = 0;
     
 #if SPLIT_COMPLEX
@@ -427,13 +416,20 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
     
     fft_c_ = reinterpret_cast<fftwf_complex*>( aligned_malloc( (partitionsize+1)*sizeof(fftwf_complex), 16 ) );
     
+    // the following fftw function is not thread safe - we have to protect it...
+    InterProcessLock fftw_lock("lock-fftw");
+    if (!fftw_lock.enter(5000))
+        return false;
+
     fftwf_plan_r2c_ = fftwf_plan_dft_r2c_1d (2*partitionsize_, fft_t_, fft_c_, fftwopt);
     fftwf_plan_c2r_ = fftwf_plan_dft_c2r_1d (2*partitionsize_, fft_c_, fft_t_, fftwopt);
     
+    fftw_lock.exit();
+
 #endif
     
     waitnewdata_.reset();
-    waitprocessing_.reset();
+    waitprocessing_.signal();
     
 #ifdef DEBUG_COUT
 	// open debug txt
@@ -449,6 +445,9 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
 		debug_out_ = new FileOutputStream(file);
 	}
 #endif
+
+    finished_part_.set(numpartitions_);
+    skip_cycles_.set(0);
 
     return true;
 }
@@ -485,7 +484,7 @@ void MtxConvSlave::StopProc()
     
     waitnewdata_.signal();
     
-    stopThread(20);
+    stopThread(50);
     
     // waitForThreadToExit(20);
 }
@@ -551,9 +550,8 @@ void MtxConvSlave::Reset()
         
     }
     
-    // numnewinsamples_ = 0;
-    
-    // outnodeoffset_ = 0;
+    finished_part_.set(numpartitions_);
+    skip_cycles_.set(0);
 }
 
 bool MtxConvSlave::AddFilter(int in, int out, const juce::AudioSampleBuffer &data)
@@ -662,7 +660,9 @@ void MtxConvSlave::run()
 			{
 				Process(i);
 			}
-		}
+            
+            waitprocessing_.signal(); // signal callback we are done in case he is waiting
+        }
 	}
 	else // lower priority - do forward/backward transform in the thread!
 	{
@@ -674,18 +674,30 @@ void MtxConvSlave::run()
 			if ( threadShouldExit() )
 				return;
 			
-			TransformInput();
+            // first check wheter we have to skip a cycle
+            while (skip_cycles_.get() > 0)
+            {
+                TransformInput(true);
+                TransformOutput(true);
+
+                WriteToOutbuf(partitionsize_, true);
+
+                skip_cycles_.operator--();
+            }
+
+			TransformInput(false);
 			
 			Process(0);
 
-			TransformOutput();
-			WriteToOutbuf(partitionsize_);
+			TransformOutput(false);
+			WriteToOutbuf(partitionsize_, false);
 
 			for (int i = 1; i < numpartitions_; i++)
 			{
 				Process(i);
 			}
 			
+            waitprocessing_.signal(); // signal callback we are done in case he is waiting
 		}
 		
 	}
@@ -693,7 +705,7 @@ void MtxConvSlave::run()
 }
 
 // this should be done in the callback
-void MtxConvSlave::TransformInput()
+void MtxConvSlave::TransformInput(bool skip)
 {
 	// new data is available - increment the partition pointer
 	part_idx_++;
@@ -713,59 +725,82 @@ void MtxConvSlave::TransformInput()
   }
 #endif
 
-	// reset the finished counter
-	finished_part_.set(0);
+    // reset the finished counter
+    if (skip)
+	    finished_part_.set(numpartitions_);
+    else
+        finished_part_.set(0);
 
-	////////////////
-    // do all the inputs
-    // copy and transform new time data for each needed input channel
-    
-    int smplstoread_end = 2*partitionsize_; // read from the end
-    int smplstoread_start = 0; // read from the start
-    
-    if (inoffset_+smplstoread_end >= inbufsize_)
+    if (!skip)
     {
-        smplstoread_end = inbufsize_ - inoffset_;
-        smplstoread_start = 2*partitionsize_ - smplstoread_end;
-    }
-    
-    int numinch = innodes_.size();
-    
-    for (int i=0; i < numinch; i++) {
-        InNode *innode = innodes_.getUnchecked(i);
-        
-        int chan = innode->in_;
-        if (smplstoread_end)
-            FloatVectorOperations::copy(fft_t_, inbuf_->getReadPointer(chan, inoffset_), smplstoread_end);
-        
-        if (smplstoread_start)
-            FloatVectorOperations::copy(fft_t_+smplstoread_end, inbuf_->getReadPointer(chan, 0), smplstoread_start);
-        
-        
-        // std::cout << "RMS IN_FFT max: " << FloatVectorOperations::findMaximum(fft_t_, partitionsize_) << " PartIdx: " << part_idx_ << std::endl;
-        
-        // do the fft
+        ////////////////
+        // do all the inputs
+        // copy and transform new time data for each needed input channel
+
+        int smplstoread_end = 2 * partitionsize_; // read from the end
+        int smplstoread_start = 0; // read from the start
+
+        if (inoffset_ + smplstoread_end >= inbufsize_)
+        {
+            smplstoread_end = inbufsize_ - inoffset_;
+            smplstoread_start = 2 * partitionsize_ - smplstoread_end;
+        }
+
+        int numinch = innodes_.size();
+
+        for (int i = 0; i < numinch; i++) {
+            InNode *innode = innodes_.getUnchecked(i);
+
+            int chan = innode->in_;
+            if (smplstoread_end)
+                FloatVectorOperations::copy(fft_t_, inbuf_->getReadPointer(chan, inoffset_), smplstoread_end);
+
+            if (smplstoread_start)
+                FloatVectorOperations::copy(fft_t_ + smplstoread_end, inbuf_->getReadPointer(chan, 0), smplstoread_start);
+
+
+            // std::cout << "RMS IN_FFT max: " << FloatVectorOperations::findMaximum(fft_t_, partitionsize_) << " PartIdx: " << part_idx_ << std::endl;
+
+            // do the fft
 #if SPLIT_COMPLEX
-        DSPSplitComplex splitcomplex;
-        splitcomplex.realp = innode->a_re_[part_idx_];
-        splitcomplex.imagp = innode->a_im_[part_idx_];
-        
-        vDSP_ctoz(reinterpret_cast<const COMPLEX*>(fft_t_), 2, &splitcomplex, 1, partitionsize_);
-        vDSP_fft_zrip(vdsp_fft_setup_, &splitcomplex, 1, vdsp_log2_, FFT_FORWARD);
-        
-        // unpack
-        innode->a_re_[part_idx_][partitionsize_] = innode->a_im_[part_idx_][0];
-        innode->a_im_[part_idx_][0] = 0.0f;
-        // fft_im_[partitionsize_] = 0.0f; // not necessary-> we wont use this value anyway
-        
-        
+            DSPSplitComplex splitcomplex;
+            splitcomplex.realp = innode->a_re_[part_idx_];
+            splitcomplex.imagp = innode->a_im_[part_idx_];
+
+            vDSP_ctoz(reinterpret_cast<const COMPLEX*>(fft_t_), 2, &splitcomplex, 1, partitionsize_);
+            vDSP_fft_zrip(vdsp_fft_setup_, &splitcomplex, 1, vdsp_log2_, FFT_FORWARD);
+
+            // unpack
+            innode->a_re_[part_idx_][partitionsize_] = innode->a_im_[part_idx_][0];
+            innode->a_im_[part_idx_][0] = 0.0f;
+            // fft_im_[partitionsize_] = 0.0f; // not necessary-> we wont use this value anyway
+
+
 #else
-        fftwf_execute_dft_r2c (fftwf_plan_r2c_, fft_t_, innode->a_c_[part_idx_]);
-        
+            fftwf_execute_dft_r2c(fftwf_plan_r2c_, fft_t_, innode->a_c_[part_idx_]);
+
 #endif
+
+        } // iterate over number of inputs
+
+    } // end not skip
+    else
+    {
+        // skip - clear innode->a_c_[part_idx_]
+        int numinch = innodes_.size();
+
+        for (int i = 0; i < numinch; i++) {
+            InNode *innode = innodes_.getUnchecked(i);
+#if SPLIT_COMPLEX
+            FloatVectorOperations::clear(innode->a_re_[part_idx_], partitionsize_ + 1);
+            FloatVectorOperations::clear(innode->a_im_[part_idx_], partitionsize_ + 1);
+#else
+            FloatVectorOperations::clear((float*)innode->a_c_[part_idx_], 2 * (partitionsize_ + 1));
+#endif
+        }
         
-    } // iterate over number of inputs
-    
+    } // end skip
+
     inoffset_ += partitionsize_;
 
     if (inoffset_ >= inbufsize_)
@@ -773,48 +808,64 @@ void MtxConvSlave::TransformInput()
 }
 
 // this should be done in callback thread as well
-void MtxConvSlave::TransformOutput()
+void MtxConvSlave::TransformOutput(bool skip)
 {
-	bool pingpong = !pingpong_;
-
-    int numouts = outnodes_.size();
-    
-    for (int i=0; i < numouts; i++)
+    if (!skip)
     {
-		OutNode *outnode = outnodes_.getUnchecked(i);
+        int numouts = outnodes_.size();
+
+        for (int i = 0; i < numouts; i++)
+        {
+            OutNode *outnode = outnodes_.getUnchecked(i);
 
 #if SPLIT_COMPLEX
-		DSPSplitComplex     splitcomplex;
-		splitcomplex.realp =  outnode->c_re_[part_idx_];
-		splitcomplex.imagp =  outnode->c_im_[part_idx_];
+            DSPSplitComplex     splitcomplex;
+            splitcomplex.realp = outnode->c_re_[part_idx_];
+            splitcomplex.imagp = outnode->c_im_[part_idx_];
 
-        outnode->c_im_[part_idx_][0] = outnode->c_re_[part_idx_][partitionsize_]; // special vDSP packing
-        vDSP_fft_zrip(vdsp_fft_setup_, &splitcomplex, 1, vdsp_log2_, FFT_INVERSE); // ifft
-        vDSP_ztoc(&splitcomplex, 1, reinterpret_cast<COMPLEX*>(fft_t_), 2, partitionsize_); // reorder
+            outnode->c_im_[part_idx_][0] = outnode->c_re_[part_idx_][partitionsize_]; // special vDSP packing
+            vDSP_fft_zrip(vdsp_fft_setup_, &splitcomplex, 1, vdsp_log2_, FFT_INVERSE); // ifft
+            vDSP_ztoc(&splitcomplex, 1, reinterpret_cast<COMPLEX*>(fft_t_), 2, partitionsize_); // reorder
 #else
-        fftwf_execute_dft_c2r (fftwf_plan_c2r_, outnode->c_c_[part_idx_], fft_t_);
+            fftwf_execute_dft_c2r(fftwf_plan_c2r_, outnode->c_c_[part_idx_], fft_t_);
 #endif
-        
-        outnode->outbuf_.copyFrom(pingpong, 0, fft_t_+partitionsize_-1, partitionsize_);
-        
-// clear freq accumulation buffers
+
+            outnode->outbuf_.copyFrom(0, 0, fft_t_ + partitionsize_ - 1, partitionsize_);
+
+            // clear freq accumulation buffers
 #if SPLIT_COMPLEX
-        FloatVectorOperations::clear(outnode->c_re_[part_idx_], partitionsize_+1);
-        FloatVectorOperations::clear(outnode->c_im_[part_idx_], partitionsize_+1);
+            FloatVectorOperations::clear(outnode->c_re_[part_idx_], partitionsize_ + 1);
+            FloatVectorOperations::clear(outnode->c_im_[part_idx_], partitionsize_ + 1);
 #else
-        FloatVectorOperations::clear((float*)outnode->c_c_[part_idx_], 2*(partitionsize_+1));
+            FloatVectorOperations::clear((float*)outnode->c_c_[part_idx_], 2 * (partitionsize_ + 1));
 #endif
-    } // end iterate over all outputs
+        } // end iterate over all outputs
 
-	pingpong_ = pingpong;
-    
+    }// skip
+    else
+    {
+        // only clear buffer
+        int numouts = outnodes_.size();
+
+        for (int i = 0; i < numouts; i++)
+        {
+            OutNode *outnode = outnodes_.getUnchecked(i);
+
+            // clear freq accumulation buffers
+#if SPLIT_COMPLEX
+            FloatVectorOperations::clear(outnode->c_re_[part_idx_], partitionsize_ + 1);
+            FloatVectorOperations::clear(outnode->c_im_[part_idx_], partitionsize_ + 1);
+#else
+            FloatVectorOperations::clear((float*)outnode->c_c_[part_idx_], 2 * (partitionsize_ + 1));
+#endif
+        } // end iterate over all outputs
+    }
+
     outnodeoffset_ = 0;
 
-	// signal that we are done with this partition
-	// waitprocessing_.signal();
 }
 
-void MtxConvSlave::WriteToOutbuf(int numsamples)
+void MtxConvSlave::WriteToOutbuf(int numsamples, bool skip)
 {
 	int smplstowrite_end = numsamples; // write to the end
 	int smplstowrite_start = 0; // write to the start
@@ -826,28 +877,27 @@ void MtxConvSlave::WriteToOutbuf(int numsamples)
 		smplstowrite_start = numsamples - smplstowrite_end;
 	}
 
-	// std::cout << "outoffset: " << outoffset_ << " end: " << smplstowrite_end << " start: " << smplstowrite_start << " pingpong: " << (int)pingpong_ << std::endl;
+	// std::cout << "outoffset: " << outoffset_ << " end: " << smplstowrite_end << " start: " << smplstowrite_start << std::endl;
 
+    if (!skip)
+    {
+        int numouts = outnodes_.size();
 
-	int numouts = outnodes_.size();
+        // std::cout << "numoutnodes: " << numouts << std::endl;
 
-	// std::cout << "numoutnodes: " << numouts << std::endl;
+        for (int i = 0; i < numouts; i++) {
 
-	for (int i = 0; i < numouts; i++) {
+            OutNode *outnode = outnodes_.getUnchecked(i);
 
-		OutNode *outnode = outnodes_.getUnchecked(i);
+            if (smplstowrite_end)
+                outbuf_->addFrom(outnode->out_, outoffset_, outnode->outbuf_, 0, outnodeoffset_, smplstowrite_end);
 
-		if (smplstowrite_end)
-			outbuf_->addFrom(outnode->out_, outoffset_, outnode->outbuf_, (int)pingpong_, outnodeoffset_, smplstowrite_end);
+            if (smplstowrite_start)
+                outbuf_->addFrom(outnode->out_, 0, outnode->outbuf_, 0, outnodeoffset_ + smplstowrite_end, smplstowrite_start);
 
-		if (smplstowrite_start)
-			outbuf_->addFrom(outnode->out_, 0, outnode->outbuf_, (int)pingpong_, outnodeoffset_ + smplstowrite_end, smplstowrite_start);
-
-
-	}
-
-	// std::cout << "outbuf ch1 rms: " << outbuf_->getRMSLevel(0, 0, bufsize_) << "outbuf ch2 rms: " << outbuf_->getRMSLevel(1, 0, bufsize_) << std::endl;
-
+        }
+    }
+	
 
 	if (smplstowrite_start)
 		outoffset_ = smplstowrite_start;
@@ -980,43 +1030,83 @@ void MtxConvSlave::Process(int filt_part_idx)
 
 
 // this is called from the master
-void MtxConvSlave::ReadOutput(int numsamples)
+bool MtxConvSlave::ReadOutput(int numsamples, bool forcesync)
 {
-    
-    numnewinsamples_+=numsamples;
-    
+    bool skip = false;
+
+    numnewinsamples_ += numsamples;
+
     // do processing if enough samples arrived
     if (numnewinsamples_ >= partitionsize_)
     {
-		if (priority_ == 0) // highest priority has to deliver immediateley
-		{
-			TransformInput();
+        if (forcesync)
+            waitprocessing_.wait(1000); // maximum wait for 1 seconds if force sync... this is a long time anyway...
+        //else
+        //    waitprocessing_.wait(1); // should we try to wait in realtime mode as well?
 
-			// compute first partition directly
-			Process(0);
+        if (finished_part_.get() < numpartitions_)
+        {
+            // did not finish all partitions... skip this cycle...
+            skip_cycles_.operator++(); // signal the next cycle to skip a cycle... (ensure threadsafety...)
 
-			// signal thread to do the other partitions
-			waitnewdata_.signal();
-			
-			TransformOutput();
+            skip = true;
+        }
+        else
+        {
+            if (priority_ == 0) // highest priority has to deliver immediateley
+            {
 
-			WriteToOutbuf(partitionsize_);
-		}
-		else // lower priority has some time for computations...
-		{
-			// signal thread to do the work...
-			waitnewdata_.signal();
-		}
-		
+                // first check wheter we have to skip a cycle
+                while (skip_cycles_.get() > 0)
+                {
+                    TransformInput(true);
+                    TransformOutput(true);
+
+                    WriteToOutbuf(partitionsize_, true);
+                    
+                    skip_cycles_.operator--();
+                }
+
+                TransformInput(false);
+
+                // compute first partition directly
+                Process(0);
+
+                // signal thread to do the other partitions
+                waitprocessing_.reset();
+                waitnewdata_.signal();
+
+                TransformOutput(false);
+
+                WriteToOutbuf(partitionsize_, false); // should i do something different here if skipped??!!
+            }
+            else // lower priority has some time for computations...
+            {
+                // signal thread to do the work...
+                waitprocessing_.reset();
+                waitnewdata_.signal();
+            }
+        }
 
         numnewinsamples_ -= partitionsize_;
     }
-    
+    // debug code...
+    else
+    {
+        if (priority_ == 0)
+        {
+            std::cout << "Problem" << std::endl;
+        }
+    }
+    //
+
 #ifdef DEBUG_COUT
     std::cout << "ReadOutput, outnodeoffset_: " << outnodeoffset_ << " outoffset_: " << outoffset_ << std::endl;
 #endif
     
 	// what to do with smaller buffers?
+
+    return !skip;
 }
 
 
