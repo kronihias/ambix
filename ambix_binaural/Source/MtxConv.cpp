@@ -55,7 +55,7 @@ void MtxConvMaster::WriteLog(String &text)
 		debug_out_->writeText(text, false, false);
 }
 
-void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf, bool forcesync)
+void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf, int numsamples, bool forcesync)
 {
     
     if (configuration_)
@@ -66,20 +66,19 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
         
         /////////////////////////
         // write to input ring buffer
-        int smplstowrite = inbuf.getNumSamples();
         int numchannels = jmin(numins_, inbuf.getNumChannels());
         
 #ifdef DEBUG_COUT
-        std::cout << "master process block: " << smplstowrite << " inoffset: " << inoffset_ << " outoffset: " << outoffset_ << std::endl;
+        std::cout << "master process block: " << numsamples << " inoffset: " << inoffset_ << " outoffset: " << outoffset_ << std::endl;
 #endif
         
-        int smplstowrite_end = smplstowrite; // write to the end
+        int smplstowrite_end = numsamples; // write to the end
         int smplstowrite_start = 0; // write to the start
         
-        if (inoffset_ + smplstowrite >= inbufsize_)
+        if (inoffset_ + numsamples >= inbufsize_)
         {
             smplstowrite_end = inbufsize_ - inoffset_;
-            smplstowrite_start = smplstowrite - smplstowrite_end;
+            smplstowrite_start = numsamples - smplstowrite_end;
         }
         
         if (smplstowrite_end > 0)
@@ -110,7 +109,7 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
 
         for (int i=0; i < numpartitions_; i++) {
             
-            finished &= partitions_.getUnchecked(i)->ReadOutput(smplstowrite, forcesync);
+            finished &= partitions_.getUnchecked(i)->ReadOutput(numsamples, forcesync);
         }
         
         if (!finished)

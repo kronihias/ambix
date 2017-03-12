@@ -337,7 +337,7 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
             
             }
              */
-            mtxconv_.processBlock(ambi_spk_buffer_, buffer, buffer.getNumSamples());
+            mtxconv_.processBlock(ambi_spk_buffer_, buffer, buffer.getNumSamples(), true);
         }
 #else
         int NumSamples = buffer.getNumSamples();

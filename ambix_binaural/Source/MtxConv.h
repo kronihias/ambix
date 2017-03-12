@@ -372,7 +372,7 @@ public:
     
     // Do the processing
     // forcesync = true will make sure that all partitions are going to be finished - use this for offline rendering!
-    void processBlock(AudioSampleBuffer& inbuf, juce::AudioSampleBuffer &outbuf, bool forcesync);
+    void processBlock(AudioSampleBuffer& inbuf, juce::AudioSampleBuffer &outbuf, int numsamples, bool forcesync=true);
     
     
     // Set all Input/Output Buffers to Zero
