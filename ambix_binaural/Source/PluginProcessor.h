@@ -24,8 +24,19 @@
 #include "AmbiSpeaker.h"
 
 #if BINAURAL_DECODER
-
-    #include "MtxConv.h"
+    #if WITH_ZITA_CONVOLVER
+        #include <zita-convolver.h>
+        #if ZITA_CONVOLVER_MAJOR_VERSION != 3
+            #error "This programs requires zita-convolver 3.x.x"
+        #endif
+        
+        #define CONVPROC_SCHEDULER_PRIORITY 0
+        #define CONVPROC_SCHEDULER_CLASS SCHED_FIFO
+        #define THREAD_SYNC_MODE true
+    #else
+        #include "MtxConv.h"
+    #endif
+    
     #include "ConvolverData.h"
 #endif
 
@@ -163,7 +174,6 @@ public:
     OwnedArray<AmbiSpeaker> _AmbiSpeakers;
 
 #if BINAURAL_DECODER
-    // OwnedArray<SpkConv> _SpkConv;
     int num_conv;
 #endif
     
@@ -205,11 +215,15 @@ private:
     
 #if BINAURAL_DECODER
     bool loadIr(AudioSampleBuffer* IRBuffer, const File& audioFile, double &samplerate, float gain=1.f, int offset=0, int length=0);
-    
+
     ConvolverData conv_data;
-    
-    MtxConvMaster mtxconv_;
-    
+
+    #if WITH_ZITA_CONVOLVER
+        Convproc zita_conv; /* zita-convolver engine class instances */
+        unsigned int _ConvBufferPos; // the position of the read/write head
+    #else
+        MtxConvMaster mtxconv_;
+    #endif
 #endif
     
     double SampleRate;

@@ -76,6 +76,9 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
     SampleRate = getSampleRate();
     
 #if BINAURAL_DECODER
+    #if WITH_ZITA_CONVOLVER
+        _ConvBufferPos = 0;
+    #endif
     num_conv = 0;
 #endif
     
@@ -84,8 +87,13 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
 Ambix_binauralAudioProcessor::~Ambix_binauralAudioProcessor()
 {
 #if BINAURAL_DECODER
-    mtxconv_.StopProc();
-    mtxconv_.Cleanup();
+    #if WITH_ZITA_CONVOLVER
+        zita_conv.stop_process();
+        zita_conv.cleanup();
+    #else
+        mtxconv_.StopProc();
+        mtxconv_.Cleanup();
+    #endif
 #endif
 }
 
@@ -280,11 +288,7 @@ void Ambix_binauralAudioProcessor::prepareToPlay (double sampleRate, int samples
     }
     
     if (configLoaded)
-    {
-#if BINAURAL_DECODER
-        mtxconv_.Reset();
-#endif
-        
+    {        
         ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
     }
 }
@@ -320,27 +324,45 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
         // clear buffer
         buffer.clear();
         
+        int NumSamples = buffer.getNumSamples();
+        
 #if BINAURAL_DECODER
         
         // it does not make sense to use the binaural decoder with
         // less than 2 channels (prevent crash here)
         if (buffer.getNumChannels() >= 2)
         {
-            /*
-          int NumConvolutions = _SpkConv.size();
-        
-          // do convolution
-        
-          for (int i=0; i < jmin(NumSpeakers, NumConvolutions); i++) {
+            #if WITH_ZITA_CONVOLVER
             
-                _SpkConv.getUnchecked(i)->process(_AmbiSpeakers.getUnchecked(i)->OutputBuffer, buffer);
-            
-            }
-             */
-            mtxconv_.processBlock(ambi_spk_buffer_, buffer, buffer.getNumSamples(), true);
+                //std::cout << "new samples: " << NumSamples << " Samples, in level: " << ambi_spk_buffer_.getMagnitude(0, NumSamples) << std::endl;
+                
+                for (int i=0; i < NumSpeakers ; i++)
+                {
+                    float* indata = zita_conv.inpdata(i)+_ConvBufferPos;
+                    memcpy(indata, ambi_spk_buffer_.getReadPointer(i), NumSamples*sizeof(float));
+                }
+                
+                _ConvBufferPos += NumSamples;
+                
+                if (_ConvBufferPos >= ConvBufferSize) {
+                    // std::cout << "processing " << _ConvBufferPos << " Samples" << std::endl;
+                    
+                    int ret = zita_conv.process(THREAD_SYNC_MODE);
+                    //std::cout << "convolver ret: " << ret << std::endl;
+                    _ConvBufferPos = 0;
+                }
+                
+                for (int i=0; i < 2 ; i++)
+                {
+                    float* outdata = zita_conv.outdata(i)+_ConvBufferPos;
+                    memcpy(buffer.getWritePointer(i), outdata, NumSamples*sizeof(float));
+                }
+                //std::cout << "new samples: " << NumSamples << " Samples, out level: " << buffer.getMagnitude(0, NumSamples) << std::endl;
+            #else
+                mtxconv_.processBlock(ambi_spk_buffer_, buffer, NumSamples, true);
+            #endif
         }
 #else
-        int NumSamples = buffer.getNumSamples();
         
         // decoder mode without convolution
         // copy back the ambisonics speaker signals
@@ -892,20 +914,43 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     
     setLatencySamples(ConvBufferSize-BufferSize);
     
-    mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192);
+    #if WITH_ZITA_CONVOLVER
     
-    // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
-    for (int i=0; i < conv_data.getNumIRs(); i++)
-    {
-        if (threadShouldExit())
-            return;
-
-        mtxconv_.AddFilter(conv_data.getInCh(i), conv_data.getOutCh(i), *conv_data.getIR(i));
+        int err=0;
+    
+        unsigned int options = 0;
         
-    }
-    
-    mtxconv_.StartProc();
-    
+        options |= Convproc::OPT_FFTW_MEASURE;
+        options |= Convproc::OPT_VECTOR_MODE;
+        
+        zita_conv.set_options (options);
+        zita_conv.set_density(0.5);
+                
+        err = zita_conv.configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), (unsigned int)conv_data.getMaxLength(), ConvBufferSize, ConvBufferSize, Convproc::MAXPART);
+        
+        for (int i=0; i < conv_data.getNumIRs(); i++)
+        {
+            err = zita_conv.impdata_create(conv_data.getInCh(i), conv_data.getOutCh(i), 1, (float *)conv_data.getIR(i)->getReadPointer(0), 0, (unsigned int)conv_data.getLength(i));
+        }
+        
+        zita_conv.print();
+        zita_conv.start_process(CONVPROC_SCHEDULER_PRIORITY, CONVPROC_SCHEDULER_CLASS);
+        
+    #else
+        mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192);
+
+        // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
+        for (int i=0; i < conv_data.getNumIRs(); i++)
+        {
+            if (threadShouldExit())
+                return;
+
+            mtxconv_.AddFilter(conv_data.getInCh(i), conv_data.getOutCh(i), *conv_data.getIR(i));
+        }
+
+        mtxconv_.StartProc();
+    #endif
+
 #endif
     
     ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
@@ -933,10 +978,15 @@ void Ambix_binauralAudioProcessor::UnloadConfiguration()
     {
         conv_data.clear();
         num_conv = 0;
-        
-        mtxconv_.StopProc();
-    
-        mtxconv_.Cleanup();
+
+        #if WITH_ZITA_CONVOLVER
+            zita_conv.stop_process();
+            zita_conv.cleanup();
+            _ConvBufferPos = 0;
+        #else
+            mtxconv_.StopProc();
+            mtxconv_.Cleanup();
+        #endif
     }
     
     //std::cout << "Unloaded Convolution..." << std::endl;
