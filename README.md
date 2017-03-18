@@ -89,7 +89,7 @@ Install Windows dependencies
 howto build ambix yourself:
 --------------
 
-- copy the Steinberg VST 2.4 SDK into the folder *mcfx/vstsdk2.4* (do to legal reasons those can not be included here)
+- copy the Steinberg VST 2.4 SDK into the folder *mcfx/vstsdk2.4* (due to legal reasons those can not be included here)
 
 - use cmake gui or cmake/ccmake from terminal:
 
