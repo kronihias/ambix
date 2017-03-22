@@ -1,2 +1,1 @@
-#version string as cmake preprocessor definition
-SET(VERSION 0.2.7)
+0.2.7
