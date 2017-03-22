@@ -133,19 +133,7 @@ ELSE (APPLE)
 	 SET(CMAKE_BUILD_TYPE Release)
 	 
 ENDIF (APPLE)
-################################################
-# VST SDK
-IF (BUILD_VST)
-	SET(VSTSDK_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vstsdk2.4 CACHE FILEPATH "specify the path of the VST 2.4 SDK")
 
-	INCLUDE_DIRECTORIES(BEFORE ${VSTSDK_INCLUDE_DIR})
-
-	SET(VSTSDK_PLUGIN_SOURCE
-	    ${VSTSDK_INCLUDE_DIR}/public.sdk/source/vst2.x/audioeffectx.cpp
-	    ${VSTSDK_INCLUDE_DIR}/public.sdk/source/vst2.x/audioeffect.cpp
-	    ${VSTSDK_INCLUDE_DIR}/public.sdk/source/vst2.x/vstplugmain.cpp
-	)
-ENDIF(BUILD_VST)
 
 ################################################
 # AUDIO UNIT
