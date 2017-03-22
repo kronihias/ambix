@@ -15,6 +15,7 @@ More information: http://www.juce.com
 > Eigen (MPL2, http://eigen.tuxfamily.org), 
 > libsoxr (LGPL, http://soxr.sourceforge.net)
 > fftw under Linux and Windows (GPL, http://www.fftw.org)
+> libzita-convolver3 optional for Linux (GPL v3)
 
 this software package goes well together with the mcfx - multichannel cross plattform audio plug-in suite: http://www.matthiaskronlachner.com/?p=1910
 
@@ -58,7 +59,6 @@ prerequisites for building
 --------------
 
 - cmake, working build environment
-- Steinberg VST 2.4 SDK
 - fftw3, Eigen 3
 - Standalone applications: ASIO SDK if you want ASIO under Windows
 
@@ -88,8 +88,6 @@ Install Windows dependencies
 
 howto build ambix yourself:
 --------------
-
-- copy the Steinberg VST 2.4 SDK into the folder *mcfx/vstsdk2.4* (do to legal reasons those can not be included here)
 
 - use cmake gui or cmake/ccmake from terminal:
 
@@ -149,6 +147,11 @@ http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_st
 
 changelog
 -----------
+* v0.2.7 (2017-03-22) 
+ambix_binaural: improved performance, various bugfixes
+ambix_rotator: improved performance
+ambix_encoder: adjustable custom id for remote control
+
 * v0.2.6 (2016-04-08) converter: fixed scaling of "O" channel when converting from/to FuMa; binaural: convolution engine fix, preset dir save fix; vmic: gui fix
 
 * v0.2.5 (2015-12-06) liblo dependencies removed
