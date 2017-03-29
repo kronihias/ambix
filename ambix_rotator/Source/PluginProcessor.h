@@ -79,6 +79,11 @@ public:
         PitchParam,
         RollParam,
         RotOrderParam,
+        Q0Param,
+        Q1Param,
+        Q2Param,
+        Q3Param,
+        Qinvert,
 		totalNumParams
 	};
     //==============================================================================
@@ -100,6 +105,8 @@ public:
     void oscMessageReceived (const OSCMessage& message);
 #endif
     
+    bool isQuaternionActive(); // returns true if currently quaternions are used, false if euler angles are used
+
 private:
     
     void calcParams();
@@ -116,6 +123,14 @@ private:
     // rotation order :  < 0.5: ypr; >=0.5 rpy
     float rot_order_param;
     
+    float q0_param;
+    float q1_param;
+    float q2_param;
+    float q3_param;
+    float qinvert_param;
+
+    bool _q_changed; // flag for telling calcParams which parameters to use for calculating rotationmatrix
+
     bool _initialized;
     bool _new_params;
     

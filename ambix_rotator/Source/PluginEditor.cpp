@@ -114,8 +114,9 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
     sld_roll->addListener (this);
     sld_roll->setDoubleClickReturnValue(true, 0.f);
     
-    addAndMakeVisible (label5 = new Label ("new label",
-                                           TRANS("Rotation order:")));
+    addAndMakeVisible(label5 = new Label("new label",
+      TRANS("Euler rotation \n"
+        "order:")));
     label5->setFont (Font (15.00f, Font::plain));
     label5->setJustificationType (Justification::centredLeft);
     label5->setEditable (false, false, false);
@@ -135,11 +136,119 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
     toggleButton2->addListener (this);
     toggleButton2->setColour (ToggleButton::textColourId, Colours::white);
 
+    addAndMakeVisible(txt_q0 = new TextEditor("new text editor"));
+    txt_q0->setTooltip(TRANS("q0, or w"));
+    txt_q0->setMultiLine(false);
+    txt_q0->setReturnKeyStartsNewLine(false);
+    txt_q0->setReadOnly(false);
+    txt_q0->setScrollbarsShown(false);
+    txt_q0->setCaretVisible(true);
+    txt_q0->setPopupMenuEnabled(true);
+    txt_q0->setText(TRANS("0.0"));
+    txt_q0->addListener(this);
+    txt_q0->setInputRestrictions(0, "0123456789.-+");
+
+    addAndMakeVisible(label7 = new Label("new label",
+      TRANS("Euler")));
+    label7->setFont(Font(15.00f, Font::plain));
+    label7->setJustificationType(Justification::centredRight);
+    label7->setEditable(false, false, false);
+    label7->setColour(Label::textColourId, Colours::white);
+    label7->setColour(TextEditor::textColourId, Colours::black);
+    label7->setColour(TextEditor::backgroundColourId, Colour(0x00000000));
+
+    addAndMakeVisible(label8 = new Label("new label",
+      TRANS("Quaternion")));
+    label8->setFont(Font(15.00f, Font::plain));
+    label8->setJustificationType(Justification::centredRight);
+    label8->setEditable(false, false, false);
+    label8->setColour(Label::textColourId, Colours::white);
+    label8->setColour(TextEditor::textColourId, Colours::black);
+    label8->setColour(TextEditor::backgroundColourId, Colour(0x00000000));
+
+    addAndMakeVisible(label6 = new Label("new label",
+      TRANS("q0")));
+    label6->setFont(Font(15.00f, Font::plain));
+    label6->setJustificationType(Justification::centredRight);
+    label6->setEditable(false, false, false);
+    label6->setColour(Label::textColourId, Colours::white);
+    label6->setColour(TextEditor::textColourId, Colours::black);
+    label6->setColour(TextEditor::backgroundColourId, Colour(0x00000000));
+
+    addAndMakeVisible(txt_q1 = new TextEditor("new text editor"));
+    txt_q1->setTooltip(TRANS("q1 or x"));
+    txt_q1->setMultiLine(false);
+    txt_q1->setReturnKeyStartsNewLine(false);
+    txt_q1->setReadOnly(false);
+    txt_q1->setScrollbarsShown(false);
+    txt_q1->setCaretVisible(true);
+    txt_q1->setPopupMenuEnabled(true);
+    txt_q1->setText(TRANS("0.0"));
+    txt_q1->addListener(this);
+    txt_q1->setInputRestrictions(0, "0123456789.+-");
+
+    addAndMakeVisible(label9 = new Label("new label",
+      TRANS("q1")));
+    label9->setFont(Font(15.00f, Font::plain));
+    label9->setJustificationType(Justification::centredRight);
+    label9->setEditable(false, false, false);
+    label9->setColour(Label::textColourId, Colours::white);
+    label9->setColour(TextEditor::textColourId, Colours::black);
+    label9->setColour(TextEditor::backgroundColourId, Colour(0x00000000));
+
+    addAndMakeVisible(txt_q2 = new TextEditor("new text editor"));
+    txt_q2->setTooltip(TRANS("q2 or y"));
+    txt_q2->setMultiLine(false);
+    txt_q2->setReturnKeyStartsNewLine(false);
+    txt_q2->setReadOnly(false);
+    txt_q2->setScrollbarsShown(false);
+    txt_q2->setCaretVisible(true);
+    txt_q2->setPopupMenuEnabled(true);
+    txt_q2->setText(TRANS("0.0"));
+    txt_q2->addListener(this);
+    txt_q2->setInputRestrictions(0, "0123456789.+-");
+
+    addAndMakeVisible(label10 = new Label("new label",
+      TRANS("q2")));
+    label10->setFont(Font(15.00f, Font::plain));
+    label10->setJustificationType(Justification::centredRight);
+    label10->setEditable(false, false, false);
+    label10->setColour(Label::textColourId, Colours::white);
+    label10->setColour(TextEditor::textColourId, Colours::black);
+    label10->setColour(TextEditor::backgroundColourId, Colour(0x00000000));
+
+    addAndMakeVisible(txt_q3 = new TextEditor("new text editor"));
+    txt_q3->setTooltip(TRANS("q3 or z"));
+    txt_q3->setMultiLine(false);
+    txt_q3->setReturnKeyStartsNewLine(false);
+    txt_q3->setReadOnly(false);
+    txt_q3->setScrollbarsShown(false);
+    txt_q3->setCaretVisible(true);
+    txt_q3->setPopupMenuEnabled(true);
+    txt_q3->setText(TRANS("0.0"));
+    txt_q3->addListener(this);
+    txt_q3->setInputRestrictions(0, "0123456789.+-");
+
+    addAndMakeVisible(label11 = new Label("new label",
+      TRANS("q3")));
+    label11->setFont(Font(15.00f, Font::plain));
+    label11->setJustificationType(Justification::centredRight);
+    label11->setEditable(false, false, false);
+    label11->setColour(Label::textColourId, Colours::white);
+    label11->setColour(TextEditor::textColourId, Colours::black);
+    label11->setColour(TextEditor::backgroundColourId, Colour(0x00000000));
+
+    addAndMakeVisible(tgl_qinvert = new ToggleButton("new toggle button"));
+    tgl_qinvert->setTooltip(TRANS("Internally inverse the quaternion resulting in the inverse rotation"));
+    tgl_qinvert->setButtonText(TRANS("inverse quaternion rotation"));
+    tgl_qinvert->addListener(this);
+    tgl_qinvert->setColour(ToggleButton::textColourId, Colours::white);
+
 
     //[UserPreSize]
     //[/UserPreSize]
 
-    setSize (400, 240);
+    setSize(400, 330);
 
     timerCallback();
     
@@ -155,7 +264,7 @@ Ambix_rotatorAudioProcessorEditor::~Ambix_rotatorAudioProcessorEditor()
     // remove me as listener for changes
     ourProcessor->removeChangeListener(this);
     stopTimer();
-    
+
     sld_yaw = nullptr;
     label2 = nullptr;
     label3 = nullptr;
@@ -165,7 +274,17 @@ Ambix_rotatorAudioProcessorEditor::~Ambix_rotatorAudioProcessorEditor()
     label5 = nullptr;
     toggleButton = nullptr;
     toggleButton2 = nullptr;
-
+    txt_q0 = nullptr;
+    label7 = nullptr;
+    label8 = nullptr;
+    label6 = nullptr;
+    txt_q1 = nullptr;
+    label9 = nullptr;
+    txt_q2 = nullptr;
+    label10 = nullptr;
+    txt_q3 = nullptr;
+    label11 = nullptr;
+    tgl_qinvert = nullptr;
 
 }
 
@@ -173,32 +292,37 @@ Ambix_rotatorAudioProcessorEditor::~Ambix_rotatorAudioProcessorEditor()
 void Ambix_rotatorAudioProcessorEditor::paint (Graphics& g)
 {
     //[UserPrePaint] Add your own custom painting code here..
+    Ambix_rotatorAudioProcessor* ourProcessor = getProcessor();
     //[/UserPrePaint]
 
-    g.fillAll (Colours::white);
+    g.fillAll(Colours::white);
 
-    g.setGradientFill (ColourGradient (Colour (0xff4e4e4e),
-                                       static_cast<float> (proportionOfWidth (0.6400f)), static_cast<float> (proportionOfHeight (0.6933f)),
-                                       Colours::black,
-                                       static_cast<float> (proportionOfWidth (0.1143f)), static_cast<float> (proportionOfHeight (0.0800f)),
-                                       true));
-    g.fillRect (0, 0, 410, 254);
+    g.setGradientFill(ColourGradient(Colour(0xff4e4e4e),
+      static_cast<float> (proportionOfWidth(0.6400f)), static_cast<float> (proportionOfHeight(0.6933f)),
+      Colours::black,
+      static_cast<float> (proportionOfWidth(0.1143f)), static_cast<float> (proportionOfHeight(0.0800f)),
+      true));
+    g.fillRect(0, 0, 410, 350);
 
-    g.setColour (Colours::black);
-    g.drawRect (0, 0, 410, 254, 1);
+    g.setColour(Colours::black);
+    g.drawRect(0, 0, 410, 350, 1);
 
-    g.setColour (Colours::azure);
-    g.setFont (Font (17.20f, Font::bold));
-    g.drawText (TRANS("AMBIX-ROTATOR"),
-                10, 8, 380, 30,
-                Justification::centred, true);
+    g.setColour(Colours::azure);
+    g.setFont(Font(17.20f, Font::bold));
+    g.drawText(TRANS("AMBIX-ROTATOR"),
+      10, 8, 380, 30,
+      Justification::centred, true);
 
-    g.setColour (Colour (0x932b1d69));
-    g.fillRoundedRectangle (9.0f, 48.0f, 383.0f, 124.0f, 10.000f);
-
-    g.setColour (Colour (0x93691d1d));
-    g.fillRoundedRectangle (9.0f, 183.0f, 383.0f, 48.0f, 10.000f);
+    g.setColour(Colour(0x932b1d69));
+    g.fillRoundedRectangle(9.0f, 48.0f, 383.0f, 179.0f, 10.000f);
     
+    g.setColour(Colour(0xff0e0e47));
+    g.fillRoundedRectangle(19.0f, 173.0f, 357.0f, 48.0f, 10.000f);
+
+    g.setColour(Colour(0xff39000b));
+    g.fillRoundedRectangle(9.0f, 238.0f, 383.0f, 83.0f, 10.000f);
+
+
     /* Version text */
     g.setColour (Colours::white);
     g.setFont (Font (10.00f, Font::plain));
@@ -217,15 +341,27 @@ void Ambix_rotatorAudioProcessorEditor::resized()
     //[UserPreResize] Add your own custom resize code here..
     //[/UserPreResize]
 
-    sld_yaw->setBounds (78, 61, 301, 24);
-    label2->setBounds (21, 61, 54, 24);
-    label3->setBounds (21, 98, 54, 24);
-    sld_pitch->setBounds (79, 98, 301, 24);
-    label4->setBounds (21, 134, 54, 24);
-    sld_roll->setBounds (79, 134, 301, 24);
-    label5->setBounds (22, 182, 109, 24);
-    toggleButton->setBounds (133, 183, 176, 24);
-    toggleButton2->setBounds (133, 206, 176, 24);
+    sld_yaw->setBounds(78, 66, 301, 24);
+    label2->setBounds(21, 66, 54, 24);
+    label3->setBounds(21, 100, 54, 24);
+    sld_pitch->setBounds(78, 100, 301, 24);
+    label4->setBounds(21, 134, 54, 24);
+    sld_roll->setBounds(78, 134, 301, 24);
+    label5->setBounds(35, 179, 109, 28);
+    toggleButton->setBounds(146, 173, 141, 24);
+    toggleButton2->setBounds(146, 195, 135, 24);
+    txt_q0->setBounds(48, 260, 49, 24);
+    label7->setBounds(273, 46, 109, 24);
+    label8->setBounds(277, 236, 109, 24);
+    label6->setBounds(17, 259, 28, 24);
+    txt_q1->setBounds(133, 261, 49, 24);
+    label9->setBounds(102, 260, 28, 24);
+    txt_q2->setBounds(222, 261, 49, 24);
+    label10->setBounds(191, 260, 28, 24);
+    txt_q3->setBounds(311, 262, 49, 24);
+    label11->setBounds(280, 261, 28, 24);
+    tgl_qinvert->setBounds(23, 292, 216, 24);
+
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -258,6 +394,31 @@ void Ambix_rotatorAudioProcessorEditor::timerCallback()
         {
             toggleButton->setToggleState(false, dontSendNotification);
             toggleButton2->setToggleState(true, dontSendNotification);
+        }
+
+        txt_q0->setText(String(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Q0Param)*2. - 1.).substring(0, 6), dontSendNotification);
+        txt_q1->setText(String(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Q1Param)*2. - 1.).substring(0, 6), dontSendNotification);
+        txt_q2->setText(String(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Q2Param)*2. - 1.).substring(0, 6), dontSendNotification);
+        txt_q3->setText(String(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Q3Param)*2. - 1.).substring(0, 6), dontSendNotification);
+
+        if (ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Qinvert) <= 0.5f)
+          tgl_qinvert->setToggleState(false, dontSendNotification);
+        else
+          tgl_qinvert->setToggleState(true, dontSendNotification);
+
+        if (ourProcessor->isQuaternionActive())
+        {
+          label7->setColour(Label::textColourId, Colours::dimgrey);
+          label7->setFont(Font(15.00f, Font::plain));
+          label8->setColour(Label::textColourId, Colours::yellow);
+          label8->setFont(Font(20.00f, Font::plain));
+        }
+        else
+        {
+          label7->setColour(Label::textColourId, Colours::yellow);
+          label7->setFont(Font(20.00f, Font::plain));
+          label8->setColour(Label::textColourId, Colours::dimgrey);
+          label8->setFont(Font(15.00f, Font::plain));
         }
     }
 }
@@ -293,6 +454,44 @@ void Ambix_rotatorAudioProcessorEditor::buttonClicked (Button* buttonThatWasClic
     {
         ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RotOrderParam, 1.f);
     }
+    else if (buttonThatWasClicked == tgl_qinvert)
+    {
+      ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Qinvert, (float)tgl_qinvert->getToggleState());
+    }
 
 }
 
+void Ambix_rotatorAudioProcessorEditor::textEditorReturnKeyPressed(TextEditor &editorChanged)
+{
+  Ambix_rotatorAudioProcessor* ourProcessor = getProcessor();
+
+  float val = editorChanged.getText().getFloatValue();
+
+  val = jlimit(-1.f, 1.f, val);
+
+  val = (val + 1.f) * 0.5f;
+
+  // editorChanged.setText(String(val), dontSendNotification);
+
+  if (&editorChanged == txt_q0)
+  {
+    ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q0Param, val);
+  } else if (&editorChanged == txt_q1)
+  {
+    ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q1Param, val);
+  }
+  else if (&editorChanged == txt_q2)
+  {
+    ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q2Param, val);
+  }
+  else if (&editorChanged == txt_q3)
+  {
+    ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q3Param, val);
+  }
+
+}
+
+void Ambix_rotatorAudioProcessorEditor::textEditorFocusLost(TextEditor &editorChanged)
+{
+  textEditorReturnKeyPressed(editorChanged);
+}

@@ -39,6 +39,7 @@ class Ambix_rotatorAudioProcessorEditor  : public AudioProcessorEditor,
                                            public SliderListener,
                                            public ButtonListener,
                                            public ChangeListener,
+                                           public TextEditorListener,
                                            public Timer
 {
 public:
@@ -54,7 +55,9 @@ public:
     void resized();
     void sliderValueChanged (Slider* sliderThatWasMoved);
     void buttonClicked (Button* buttonThatWasClicked);
-    
+    void textEditorFocusLost(TextEditor &);
+    void textEditorReturnKeyPressed(TextEditor &);
+
     void changeListenerCallback (ChangeBroadcaster *source);
 
     void timerCallback();
@@ -73,6 +76,17 @@ private:
     ScopedPointer<Label> label5;
     ScopedPointer<ToggleButton> toggleButton;
     ScopedPointer<ToggleButton> toggleButton2;
+    ScopedPointer<TextEditor> txt_q0;
+    ScopedPointer<Label> label7;
+    ScopedPointer<Label> label8;
+    ScopedPointer<Label> label6;
+    ScopedPointer<TextEditor> txt_q1;
+    ScopedPointer<Label> label9;
+    ScopedPointer<TextEditor> txt_q2;
+    ScopedPointer<Label> label10;
+    ScopedPointer<TextEditor> txt_q3;
+    ScopedPointer<Label> label11;
+    ScopedPointer<ToggleButton> tgl_qinvert;
 
     bool _changed;
     

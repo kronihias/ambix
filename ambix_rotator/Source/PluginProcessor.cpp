@@ -76,6 +76,31 @@ void Ambix_rotatorAudioProcessor::oscMessageReceived (const OSCMessage& message)
         setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RollParam, jlimit(0.f, 1.f, val[6]/360.f+0.5f));
         
     }
+    else if (message.getAddressPattern() == OSCAddressPattern("/quaternion")) {
+      // /quaternion [q0] [q1] [q2] [q3]
+      float val[4];
+
+      for (int i = 0; i < jmin(4, message.size()); i++) {
+
+        val[i] = 0.5f;
+
+        // get the value wheter it is a int or float value
+        if (message[i].getType() == OSCTypes::float32)
+        {
+          val[i] = (float)message[i].getFloat32();
+        }
+        else if (message[i].getType() == OSCTypes::int32)
+        {
+          val[i] = (float)message[i].getInt32();
+        }
+
+      }
+
+      setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q0Param, jlimit(0.f, 1.f, (val[0] + 1.f) / 2.f));
+      setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q1Param, jlimit(0.f, 1.f, (val[1] + 1.f) / 2.f));
+      setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q2Param, jlimit(0.f, 1.f, (val[2] + 1.f) / 2.f));
+      setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q3Param, jlimit(0.f, 1.f, (val[3] + 1.f) / 2.f));
+    }
     
     // debug the message
 #if 0
@@ -106,6 +131,12 @@ yaw_param(0.5f),
 pitch_param(0.5f),
 roll_param(0.5f),
 rot_order_param(0.f),
+q0_param(0.5f),
+q1_param(0.5f),
+q2_param(0.5f),
+q3_param(0.5f),
+qinvert_param(0.f),
+_q_changed(false),
 _initialized(false),
 _new_params(true),
 output_buffer(AMBI_CHANNELS,256)
@@ -150,13 +181,20 @@ float Ambix_rotatorAudioProcessor::getParameter (int index)
 		case PitchParam:    return pitch_param;
 		case RollParam:    return roll_param;
         case RotOrderParam: return rot_order_param;
-            
+        case Q0Param:       return q0_param;
+        case Q1Param:       return q1_param;
+        case Q2Param:       return q2_param;
+        case Q3Param:       return q3_param;
+        case Qinvert:       return qinvert_param;
+
 		default:            return 0.0f;
 	}
 }
 
 void Ambix_rotatorAudioProcessor::setParameter (int index, float newValue)
 {
+  newValue = jlimit(0.f, 1.f, newValue);
+
     switch (index)
 	{
         case YawParam:
@@ -171,10 +209,31 @@ void Ambix_rotatorAudioProcessor::setParameter (int index, float newValue)
         case RotOrderParam:
             rot_order_param = newValue;
             break;
+        case Q0Param:
+            q0_param = newValue;
+            break;
+        case Q1Param:
+            q1_param = newValue;
+            break;
+        case Q2Param:
+            q2_param = newValue;
+            break;
+        case Q3Param:
+            q3_param = newValue;
+            break;
+        case Qinvert:
+            qinvert_param = newValue;
+            break;
             
 		default:
             break;
 	}
+
+    if (index >= Q0Param)
+      _q_changed = true;
+    else
+      _q_changed = false;
+
     _new_params = true;
   
     sendChangeMessage();
@@ -188,6 +247,11 @@ const String Ambix_rotatorAudioProcessor::getParameterName (int index)
         case PitchParam:        return "Pitch";
         case RollParam:        return "Roll";
         case RotOrderParam:        return "Rotation order";
+        case Q0Param:        return "Quaternion q0";
+        case Q1Param:        return "Quaternion q1";
+        case Q2Param:        return "Quaternion q2";
+        case Q3Param:        return "Quaternion q3";
+        case Qinvert:        return "Inverse Quaternion Rotation";
             
 		default:								break;
 	}
@@ -223,7 +287,30 @@ const String Ambix_rotatorAudioProcessor::getParameterText (int index)
             else
                 text = "roll-pitch-yaw";
             break;
-            
+
+        case Q0Param:
+            text = String(q0_param * 2. - 1.).substring(0, 6);
+            break;
+
+        case Q1Param:
+            text = String(q1_param * 2. - 1.).substring(0, 6);
+            break;
+
+        case Q2Param:
+            text = String(q2_param * 2. - 1.).substring(0, 6);
+            break;
+
+        case Q3Param:
+            text = String(q3_param * 2. - 1.).substring(0, 6);
+            break;
+
+        case Qinvert:
+            if (qinvert_param <= 0.5f)
+                text = "";
+            else
+                text = "inverse";
+            break;
+
 		default:
             break;
 	}
@@ -550,38 +637,89 @@ void Ambix_rotatorAudioProcessor::calcParams()
   // rotation parameters in radiants
   // use mathematical negative angles for yaw
   
-  double yaw = -((double)yaw_param*2*M_PI - M_PI); // z
-  double pitch = (double)pitch_param*2*M_PI - M_PI; // y
-  double roll = (double)roll_param*2*M_PI - M_PI; // x
-  
-  Eigen::Matrix3d RotX, RotY, RotZ, Rot;
-  
-  RotX = RotY = RotZ = Eigen::Matrix3d::Zero(3,3);
-  
-  RotX(0,0) = 1.f;
-  RotX(1,1) = RotX(2,2) = cos(roll);
-  RotX(1,2) = sin(roll);
-  RotX(2,1) = -RotX(1,2);
-  
-  RotY(0,0) = RotY(2,2) = cos(pitch);
-  RotY(0,2) = sin(pitch);
-  RotY(2,0) = -RotY(0,2);
-  RotY(1,1) = 1.f;
-  
-  RotZ(0,0) = RotZ(1,1) = cos(yaw);
-  RotZ(0,1) = sin(yaw);
-  RotZ(1,0) = -RotZ(0,1);
-  RotZ(2,2) = 1.f;
-  
-  // multiply individual rotation matrices
-  if (rot_order_param < 0.5f)
+  Eigen::Matrix3d Rot = Eigen::Matrix3d::Identity(3,3);
+
+  if (_q_changed)
   {
-    // ypr order zyx -> mutliply inverse!
-    Rot = RotX * RotY * RotZ;
+    // use quaternion input to calc rotation
+    float q0 = q0_param*2. - 1.;
+    float q1 = q1_param*2. - 1.;
+    float q2 = q2_param*2. - 1.;
+    float q3 = q3_param*2. - 1.;
+
+    // normalize the quaternion just in case it isn't
+    // ||q|| = 1, sqrt(q0^2+q1^2+q2^2+q3^2)
+    float absq = sqrtf(q0*q0 + q1*q1 + q2*q2 + q3*q3);
+    if ((absq != 0.f) && absq != 1.0)
+    {
+      q0 = q0 / absq;
+      q1 = q1 / absq;
+      q2 = q2 / absq;
+      q3 = q3 / absq;
+    }
+    
+    if (qinvert_param > 0.5)
+    {
+      // do inverse rotation
+      q1 = -q1;
+      q2 = -q2;
+      q3 = -q3;
+    }
+    float q0q0 = q0*q0;
+    float q1q1 = q1*q1;
+    float q2q2 = q2*q2;
+    float q3q3 = q3*q3;
+    
+    // James Diebel - 
+    // Representing Attitude : Euler Angles, Unit Quaternions, and Rotation Vectors (Eq. 125)
+    
+    Rot(0, 0) = q0q0 + q1q1 - q2q2 - q3q3;
+    Rot(0, 1) = 2 * q1*q2 + 2 * q0*q3;
+    Rot(0, 2) = 2 * q1*q3 - 2 * q0*q2;
+    Rot(1, 0) = 2 * q1*q2 - 2 * q0*q3;
+    Rot(1, 1) = q0q0 - q1q1 + q2q2 - q3q3;
+    Rot(1, 2) = 2 * q2*q3 + 2 * q0*q1;
+    Rot(2, 0) = 2 * q1*q3 + 2 * q0*q2;
+    Rot(2, 1) = 2 * q2*q3 - 2 * q0*q1;
+    Rot(2, 2) = q0q0 - q1q1 - q2q2 + q3q3;
+
   } else {
-    // rpy order xyz -> mutliply inverse!
-    Rot = RotZ * RotY * RotX;
+    // use yaw, pitch, roll to calc rotation matrix
+    Eigen::Matrix3d RotX, RotY, RotZ;
+
+    double yaw = -((double)yaw_param * 2 * M_PI - M_PI); // z
+    double pitch = (double)pitch_param * 2 * M_PI - M_PI; // y
+    double roll = (double)roll_param * 2 * M_PI - M_PI; // x
+
+    RotX = RotY = RotZ = Eigen::Matrix3d::Zero(3, 3);
+
+    RotX(0, 0) = 1.f;
+    RotX(1, 1) = RotX(2, 2) = cos(roll);
+    RotX(1, 2) = sin(roll);
+    RotX(2, 1) = -RotX(1, 2);
+
+    RotY(0, 0) = RotY(2, 2) = cos(pitch);
+    RotY(0, 2) = sin(pitch);
+    RotY(2, 0) = -RotY(0, 2);
+    RotY(1, 1) = 1.f;
+
+    RotZ(0, 0) = RotZ(1, 1) = cos(yaw);
+    RotZ(0, 1) = sin(yaw);
+    RotZ(1, 0) = -RotZ(0, 1);
+    RotZ(2, 2) = 1.f;
+
+    // multiply individual rotation matrices
+    if (rot_order_param < 0.5f)
+    {
+      // ypr order zyx -> mutliply inverse!
+      Rot = RotX * RotY * RotZ;
+    }
+    else {
+      // rpy order xyz -> mutliply inverse!
+      Rot = RotZ * RotY * RotX;
+    }
   }
+  
   
   // first order initialization - prototype matrix
   Eigen::Matrix3d R_1;
@@ -691,6 +829,11 @@ void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     
 }
 
+bool Ambix_rotatorAudioProcessor::isQuaternionActive()
+{
+    return _q_changed;
+}
+
 //==============================================================================
 bool Ambix_rotatorAudioProcessor::hasEditor() const
 {
@@ -718,6 +861,7 @@ void Ambix_rotatorAudioProcessor::getStateInformation (MemoryBlock& destData)
     {
         xml.setAttribute (String(i), getParameter(i));
     }
+    xml.setAttribute("_q_changed", _q_changed);
     
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
@@ -738,6 +882,13 @@ void Ambix_rotatorAudioProcessor::setStateInformation (const void* data, int siz
             for (int i=0; i < getNumParameters(); i++) {
                 setParameter(i, xmlState->getDoubleAttribute(String(i)));
             }
+
+            if (xmlState->hasAttribute("_q_changed"))
+            {
+              _q_changed = xmlState->getBoolAttribute("_q_changed");
+              _new_params = true;
+            }
+             
         }
         
     }
