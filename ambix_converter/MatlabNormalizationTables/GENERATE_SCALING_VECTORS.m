@@ -27,3 +27,6 @@ sn3d_n3d = N3D_Norm(acn)./SN3D_Norm(acn);
 % N3D to SN3D
 n3d_sn3d = SN3D_Norm(acn)./N3D_Norm(acn);
 
+
+%% Generate Condon Shortley Phase
+cs = cs_phase(acn);
