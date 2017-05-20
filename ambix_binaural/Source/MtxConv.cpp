@@ -42,7 +42,7 @@ MtxConvMaster::MtxConvMaster() : inbuf_(1,256),
 	file = file.getSpecialLocation(File::SpecialLocationType::tempDirectory).getChildFile(filename);
 	debug_out_ = new FileOutputStream(file);
 #endif
-    // fftw_make_planner_thread_safe(); // this does currently not work... use system wide lock instead...
+    fftwf_make_planner_thread_safe(); // this works since fftw-3.3.6-pl2
 }
 
 MtxConvMaster::~MtxConvMaster()
@@ -415,16 +415,9 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
     
     fft_c_ = reinterpret_cast<fftwf_complex*>( aligned_malloc( (partitionsize+1)*sizeof(fftwf_complex), 16 ) );
     
-    // the following fftw function is not thread safe - we have to protect it...
-    InterProcessLock fftw_lock("lock-fftw");
-    if (!fftw_lock.enter(5000))
-        return false;
-
     fftwf_plan_r2c_ = fftwf_plan_dft_r2c_1d (2*partitionsize_, fft_t_, fft_c_, fftwopt);
     fftwf_plan_c2r_ = fftwf_plan_dft_c2r_1d (2*partitionsize_, fft_c_, fft_t_, fftwopt);
     
-    fftw_lock.exit();
-
 #endif
     
     waitnewdata_.reset();
@@ -1089,15 +1082,6 @@ bool MtxConvSlave::ReadOutput(int numsamples, bool forcesync)
 
         numnewinsamples_ -= partitionsize_;
     }
-    // debug code...
-    else
-    {
-        if (priority_ == 0)
-        {
-            std::cout << "Problem" << std::endl;
-        }
-    }
-    //
 
 #ifdef DEBUG_COUT
     std::cout << "ReadOutput, outnodeoffset_: " << outnodeoffset_ << " outoffset_: " << outoffset_ << std::endl;
