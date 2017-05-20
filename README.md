@@ -147,6 +147,10 @@ http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_st
 
 changelog
 -----------
+* v0.2.8 (2017-05-20)
+ambix_binaural: fftw threadsafty improved: fix crash during startup if other plugin uses fftw
+ambix_rotator: add quaternion input
+
 * v0.2.7 (2017-03-22) 
 ambix_binaural: improved performance, various bugfixes
 ambix_rotator: improved performance
