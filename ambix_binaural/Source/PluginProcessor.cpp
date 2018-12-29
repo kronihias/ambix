@@ -924,9 +924,9 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
         options |= Convproc::OPT_VECTOR_MODE;
         
         zita_conv.set_options (options);
-        zita_conv.set_density(0.5);
+        const float density = 0.5f;
                 
-        err = zita_conv.configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), (unsigned int)conv_data.getMaxLength(), ConvBufferSize, ConvBufferSize, Convproc::MAXPART);
+        err = zita_conv.configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), (unsigned int)conv_data.getMaxLength(), ConvBufferSize,Convproc::MINPART, Convproc::MAXPART, density);
         
         for (int i=0; i < conv_data.getNumIRs(); i++)
         {
