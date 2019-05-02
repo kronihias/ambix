@@ -26,9 +26,6 @@
 #if BINAURAL_DECODER
     #if WITH_ZITA_CONVOLVER
         #include <zita-convolver.h>
-        #if ZITA_CONVOLVER_MAJOR_VERSION != 3
-            #error "This programs requires zita-convolver 3.x.x"
-        #endif
         
         #define CONVPROC_SCHEDULER_PRIORITY 0
         #define CONVPROC_SCHEDULER_CLASS SCHED_FIFO
