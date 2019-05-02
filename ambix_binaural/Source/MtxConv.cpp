@@ -42,7 +42,10 @@ MtxConvMaster::MtxConvMaster() : inbuf_(1,256),
 	file = file.getSpecialLocation(File::SpecialLocationType::tempDirectory).getChildFile(filename);
 	debug_out_ = new FileOutputStream(file);
 #endif
+
+#if !SPLIT_COMPLEX
     fftwf_make_planner_thread_safe(); // this works since fftw-3.3.6-pl2
+#endif
 }
 
 MtxConvMaster::~MtxConvMaster()
