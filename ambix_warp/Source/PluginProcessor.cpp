@@ -520,7 +520,7 @@ void Ambix_warpAudioProcessor::calcParams()
         // apply preemphasis if wanted
         if (preemp_param > 0.5f)
         {
-            Sh_matrix_mod = Sh_matrix_mod * pre_emphasis.asDiagonal();
+            Sh_matrix_mod = pre_emphasis.asDiagonal() * Sh_matrix_mod;
         }
         
         // calculate new transformation matrix
