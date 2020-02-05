@@ -44,7 +44,7 @@ IF(BUILD_STANDALONE)
 ENDIF(BUILD_STANDALONE)
 
 IF(UNIX AND NOT APPLE AND NOT ANDROID)
-	SET(WITH_ZITA_CONVOLVER TRUE CACHE BOOL "build with zita-convolver (better performance under linux)")
+	SET(WITH_ZITA_CONVOLVER FALSE CACHE BOOL "build with zita-convolver (better performance under linux)")
 ENDIF(UNIX AND NOT APPLE AND NOT ANDROID)	
 
 #########
