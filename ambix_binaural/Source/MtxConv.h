@@ -356,8 +356,9 @@ public:
                      int numouts,
                      int blocksize,
                      int maxsize,
-					 int minpart,
-                     int maxpart);
+                     int minpart,
+                     int maxpart,
+                     bool safemode=false); // will add a delay of minpart_ samples to make sure there is never a buffer underrun for hosts that dare to send partial blocks(Adobe and Steinberg)
     
     // Add an Impulse Response with dedicated Input/Output assignement
     bool AddFilter ( int in,
@@ -400,38 +401,38 @@ public:
     }
 
 private:
-    
+
     AudioSampleBuffer   inbuf_;             // Holds the Time Domain Input Samples
     AudioSampleBuffer   outbuf_;            // Hold the Time Domain Output Samples
-    
-	int					inbufsize_;			// size of time domain input buffer (2*maxpart_)
+
+    int                 inbufsize_;         // size of time domain input buffer (2*maxpart_)
     int                 outbufsize_;        // size of time domain output buffer (2*maxsize_)
-    
+
     int                 inoffset_;          // current ring buffer write offset
     int                 outoffset_;         // current ring buffer read offset
-    
+
     int                 blocksize_;         // Blocksize of host process (how many samples are processed in each callback)
-    
-	int					minpart_;			// Size of first partition
-	int					maxpart_;			// Maximum partition size
-	
+
+    int                 minpart_;           // Size of first partition
+    int                 maxpart_;           // Maximum partition size
+
     int                 numins_;            // Number of Input Channels
     int                 numouts_;           // Number of Output Channels
-    
+
     int                 numpartitions_;     // Number of Partition Levels (different blocklengths)
-    
+
     int                 skip_count_;        // The number of skipped partitions
 
     int                 maxsize_;           // maximum filter length
-    
+
     bool                isprocessing_;      // true = Processing is active
-    
+
     bool                configuration_;     // isconfigured
-    
+
     CriticalSection     lock_;              // lock critical section
-    
+
     OwnedArray<MtxConvSlave>    partitions_;// these are my partitions with different size
-    
+
 	ScopedPointer<FileOutputStream>	debug_out_; // Debug output Text File
 };
 

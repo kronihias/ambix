@@ -23,7 +23,7 @@
 MtxConvMaster::MtxConvMaster() : inbuf_(1,256),
                                  outbuf_(1, 256),
                                  inbufsize_(512),
-							     outbufsize_(512),
+                                 outbufsize_(512),
                                  inoffset_(0),
                                  outoffset_(0),
                                  blocksize_(256),
@@ -34,7 +34,7 @@ MtxConvMaster::MtxConvMaster() : inbuf_(1,256),
                                  skip_count_(0),
                                  isprocessing_(false),
                                  configuration_(false),
-								 debug_out_(nullptr)
+                                 debug_out_(nullptr)
 {
 #ifdef DEBUG_COUT
 	File file;
@@ -72,7 +72,9 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
         int numchannels = jmin(numins_, inbuf.getNumChannels());
         
 #ifdef DEBUG_COUT
-        std::cout << "master process block: " << numsamples << " inoffset: " << inoffset_ << " outoffset: " << outoffset_ << std::endl;
+        String dbg_text;
+        dbg_text << "master process block: " << numsamples << " inoffset: " << inoffset_ << " outoffset: " << outoffset_ << "\n";
+        WriteLog(dbg_text);
 #endif
         
         int smplstowrite_end = numsamples; // write to the end
@@ -120,46 +122,46 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
 
         /////////////////////////
         // write to output buffer
-        
+
         outbuf.clear();
-        
-        int smplstoread = outbuf.getNumSamples();
+
+        int smplstoread = numsamples;
         numchannels = jmin(outbuf.getNumChannels(), numouts_);
-        
+
         int smplstoread_end = smplstoread;
         int smplstoread_start = 0;
-        
+
         if (outoffset_ + smplstoread >= outbufsize_)
         {
-            smplstowrite_end = outbufsize_ - outoffset_;
+            smplstoread_end = outbufsize_ - outoffset_;
             smplstoread_start = smplstoread - smplstoread_end;
         }
-        
+
         if (smplstoread_end > 0)
         {
-            for (int chan=0; chan < numchannels; chan++)
+            for (int chan = 0; chan < numchannels; chan++)
             {
-                outbuf.copyFrom(chan, 0, outbuf_, chan, outoffset_, smplstowrite_end);
+                outbuf.copyFrom(chan, 0, outbuf_, chan, outoffset_, smplstoread_end);
             }
-            outbuf_.clear(outoffset_, smplstowrite_end); // clear the output buffer
-            
-            outoffset_ += smplstowrite_end;
+            outbuf_.clear(outoffset_, smplstoread_end); // clear the output buffer
+
+            outoffset_ += smplstoread_end;
         }
-        
+
         if (smplstoread_start > 0)
         {
-            for (int chan=0; chan < numchannels; chan++)
+            for (int chan = 0; chan < numchannels; chan++)
             {
-                outbuf.copyFrom(chan, smplstowrite_end, outbuf_, chan, outoffset_, smplstoread_start);
+                outbuf.copyFrom(chan, smplstoread_end, outbuf_, chan, 0, smplstoread_start);
             }
-            outbuf_.clear(outoffset_, smplstoread_start); // clear the output buffer
-            
+            outbuf_.clear(0, smplstoread_start); // clear the output buffer
+
             outoffset_ = smplstoread_start;
         }
-        
+
         if (outoffset_ >= outbufsize_)
             outoffset_ -= outbufsize_;
-        
+
     } // configured true
     else
     {
@@ -168,7 +170,7 @@ void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSamp
     
 }
 
-bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsize, int minpart, int maxpart)
+bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsize, int minpart, int maxpart, bool safemode)
 {
     if (!numins || !numouts || !blocksize || configuration_)
         return false;
@@ -260,12 +262,15 @@ bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsiz
     inbuf_.clear();
     outbuf_.clear();
     
-	// set the outoffset which will be != 0 if minpart_ > blocksize is used
-	outoffset_ = blocksize_ - minpart_;
-    
-	if (outoffset_ < 0)
-		outoffset_ += outbufsize_;
-    
+    // set the outoffset which will be != 0 if minpart_ > blocksize is used
+    if (safemode)
+        outoffset_ = -minpart_; // safe mode, has higher latency
+    else
+        outoffset_ = blocksize_ - minpart_;    // minimum latency mode -> might cause problems with some hosts that send varying (incomplete) blocks (eg. adobe premiere, nuendo)
+
+    if (outoffset_ < 0)
+        outoffset_ += outbufsize_;
+
     // set the actual buffersize and compute correct offsets!
     for (int i=0; i < numpartitions_; i++) {
         MtxConvSlave *partition = partitions_.getUnchecked(i);
@@ -453,7 +458,7 @@ void MtxConvSlave::SetBufsize(int inbufsize, int outbufsize, int blocksize)
 	outbufsize_ = outbufsize;
 
 #ifdef DEBUG_COUT
-    std::cout << "Slave::SETBUFSIZE: " << bufsize_ << "offset_: " << offset_ << std::endl;
+    std::cout << "Slave::SETBUFSIZE: inbufsize_: " << inbufsize_ << "outbufsize_: " << outbufsize_ << "offset_: " << offset_ << std::endl;
 #endif
     
     inoffset_ = inbufsize_ - partitionsize_ + 1; // offset due to overlap/save

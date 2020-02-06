@@ -57,6 +57,7 @@ public:
     int getLength(int id);
     
     int getMaxLength();
+    double getMaxLengthInSeconds();
     
     // set the target samplerate -> ir gets resampled if added with different samplingrate
     void setSampleRate(double samplerate);

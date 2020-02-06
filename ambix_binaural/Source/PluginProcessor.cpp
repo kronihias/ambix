@@ -80,6 +80,7 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
         _ConvBufferPos = 0;
     #endif
     num_conv = 0;
+    safemode_ = false;
 #endif
     
 }
@@ -910,10 +911,11 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     } // end iterate over configuration file lines
     
 #if BINAURAL_DECODER
-    
-    
-    setLatencySamples(ConvBufferSize-BufferSize);
-    
+
+    // try autodetecting host and deciding whether we need safemode (to avoid having to add another user parameter - let's see how this works for testers) 
+    PluginHostType me;
+    safemode_ = me.isAdobeAudition() || me.isPremiere() || me.isSteinberg(); // probably an incomplete list
+
     #if WITH_ZITA_CONVOLVER
     
         int err=0;
@@ -937,7 +939,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
         zita_conv.start_process(CONVPROC_SCHEDULER_PRIORITY, CONVPROC_SCHEDULER_CLASS);
         
     #else
-        mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192);
+        mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192, safemode_);
 
         // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
         for (int i=0; i < conv_data.getNumIRs(); i++)
@@ -956,6 +958,11 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
     
     configLoaded = true;
+
+    if (safemode_)
+        setLatencySamples(ConvBufferSize);
+    else
+        setLatencySamples(ConvBufferSize - BufferSize);
 
 
     _configFile = configFile;

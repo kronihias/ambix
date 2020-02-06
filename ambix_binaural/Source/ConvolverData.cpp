@@ -103,6 +103,9 @@ void ConvolverData::addIR(int in_ch, int out_ch, int offset, int delay, int leng
                              &q_spec, // soxr_quality_spec_t
                              NULL); // soxr_runtime_spec_t
         
+        // scale to maintain filter gain
+        ResampledBuffer.applyGain(src_samplerate / SampleRate);
+
         (*IRBuf) = ResampledBuffer;
         
     }
@@ -150,6 +153,11 @@ int ConvolverData::getLength(int id)
 int ConvolverData::getMaxLength()
 {
     return MaxLen;
+}
+
+double ConvolverData::getMaxLengthInSeconds()
+{
+    return (double)MaxLen/SampleRate;
 }
 
 void ConvolverData::setSampleRate(double samplerate)
