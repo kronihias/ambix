@@ -163,7 +163,11 @@ public:
     
     void UnloadConfiguration();
     void ReloadConfiguration();
-    
+
+    // for gui
+    bool SaveConfiguration(File zipFile);
+    Atomic<int> _readyToSaveConfiguration;
+
     unsigned int getBufferSize();
     unsigned int getConvBufferSize();
     void setConvBufferSize(unsigned int bufsize);
@@ -189,7 +193,9 @@ public:
     void LoadPreset(unsigned int preset);
     
     void LoadPresetByName(String presetName);
-    
+
+    Atomic<int> _storeConfigDataInProject;
+
     File presetDir; // where to search for presets
     File lastDir; // for open file dialog...
     
@@ -204,8 +210,13 @@ public:
     File _configFile;
     
 private:
-    
+
+    void DeleteTemporaryFiles();
+
     File _desConfigFile;
+
+    File _tempConfigZipFile;
+    Array<File> _cleanUpFilesOnExit;
 
     AudioSampleBuffer ambi_spk_buffer_;
     

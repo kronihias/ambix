@@ -97,7 +97,8 @@ private:
     ScopedPointer<Label> num_hrtf;
     ScopedPointer<TextButton> btn_preset_folder;
     ScopedPointer<Slider> sld_gain;
-    
+    ScopedPointer<ToggleButton> tgl_save_preset;
+
 #if BINAURAL_DECODER
     ScopedPointer<ToggleButton> tgl_load_irs;
     ScopedPointer<ComboBox> box_conv_buffer;

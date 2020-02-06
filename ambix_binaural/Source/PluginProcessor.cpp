@@ -54,6 +54,8 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
                                 SampleRate(44100),
                                 isProcessing(false),
                                 _gain(0.5f),
+                                _storeConfigDataInProject(1),
+                                _readyToSaveConfiguration(false),
                                 Thread("ambix_binaural")
 
 {
@@ -112,8 +114,9 @@ void Ambix_binauralAudioProcessor::LoadPreset(unsigned int preset)
 {
     if (preset < (unsigned int)_presetFiles.size())
     {
-        // ScheduleConfiguration(_presetFiles.getUnchecked(preset));
+        DeleteTemporaryFiles();
         LoadConfigurationAsync(_presetFiles.getUnchecked(preset));
+        box_preset_str = _presetFiles.getUnchecked(preset).getFileNameWithoutExtension();
     }
 }
 
@@ -124,6 +127,7 @@ void Ambix_binauralAudioProcessor::LoadPresetByName(String presetName)
     
     if (files.size())
     {
+        DeleteTemporaryFiles();
         LoadConfigurationAsync(files.getUnchecked(0)); // Load first result
         box_preset_str = files.getUnchecked(0).getFileNameWithoutExtension();
     }
@@ -430,8 +434,10 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     DebugPrint(debug);
     
     activePreset = configFile.getFileName(); // store filename only, on restart search preset folder for it!
-    box_preset_str = configFile.getFileNameWithoutExtension();
     
+    Array<File> configFileAndDataFiles;
+    configFileAndDataFiles.add(configFile);
+
     StringArray myLines;
     
     configFile.readLines(myLines);
@@ -682,7 +688,8 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
 
                         
                         File IrFilename = configFile.getParentDirectory().getChildFile(filename);
-                        
+
+                        configFileAndDataFiles.addIfNotAlreadyThere(IrFilename);
                         /*
                         _SpkConv.add(new SpkConv());
                         if (_SpkConv.getLast()->loadIr(IrFilename, SampleRate, BufferSize, gain * global_hrtf_gain, delay, swapChannels))
@@ -968,7 +975,35 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     _configFile = configFile;
     
     sendChangeMessage(); // notify editor
-    
+
+    /* save preset files as temporary .zip file, save this zip file later in the chunk if user wants to store preset within project */
+    _tempConfigZipFile = _tempConfigZipFile.createTempFile(".zip");
+
+    _cleanUpFilesOnExit.add(_tempConfigZipFile); // delete the file when we exit the plugin
+
+    ZipFile::Builder compressedConfigFileAndDataFiles;
+    for (int i = 0; i < configFileAndDataFiles.size(); i++)
+    {
+        String storedPath = ""; // add relative path
+        if (i > 0)
+            storedPath = configFileAndDataFiles.getUnchecked(i).getRelativePathFrom(configFileAndDataFiles.getUnchecked(0));
+
+        compressedConfigFileAndDataFiles.addFile(configFileAndDataFiles.getUnchecked(i), 5, storedPath);
+    }
+
+    FileOutputStream outputStream(_tempConfigZipFile);
+    if (outputStream.openedOk())
+    {
+        outputStream.setPosition(0); // overwrite file if already exists
+        outputStream.truncate();
+
+        double progress = 0.;
+        compressedConfigFileAndDataFiles.writeToStream(outputStream, &progress);
+
+        _readyToSaveConfiguration.set(true);
+    }
+
+   sendChangeMessage(); // notify editor again since we can save the configuration now
 }
 
 
@@ -1021,7 +1056,25 @@ void Ambix_binauralAudioProcessor::ReloadConfiguration()
         LoadConfigurationAsync(_configFile);
 }
 
+bool Ambix_binauralAudioProcessor::SaveConfiguration(File zipFile)
+{
+    if (_readyToSaveConfiguration.get())
+        return _tempConfigZipFile.copyFileTo(zipFile);
+    else
+        return false;
+}
+
 #if BINAURAL_DECODER
+void Ambix_binauralAudioProcessor::DeleteTemporaryFiles()
+{
+    _readyToSaveConfiguration.set(false);
+
+    for (int i = 0; i < _cleanUpFilesOnExit.size(); i++)
+    {
+        _cleanUpFilesOnExit.getUnchecked(i).deleteRecursively();
+    }
+    _cleanUpFilesOnExit.clear();
+}
 bool Ambix_binauralAudioProcessor::loadIr(AudioSampleBuffer* IRBuffer, const File& audioFile, double &samplerate, float gain, int offset, int length)
 {
     if (!audioFile.existsAsFile())
@@ -1126,7 +1179,16 @@ void Ambix_binauralAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("presetDir", presetDir.getFullPathName());
     xml.setAttribute("ConvBufferSize", (int)ConvBufferSize);
     xml.setAttribute("Gain", _gain);
-    
+    xml.setAttribute("storeConfigDataInProject", _storeConfigDataInProject.get());
+
+    // add .zip configuration as base64 dump
+    if (_tempConfigZipFile.existsAsFile() && _storeConfigDataInProject.get())
+    {
+        MemoryBlock tempFileBlock;
+        if (_tempConfigZipFile.loadFileAsData(tempFileBlock))
+            xml.setAttribute("configData", tempFileBlock.toBase64Encoding());
+    }
+
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
 }
@@ -1153,6 +1215,9 @@ void Ambix_binauralAudioProcessor::setStateInformation (const void* data, int si
             ConvBufferSize = xmlState->getIntAttribute("ConvBufferSize", ConvBufferSize);
             
             _gain = jlimit(0.f, 1.f, (float)xmlState->getDoubleAttribute("Gain", 0.5f));
+
+            _storeConfigDataInProject.set(xmlState->getIntAttribute("storeConfigDataInProject", 0)); // -> default: don't store convolver data for existing projects
+
         }
       
         File tempDir(newPresetDir);
@@ -1160,7 +1225,35 @@ void Ambix_binauralAudioProcessor::setStateInformation (const void* data, int si
             presetDir = tempDir;
             SearchPresets(presetDir);
         }
-      
+
+        // load config from chunk data
+        if (xmlState->hasAttribute("configData") && _storeConfigDataInProject.get())
+        {
+            DebugPrint("Load configuration from saved project data\n");
+            // todo....!
+            MemoryBlock tempMem;
+            tempMem.fromBase64Encoding(xmlState->getStringAttribute("configData"));
+            MemoryInputStream tempInStream(tempMem, false);
+            ZipFile dataZip(tempInStream);
+            File tempConfigFolder = File::createTempFile("");
+            dataZip.uncompressTo(tempConfigFolder, true); // we should later delete those files!!
+
+            _cleanUpFilesOnExit.add(tempConfigFolder);
+
+            Array <File> configfiles; // should be exactly one...
+            tempConfigFolder.findChildFiles(configfiles, File::findFiles, false, activePreset);
+
+            if (configfiles.size() == 1)
+            {
+                LoadConfigurationAsync(configfiles.getUnchecked(0));
+                box_preset_str = configfiles.getUnchecked(0).getFileNameWithoutExtension();
+                box_preset_str << " (saved within project)";
+            }
+
+            return;
+        }
+
+        // load preset from file in case it was not stored
         if (activePreset.isNotEmpty()) {
           LoadPresetByName(activePreset);
         }

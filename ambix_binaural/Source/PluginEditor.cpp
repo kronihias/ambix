@@ -164,7 +164,14 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     sld_gain->addListener (this);
     sld_gain->setSkewFactor (1.6f);
     sld_gain->setDoubleClickReturnValue(true, 0.f);
-    
+
+    addAndMakeVisible(tgl_save_preset = new ToggleButton("new toggle button"));
+    tgl_save_preset->setButtonText(TRANS("Save preset within project"));
+    tgl_save_preset->setTooltip(TRANS("this will save the preset and data within the project and reload it from there; CAUTION: may slow down saving/opening your project and increases project file size!"));
+    tgl_save_preset->addListener(this);
+    tgl_save_preset->setToggleState(true, dontSendNotification);
+    tgl_save_preset->setColour(ToggleButton::textColourId, Colours::white);
+
 #if BINAURAL_DECODER
     addAndMakeVisible (tgl_load_irs = new ToggleButton ("new toggle button"));
     tgl_load_irs->setTooltip (TRANS("load impulse responses if new preset being loaded - deactivate if IRs already loaded - for fast decoder matrix switching"));
@@ -179,7 +186,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     box_conv_buffer->setJustificationType (Justification::centredLeft);
 #endif
     
-    setSize (350, 300);
+    setSize (350, 325);
     
     DrawMeters();
 
@@ -224,7 +231,8 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
     num_hrtf = nullptr;
     btn_preset_folder = nullptr;
     sld_gain = nullptr;
-    
+    tgl_save_preset = nullptr;
+
 #if BINAURAL_DECODER
     tgl_load_irs = nullptr;
     box_conv_buffer = nullptr;
@@ -245,19 +253,19 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
                                        Colours::black,
                                        (float) (proportionOfWidth (0.1143f)), (float) (proportionOfHeight (0.0800f)),
                                        true));
-    g.fillRect (0, 0, 350 + _width, 300);
+    g.fillRect (0, 0, 350 + _width, 325);
 
     g.setColour (Colours::black);
-    g.drawRect (0, 0, 350, 300, 1);
+    g.drawRect (0, 0, 350, 325, 1);
 
     g.setColour (Colour (0x410000ff));
-    g.fillRoundedRectangle (18.0f, 100.0f, 222.0f, 76.0f, 10.0000f);
+    g.fillRoundedRectangle (18.0f, 128.0f, 217.0f, 76.0f, 10.0000f);
     
     g.setColour (Colours::white);
 
     g.setFont (Font (12.40f, Font::plain));
     g.drawText (TRANS("Volume [dB]"),
-                351, 276, 65, 23,
+                353, 282, 65, 23,
                 Justification::centred, true);
     
     g.setFont (Font (17.2000f, Font::bold));
@@ -295,19 +303,20 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
 
 void Ambix_binauralAudioProcessorEditor::resized()
 {
-    label->setBounds (16, 104, 184, 24);
+    label->setBounds (16, 129, 184, 24);
     txt_preset->setBounds (72, 64, 200, 24);
     label5->setBounds (8, 64, 56, 24);
-    txt_debug->setBounds (16, 184, 320, 96);
+    txt_debug->setBounds (16, 217, 320, 96);
     btn_open->setBounds (280, 64, 56, 24);
-    label2->setBounds (62, 128, 137, 24);
-    label3->setBounds (48, 152, 152, 24);
-    label4->setBounds (24, 280, 64, 16);
-    num_ch->setBounds (192, 104, 40, 24);
-    num_spk->setBounds (192, 128, 40, 24);
-    num_hrtf->setBounds (192, 152, 40, 24);
+    label2->setBounds (62, 153, 137, 24);
+    label3->setBounds (48, 177, 152, 24);
+    label4->setBounds (24, 305, 64, 16);
+    num_ch->setBounds (192, 129, 40, 24);
+    num_spk->setBounds (192, 153, 40, 24);
+    num_hrtf->setBounds (192, 177, 40, 24);
     btn_preset_folder->setBounds (248, 96, 94, 24);
-    sld_gain->setBounds (351, 18, 48, 254);
+    sld_gain->setBounds (352, 18, 48, 264);
+    tgl_save_preset->setBounds(16, 92, 200, 24);
 #if BINAURAL_DECODER
     tgl_load_irs->setBounds (260, 125, 80, 24);
     box_conv_buffer->setBounds (271, 155, 65, 22);
@@ -335,7 +344,9 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
     txt_preset->setText(ourProcessor->box_preset_str);
     txt_preset->setCaretPosition(txt_preset->getTotalNumChars()-1);
     txt_preset->setTooltip(txt_preset->getText());
-    
+
+    tgl_save_preset->setToggleState(ourProcessor->_storeConfigDataInProject.get(), dontSendNotification);
+
 #if BINAURAL_DECODER
     tgl_load_irs->setToggleState(ourProcessor->_load_ir, dontSendNotification);
     
@@ -412,7 +423,14 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
         }
         
     }
-    
+
+    if (ourProcessor->activePreset.isNotEmpty())
+    {
+        popup_presets.addSeparator();
+        popup_presets.addItem(-2, String("save preset to .zip file..."), ourProcessor->_readyToSaveConfiguration.get());
+    }
+
+    popup_presets.addSeparator();
     popup_presets.addItem(-1, String("open from file..."));
     
 }
@@ -442,6 +460,19 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
             //ourProcessor->ScheduleConfiguration(mooseFile);
             ourProcessor->LoadConfiguration(mooseFile);
             
+            ourProcessor->lastDir = mooseFile.getParentDirectory();
+        }
+    }
+    else if (result == -2)
+    {
+        FileChooser myChooser("Save the loaded preset as .zip file...",
+            ourProcessor->lastDir.getChildFile(ourProcessor->activePreset),
+            "*.zip");
+        if (myChooser.browseForFileToSave(true))
+        {
+            File mooseFile(myChooser.getResult());
+            ourProcessor->SaveConfiguration(mooseFile);
+
             ourProcessor->lastDir = mooseFile.getParentDirectory();
         }
     }
@@ -523,9 +554,12 @@ void Ambix_binauralAudioProcessorEditor::buttonClicked (Button* buttonThatWasCli
             UpdatePresets();
         }
     }
-    
+    else if (buttonThatWasClicked == tgl_save_preset)
+    {
+        ourProcessor->_storeConfigDataInProject = tgl_save_preset->getToggleState();
+    }
 #if BINAURAL_DECODER
-    if (buttonThatWasClicked == tgl_load_irs)
+    else if (buttonThatWasClicked == tgl_load_irs)
     {
         ourProcessor->_load_ir = tgl_load_irs->getToggleState();
     }
@@ -539,7 +573,7 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
     
     if (_meters.size() != ourProcessor->_AmbiSpeakers.size()) {
         
-        int xoffset = 15;
+        int xoffset = 17;
         
         // clear meters first?
         _meters.clear();
@@ -569,7 +603,7 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
             }
         }
         
-        _width = _meters.size() * 15 + 85;
+        _width = _meters.size() * 15 + 87;
         
         _scales.add(new MyMeterScale());
         addChildComponent(_scales.getLast());
@@ -580,7 +614,7 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
     }
     
     // resize component
-    setSize (350 + _width, 300);
+    setSize (350 + _width, 325);
 }
 
 void Ambix_binauralAudioProcessorEditor::UpdateMeters()
