@@ -966,11 +966,14 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     
     configLoaded = true;
 
+#if BINAURAL_DECODER
     if (safemode_)
         setLatencySamples(ConvBufferSize);
     else
         setLatencySamples(ConvBufferSize - BufferSize);
-
+#else
+    setLatencySamples(0);
+#endif
 
     _configFile = configFile;
     
@@ -1064,7 +1067,6 @@ bool Ambix_binauralAudioProcessor::SaveConfiguration(File zipFile)
         return false;
 }
 
-#if BINAURAL_DECODER
 void Ambix_binauralAudioProcessor::DeleteTemporaryFiles()
 {
     _readyToSaveConfiguration.set(false);
@@ -1075,6 +1077,8 @@ void Ambix_binauralAudioProcessor::DeleteTemporaryFiles()
     }
     _cleanUpFilesOnExit.clear();
 }
+
+#if BINAURAL_DECODER
 bool Ambix_binauralAudioProcessor::loadIr(AudioSampleBuffer* IRBuffer, const File& audioFile, double &samplerate, float gain, int offset, int length)
 {
     if (!audioFile.existsAsFile())
