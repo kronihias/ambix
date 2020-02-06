@@ -147,6 +147,9 @@ http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_st
 
 changelog
 -----------
+* v0.2.10 (2020-02-06)
+amibx_binaural: fix dropouts/artifacts for hosts that send incomplete block sizes (eg. Adobe, Steinberg); option to store preset within the project -> allows to exchange a DAW (eg. Reaper) project without need to provide the preset files extra, allow to export stored preset as .zip file for recovering it from the project
+
 * v0.2.9 (2019-06-12)
 amibx_warp: fixed crash
 
