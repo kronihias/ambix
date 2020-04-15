@@ -4,6 +4,7 @@ SET ( WITH_FFTW3 FALSE )
 
 # binaural
 ADD_DEFINITIONS (-DBINAURAL_DECODER=0)
+ADD_DEFINITIONS(-DJucePlugin_LV2URI="https://github.com/kronihias/ambix/ambix_decoder")
 SET ( SPECIFIC_PROJECTNAME ambix_decoder )
 
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_binaural )

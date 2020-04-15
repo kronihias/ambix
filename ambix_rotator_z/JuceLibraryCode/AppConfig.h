@@ -341,7 +341,7 @@
 #endif
 
 #ifndef JucePlugin_LV2URI
-  #define JucePlugin_LV2URI               JucePlugin_Name
+  #define JucePlugin_LV2URI               "https://github.com/kronihias/ambix/ambix_rotator_z"
 #endif
 #ifndef JucePlugin_WantsLV2State
   #define JucePlugin_WantsLV2State        1
