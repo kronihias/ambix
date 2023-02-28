@@ -36,9 +36,9 @@
                                                                     //[/Comments]
 */
 class Ambix_directional_loudnessAudioProcessorEditor  : public AudioProcessorEditor,
-                                                        public ButtonListener,
-                                                        public SliderListener,
-                                                        public ComboBoxListener
+                                                        public Button::Listener,
+                                                        public Slider::Listener,
+                                                        public ComboBox::Listener
 {
 public:
     //==============================================================================
@@ -49,11 +49,11 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
 
-    void paint (Graphics& g);
-    void resized();
-    void buttonClicked (Button* buttonThatWasClicked);
-    void sliderValueChanged (Slider* sliderThatWasMoved);
-    void comboBoxChanged (ComboBox* comboBoxThatHasChanged);
+    void paint (Graphics& g) override;
+    void resized() override;
+    void buttonClicked (Button* buttonThatWasClicked) override;
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
 
     // Binary resources:
     static const char* solo_symbol_png;
@@ -75,27 +75,27 @@ private:
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<Label> lbl_gd;
-    ScopedPointer<Component> filtergraph;
-    ScopedPointer<ImageButton> btn_drag;
-    ScopedPointer<Slider> sld_az_1;
-    ScopedPointer<Slider> sld_el_1;
-    ScopedPointer<ComboBox> box_shape_1;
-    ScopedPointer<Slider> sld_w_1;
-    ScopedPointer<Slider> sld_h_1;
-    ScopedPointer<ImageButton> btn_solo_1;
-    ScopedPointer<Slider> sld_gain_1;
-    ScopedPointer<Slider> sld_az_2;
-    ScopedPointer<Slider> sld_el_2;
-    ScopedPointer<ComboBox> box_shape_2;
-    ScopedPointer<Slider> sld_w_2;
-    ScopedPointer<Slider> sld_h_2;
-    ScopedPointer<ImageButton> btn_solo_2;
-    ScopedPointer<Slider> sld_gain_2;
-    ScopedPointer<TabbedComponent> tabbedComponent;
-    ScopedPointer<TabbedComponent> tabbedComponent2;
-    ScopedPointer<Label> lbl_drag;
-    ScopedPointer<ImageButton> btn_solo_reset;
+    std::unique_ptr<Label> lbl_gd;
+    std::unique_ptr<Component> filtergraph;
+    std::unique_ptr<ImageButton> btn_drag;
+    std::unique_ptr<Slider> sld_az_1;
+    std::unique_ptr<Slider> sld_el_1;
+    std::unique_ptr<ComboBox> box_shape_1;
+    std::unique_ptr<Slider> sld_w_1;
+    std::unique_ptr<Slider> sld_h_1;
+    std::unique_ptr<ImageButton> btn_solo_1;
+    std::unique_ptr<Slider> sld_gain_1;
+    std::unique_ptr<Slider> sld_az_2;
+    std::unique_ptr<Slider> sld_el_2;
+    std::unique_ptr<ComboBox> box_shape_2;
+    std::unique_ptr<Slider> sld_w_2;
+    std::unique_ptr<Slider> sld_h_2;
+    std::unique_ptr<ImageButton> btn_solo_2;
+    std::unique_ptr<Slider> sld_gain_2;
+    std::unique_ptr<TabbedComponent> tabbedComponent;
+    std::unique_ptr<TabbedComponent> tabbedComponent2;
+    std::unique_ptr<Label> lbl_drag;
+    std::unique_ptr<ImageButton> btn_solo_reset;
 
 
     //==============================================================================

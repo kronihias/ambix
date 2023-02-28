@@ -30,19 +30,6 @@
     #define AMBI_ORDER 5   // N
 #endif
 
-#define Plugin_Name                   ambix_warp_o
-#define Plugin_Code                   1096245552 // AWa0
-
-
-// generate plugin name with ambi order
-#define QU(x) #x
-#define QUH(x) QU(x)
-#define JucePlugin_Name                   QUH(Plugin_Name) QUH(AMBI_ORDER)
-
-#define ADD(x, y) ((x) + (y))
-
-#define JucePlugin_PluginCode             ADD(Plugin_Code,AMBI_ORDER)
-
 ////////////////////////////////////////////
 
 // this is the formular for 3d... not meant to be changed!
@@ -195,15 +182,6 @@
 #endif
 #ifndef  JucePlugin_PluginCode
  #define JucePlugin_PluginCode             'AmWa'
-#endif
-#ifndef  JucePlugin_MaxNumInputChannels
- #define JucePlugin_MaxNumInputChannels    AMBI_CHANNELS
-#endif
-#ifndef  JucePlugin_MaxNumOutputChannels
- #define JucePlugin_MaxNumOutputChannels   AMBI_CHANNELS
-#endif
-#ifndef  JucePlugin_PreferredChannelConfigurations
- #define JucePlugin_PreferredChannelConfigurations  {AMBI_CHANNELS, AMBI_CHANNELS}
 #endif
 #ifndef  JucePlugin_IsSynth
  #define JucePlugin_IsSynth                0

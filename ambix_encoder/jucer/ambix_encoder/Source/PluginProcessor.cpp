@@ -43,12 +43,12 @@ void Ambix_encoderAudioProcessor::setParameter (int index, float newValue)
 
 const String Ambix_encoderAudioProcessor::getParameterName (int index)
 {
-    return String::empty;
+    return String();
 }
 
 const String Ambix_encoderAudioProcessor::getParameterText (int index)
 {
-    return String::empty;
+    return String();
 }
 
 const String Ambix_encoderAudioProcessor::getInputChannelName (int channelIndex) const
@@ -115,7 +115,7 @@ void Ambix_encoderAudioProcessor::setCurrentProgram (int index)
 
 const String Ambix_encoderAudioProcessor::getProgramName (int index)
 {
-    return String::empty;
+    return String();
 }
 
 void Ambix_encoderAudioProcessor::changeProgramName (int index, const String& newName)

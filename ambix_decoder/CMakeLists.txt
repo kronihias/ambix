@@ -1,5 +1,15 @@
-ADD_SUBDIRECTORY ( ambix_decoder )
+SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_binaural )
 
-IF (BUILD_STANDALONE)
-	ADD_SUBDIRECTORY ( ambix_decoder_standalone )
-ENDIF (BUILD_STANDALONE)
+SET ( WITH_MyMeter TRUE )
+SET ( WITH_MyMeterDsp TRUE )
+SET ( WITH_FFTW3 FALSE )
+
+ADD_DEFINITIONS (-DBINAURAL_DECODER=0)
+SET ( SPECIFIC_PROJECTNAME ambix_decoder )
+
+SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_binaural )
+
+SET ( IGNORE_SRC_FILES MtxConv.cpp
+    ConvolverData.cpp)
+
+INCLUDE(${SRC_DIR}/Subproject.cmake)

@@ -1,19 +1,19 @@
 /*
  ==============================================================================
- 
+
  This file is part of the ambix Ambisonic plug-in suite.
  Copyright (c) 2013/2014 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  ambix is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -31,19 +31,6 @@
 #ifndef WITH_OSC
     #define WITH_OSC	1
 #endif
-
-#define Plugin_Name                   ambix_rotator_o
-#define Plugin_Code                   1095921456 // ARo0
-
-
-// generate plugin name with ambi order
-#define QU(x) #x
-#define QUH(x) QU(x)
-#define JucePlugin_Name                   QUH(Plugin_Name) QUH(AMBI_ORDER)
-
-#define ADD(x, y) ((x) + (y))
-
-#define JucePlugin_PluginCode             ADD(Plugin_Code,AMBI_ORDER)
 
 /////////////////////////////////////
 // this is the formular for 3d... not meant to be changed!
@@ -170,15 +157,6 @@
 #endif
 #ifndef  JucePlugin_PluginCode
  #define JucePlugin_PluginCode             'AmRo'
-#endif
-#ifndef  JucePlugin_MaxNumInputChannels
- #define JucePlugin_MaxNumInputChannels    AMBI_CHANNELS
-#endif
-#ifndef  JucePlugin_MaxNumOutputChannels
- #define JucePlugin_MaxNumOutputChannels   AMBI_CHANNELS
-#endif
-#ifndef  JucePlugin_PreferredChannelConfigurations
- #define JucePlugin_PreferredChannelConfigurations  {AMBI_CHANNELS,AMBI_CHANNELS}
 #endif
 #ifndef  JucePlugin_IsSynth
  #define JucePlugin_IsSynth                0

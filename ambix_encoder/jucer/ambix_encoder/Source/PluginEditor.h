@@ -36,8 +36,8 @@
                                                                     //[/Comments]
 */
 class Ambix_encoderAudioProcessorEditor  : public AudioProcessorEditor,
-                                           public SliderListener,
-                                           public ButtonListener
+                                           public Slider::Listener,
+                                           public Button::Listener
 {
 public:
     //==============================================================================
@@ -48,10 +48,10 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
 
-    void paint (Graphics& g);
-    void resized();
-    void sliderValueChanged (Slider* sliderThatWasMoved);
-    void buttonClicked (Button* buttonThatWasClicked);
+    void paint (Graphics& g) override;
+    void resized() override;
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void buttonClicked (Button* buttonThatWasClicked) override;
 
     // Binary resources:
     static const char* settings_png;
@@ -65,18 +65,18 @@ private:
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<Slider> sld_el;
-    ScopedPointer<Component> opengl_component;
-    ScopedPointer<Slider> sld_az;
-    ScopedPointer<Slider> sld_size;
-    ScopedPointer<Slider> sld_width;
-    ScopedPointer<Slider> sld_speed;
-    ScopedPointer<Slider> sld_el_move;
-    ScopedPointer<Slider> sld_az_move;
-    ScopedPointer<TextEditor> txt_az_move;
-    ScopedPointer<TextEditor> txt_el_move;
-    ScopedPointer<Label> lbl_id;
-    ScopedPointer<ImageButton> btn_settings;
+    std::unique_ptr<Slider> sld_el;
+    std::unique_ptr<Component> opengl_component;
+    std::unique_ptr<Slider> sld_az;
+    std::unique_ptr<Slider> sld_size;
+    std::unique_ptr<Slider> sld_width;
+    std::unique_ptr<Slider> sld_speed;
+    std::unique_ptr<Slider> sld_el_move;
+    std::unique_ptr<Slider> sld_az_move;
+    std::unique_ptr<TextEditor> txt_az_move;
+    std::unique_ptr<TextEditor> txt_el_move;
+    std::unique_ptr<Label> lbl_id;
+    std::unique_ptr<ImageButton> btn_settings;
 
 
     //==============================================================================

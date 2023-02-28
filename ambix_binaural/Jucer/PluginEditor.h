@@ -36,9 +36,9 @@
                                                                     //[/Comments]
 */
 class Ambix_binauralAudioProcessorEditor  : public AudioProcessorEditor,
-                                            public ComboBoxListener,
-                                            public ButtonListener,
-                                            public SliderListener
+                                            public ComboBox::Listener,
+                                            public Button::Listener,
+                                            public Slider::Listener
 {
 public:
     //==============================================================================
@@ -62,29 +62,29 @@ private:
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<GroupComponent> gr_hp;
-    ScopedPointer<Label> label;
-    ScopedPointer<ComboBox> box_presets;
-    ScopedPointer<Label> label5;
-    ScopedPointer<TextEditor> txt_debug;
-    ScopedPointer<TextButton> btn_open;
-    ScopedPointer<Label> label2;
-    ScopedPointer<Label> label3;
-    ScopedPointer<Label> label4;
-    ScopedPointer<Label> num_ch;
-    ScopedPointer<Label> num_spk;
-    ScopedPointer<Label> num_hrtf;
-    ScopedPointer<TextButton> btn_preset_folder;
-    ScopedPointer<ToggleButton> tgl_load_irs;
-    ScopedPointer<Slider> sld_hpf;
-    ScopedPointer<ComboBox> box_hp_order;
-    ScopedPointer<GroupComponent> groupComponent2;
-    ScopedPointer<Slider> sld_lpf;
-    ScopedPointer<ComboBox> box_lp_order;
-    ScopedPointer<ComboBox> box_sub_output;
-    ScopedPointer<ComboBox> box_sub_output2;
-    ScopedPointer<Slider> sld_sub_vol;
-    ScopedPointer<Slider> sld_gain;
+    std::unique_ptr<GroupComponent> gr_hp;
+    std::unique_ptr<Label> label;
+    std::unique_ptr<ComboBox> box_presets;
+    std::unique_ptr<Label> label5;
+    std::unique_ptr<TextEditor> txt_debug;
+    std::unique_ptr<TextButton> btn_open;
+    std::unique_ptr<Label> label2;
+    std::unique_ptr<Label> label3;
+    std::unique_ptr<Label> label4;
+    std::unique_ptr<Label> num_ch;
+    std::unique_ptr<Label> num_spk;
+    std::unique_ptr<Label> num_hrtf;
+    std::unique_ptr<TextButton> btn_preset_folder;
+    std::unique_ptr<ToggleButton> tgl_load_irs;
+    std::unique_ptr<Slider> sld_hpf;
+    std::unique_ptr<ComboBox> box_hp_order;
+    std::unique_ptr<GroupComponent> groupComponent2;
+    std::unique_ptr<Slider> sld_lpf;
+    std::unique_ptr<ComboBox> box_lp_order;
+    std::unique_ptr<ComboBox> box_sub_output;
+    std::unique_ptr<ComboBox> box_sub_output2;
+    std::unique_ptr<Slider> sld_sub_vol;
+    std::unique_ptr<Slider> sld_gain;
 
 
     //==============================================================================

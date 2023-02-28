@@ -36,8 +36,8 @@
                                                                     //[/Comments]
 */
 class Settings  : public Component,
-                  public ButtonListener,
-                  public SliderListener
+                  public Button::Listener,
+                  public Slider::Listener
 {
 public:
     //==============================================================================
@@ -48,10 +48,10 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
 
-    void paint (Graphics& g);
-    void resized();
-    void buttonClicked (Button* buttonThatWasClicked);
-    void sliderValueChanged (Slider* sliderThatWasMoved);
+    void paint (Graphics& g) override;
+    void resized() override;
+    void buttonClicked (Button* buttonThatWasClicked) override;
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
 
 
 
@@ -61,13 +61,13 @@ private:
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<TextEditor> txt_snd_ip;
-    ScopedPointer<TextEditor> txt_snd_port;
-    ScopedPointer<ToggleButton> tgl_snd_active;
-    ScopedPointer<TextEditor> txt_rcv_port;
-    ScopedPointer<ToggleButton> tgl_rcv_active;
-    ScopedPointer<Label> lbl_id;
-    ScopedPointer<Slider> slider;
+    std::unique_ptr<TextEditor> txt_snd_ip;
+    std::unique_ptr<TextEditor> txt_snd_port;
+    std::unique_ptr<ToggleButton> tgl_snd_active;
+    std::unique_ptr<TextEditor> txt_rcv_port;
+    std::unique_ptr<ToggleButton> tgl_rcv_active;
+    std::unique_ptr<Label> lbl_id;
+    std::unique_ptr<Slider> slider;
 
 
     //==============================================================================

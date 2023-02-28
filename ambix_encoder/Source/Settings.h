@@ -36,9 +36,9 @@
                                                                     //[/Comments]
 */
 class Settings  : public Component,
-                  public ButtonListener,
-                  public SliderListener,
-                  public TextEditorListener
+                  public Button::Listener,
+                  public Slider::Listener,
+                  public TextEditor::Listener
 {
 public:
     //==============================================================================
@@ -49,31 +49,30 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
 
-    void paint (Graphics& g);
-    void resized();
-    void buttonClicked (Button* buttonThatWasClicked);
-    void sliderValueChanged (Slider* sliderThatWasMoved);
-    
-    void textEditorFocusLost (TextEditor& ed);
-    void textEditorReturnKeyPressed (TextEditor& ed);
+    void paint (Graphics& g) override;
+    void resized() override;
+    void buttonClicked (Button* buttonThatWasClicked) override;
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
+
+    void textEditorFocusLost (TextEditor& ed) override;
+    void textEditorReturnKeyPressed (TextEditor& ed) override;
 
     void updateOscSend();
-    
+
     void updateSettings();
 
 private:
-    //[UserVariables]   -- You can add your own custom variables in this section.
     Ambix_encoderAudioProcessor& _processor;
-    //[/UserVariables]
 
+    LookAndFeel_V3 globalLaF;
     //==============================================================================
-    ScopedPointer<TextEditor> txt_snd_ip;
-    ScopedPointer<TextEditor> txt_snd_port;
-    ScopedPointer<ToggleButton> tgl_snd_active;
-    ScopedPointer<TextEditor> txt_rcv_port;
-    ScopedPointer<ToggleButton> tgl_rcv_active;
-    ScopedPointer<Label> lbl_id;
-    ScopedPointer<Slider> slider;
+    TextEditor txt_snd_ip;
+    TextEditor txt_snd_port;
+    ToggleButton tgl_snd_active;
+    TextEditor txt_rcv_port;
+    ToggleButton tgl_rcv_active;
+    Label lbl_id;
+    Slider slider;
 
 
     //==============================================================================

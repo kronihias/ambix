@@ -36,7 +36,7 @@
                                                                     //[/Comments]
 */
 class Ambix_encoderAudioProcessorEditor  : public AudioProcessorEditor,
-                                           public SliderListener
+                                           public Slider::Listener
 {
 public:
     //==============================================================================
@@ -58,18 +58,18 @@ private:
     //[/UserVariables]
 
     //==============================================================================
-    ScopedPointer<Slider> sld_el;
-    ScopedPointer<Component> opengl_component;
-    ScopedPointer<Slider> sld_az;
-    ScopedPointer<Slider> sld_size;
-    ScopedPointer<Slider> sld_width;
-    ScopedPointer<Slider> sld_speed;
-    ScopedPointer<Slider> sld_el_move;
-    ScopedPointer<Slider> sld_az_move;
-    ScopedPointer<TextEditor> txt_az_move;
-    ScopedPointer<TextEditor> txt_el_move;
-    ScopedPointer<Label> lbl_id;
-    ScopedPointer<TextEditor> txt_id;
+    std::unique_ptr<Slider> sld_el;
+    std::unique_ptr<Component> opengl_component;
+    std::unique_ptr<Slider> sld_az;
+    std::unique_ptr<Slider> sld_size;
+    std::unique_ptr<Slider> sld_width;
+    std::unique_ptr<Slider> sld_speed;
+    std::unique_ptr<Slider> sld_el_move;
+    std::unique_ptr<Slider> sld_az_move;
+    std::unique_ptr<TextEditor> txt_az_move;
+    std::unique_ptr<TextEditor> txt_el_move;
+    std::unique_ptr<Label> lbl_id;
+    std::unique_ptr<TextEditor> txt_id;
 
 
     //==============================================================================

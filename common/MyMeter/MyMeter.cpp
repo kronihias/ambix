@@ -68,8 +68,6 @@ float iec_scale(float dB)
 //==============================================================================
 MyMeter::MyMeter ()
 : _peak_hold(false),
-    cachedImage_meter_gradient_png (0),
-    cachedImage_meter_gradient_off_png (0),
     dpk_scale(0.f),
     rms_scale(0.f),
     dpk_hold_scale(0.f),
@@ -209,8 +207,7 @@ void MyMeter::setValue(float rms, float dpk)
     
 }
 
-MyMeterScale::MyMeterScale() :
-cachedImage_meter_scale_png (0)
+MyMeterScale::MyMeterScale()
 {
     cachedImage_meter_scale_png = ImageCache::getFromMemory (meter_scale_png, meter_scale_pngSize);
     setSize(20, 170);

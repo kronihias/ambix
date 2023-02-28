@@ -30,102 +30,86 @@
 Settings::Settings (Ambix_encoderAudioProcessor& Processor)
     : _processor(Processor)
 {
-    addAndMakeVisible (txt_snd_ip = new TextEditor ("new text editor"));
-    txt_snd_ip->setTooltip (TRANS("send ip address, specify multiple addresses by separating them with semicolon ;"));
-    txt_snd_ip->addListener (this);
-    txt_snd_ip->setMultiLine (false);
-    txt_snd_ip->setReturnKeyStartsNewLine (false);
-    txt_snd_ip->setReadOnly (false);
-    txt_snd_ip->setScrollbarsShown (false);
-    txt_snd_ip->setCaretVisible (true);
-    txt_snd_ip->setPopupMenuEnabled (true);
-    txt_snd_ip->setText (TRANS("127.0.0.1"));
+    setLookAndFeel (&globalLaF);
 
-    addAndMakeVisible (txt_snd_port = new TextEditor ("new text editor"));
-    txt_snd_port->setTooltip (TRANS("send port, specify multiple ports by separating them with semicolon ;"));
-    txt_snd_port->addListener (this);
-    txt_snd_port->setMultiLine (false);
-    txt_snd_port->setReturnKeyStartsNewLine (false);
-    txt_snd_port->setReadOnly (false);
-    txt_snd_port->setScrollbarsShown (false);
-    txt_snd_port->setCaretVisible (true);
-    txt_snd_port->setPopupMenuEnabled (true);
-    txt_snd_port->setText (TRANS("8000"));
+    addAndMakeVisible (txt_snd_ip);
+    txt_snd_ip.setTooltip ("send ip address, specify multiple addresses by separating them with semicolon ;");
+    txt_snd_ip.addListener (this);
+    txt_snd_ip.setMultiLine (false);
+    txt_snd_ip.setReturnKeyStartsNewLine (false);
+    txt_snd_ip.setReadOnly (false);
+    txt_snd_ip.setScrollbarsShown (false);
+    txt_snd_ip.setCaretVisible (true);
+    txt_snd_ip.setPopupMenuEnabled (true);
+    txt_snd_ip.setText (TRANS("127.0.0.1"));
 
-    addAndMakeVisible (tgl_snd_active = new ToggleButton ("new toggle button"));
-    tgl_snd_active->setButtonText (TRANS("active"));
-    tgl_snd_active->addListener (this);
-    tgl_snd_active->setToggleState (true, dontSendNotification);
-    tgl_snd_active->setColour (ToggleButton::textColourId, Colours::black);
+    addAndMakeVisible (txt_snd_port);
+    txt_snd_port.setTooltip (TRANS("send port, specify multiple ports by separating them with semicolon ;"));
+    txt_snd_port.addListener (this);
+    txt_snd_port.setMultiLine (false);
+    txt_snd_port.setReturnKeyStartsNewLine (false);
+    txt_snd_port.setReadOnly (false);
+    txt_snd_port.setScrollbarsShown (false);
+    txt_snd_port.setCaretVisible (true);
+    txt_snd_port.setPopupMenuEnabled (true);
+    txt_snd_port.setText (TRANS("8000"));
 
-    addAndMakeVisible (txt_rcv_port = new TextEditor ("new text editor"));
-    txt_rcv_port->setTooltip (TRANS("osc receive port - open port is configured automatically!"));
-    txt_rcv_port->setMultiLine (false);
-    txt_rcv_port->setReturnKeyStartsNewLine (false);
-    txt_rcv_port->setReadOnly (true);
-    txt_rcv_port->setScrollbarsShown (false);
-    txt_rcv_port->setCaretVisible (false);
-    txt_rcv_port->setPopupMenuEnabled (true);
-    txt_rcv_port->setText (TRANS("8000"));
+    addAndMakeVisible (tgl_snd_active);
+    tgl_snd_active.setButtonText (TRANS("active"));
+    tgl_snd_active.addListener (this);
+    tgl_snd_active.setToggleState (true, dontSendNotification);
+    tgl_snd_active.setColour (ToggleButton::textColourId, Colours::black);
 
-    addAndMakeVisible (tgl_rcv_active = new ToggleButton ("new toggle button"));
-    tgl_rcv_active->setButtonText (TRANS("active"));
-    tgl_rcv_active->addListener (this);
-    tgl_rcv_active->setToggleState (true, dontSendNotification);
-    tgl_rcv_active->setColour (ToggleButton::textColourId, Colours::black);
+    addAndMakeVisible (txt_rcv_port);
+    txt_rcv_port.setTooltip (TRANS("osc receive port - open port is configured automatically!"));
+    txt_rcv_port.setMultiLine (false);
+    txt_rcv_port.setReturnKeyStartsNewLine (false);
+    txt_rcv_port.setReadOnly (true);
+    txt_rcv_port.setScrollbarsShown (false);
+    txt_rcv_port.setCaretVisible (false);
+    txt_rcv_port.setPopupMenuEnabled (true);
+    txt_rcv_port.setText (TRANS("8000"));
 
-    addAndMakeVisible (lbl_id = new Label ("new label",
-                                           TRANS("ID: 1")));
-    lbl_id->setFont (Font (15.00f, Font::plain));
-    lbl_id->setJustificationType (Justification::centredRight);
-    lbl_id->setEditable (false, false, false);
-    lbl_id->setColour (Label::textColourId, Colour (0xff888888));
-    lbl_id->setColour (TextEditor::textColourId, Colours::black);
-    lbl_id->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+    addAndMakeVisible (tgl_rcv_active);
+    tgl_rcv_active.setButtonText (TRANS("active"));
+    tgl_rcv_active.addListener (this);
+    tgl_rcv_active.setToggleState (true, dontSendNotification);
+    tgl_rcv_active.setColour (ToggleButton::textColourId, Colours::black);
 
-    addAndMakeVisible (slider = new Slider ("new slider"));
-    slider->setTooltip (TRANS("interval between two OSC messages are sent"));
-    slider->setRange (1, 1000, 1);
-    slider->setTextValueSuffix(" ms");
-    slider->setSliderStyle (Slider::RotaryHorizontalVerticalDrag);
-    slider->setTextBoxStyle (Slider::TextBoxLeft, false, 60, 20);
-    slider->setColour (Slider::thumbColourId, Colours::black);
-    slider->setColour (Slider::rotarySliderFillColourId, Colours::black);
-    slider->addListener (this);
-    slider->setSkewFactor (0.6);
-    slider->setDoubleClickReturnValue(true, 50.f);
-    //[UserPreSize]
-    //[/UserPreSize]
+    addAndMakeVisible (lbl_id);
+    lbl_id.setText("ID: 1", dontSendNotification);
+    lbl_id.setFont (Font (15.00f, Font::plain));
+    lbl_id.setJustificationType (Justification::centredRight);
+    lbl_id.setEditable (false, false, false);
+    lbl_id.setColour (Label::textColourId, Colour (0xff888888));
+    lbl_id.setColour (TextEditor::textColourId, Colours::black);
+    lbl_id.setColour (TextEditor::backgroundColourId, Colour (0x00000000));
+
+    addAndMakeVisible (slider);
+    slider.setTooltip (TRANS("interval between two OSC messages are sent"));
+    slider.setRange (1, 1000, 1);
+    slider.setTextValueSuffix(" ms");
+    slider.setSliderStyle (Slider::RotaryHorizontalVerticalDrag);
+    slider.setTextBoxStyle (Slider::TextBoxLeft, false, 60, 20);
+    slider.setColour (Slider::thumbColourId, Colours::black);
+    slider.setColour (Slider::rotarySliderFillColourId, Colours::black);
+    slider.addListener (this);
+    slider.setSkewFactor (0.6);
+    slider.setDoubleClickReturnValue(true, 50.f);
 
     setSize (203, 290);
 
-
-    //[Constructor] You can add your own custom stuff here..
     updateSettings();
-    
+
     String str_id = "ID: ";
     str_id << _processor.m_id;
-    lbl_id->setText(str_id, dontSendNotification);
-    //[/Constructor]
+    lbl_id.setText(str_id, dontSendNotification);
 }
 
 Settings::~Settings()
 {
     _processor.myProperties.saveIfNeeded();
-    //[Destructor_pre]. You can add your own custom destruction code here..
-    //[/Destructor_pre]
 
-    txt_snd_ip = nullptr;
-    txt_snd_port = nullptr;
-    tgl_snd_active = nullptr;
-    txt_rcv_port = nullptr;
-    tgl_rcv_active = nullptr;
-    lbl_id = nullptr;
-    slider = nullptr;
-
-
-    //[Destructor]. You can add your own custom destruction code here..
-    //[/Destructor]
 }
 
 //==============================================================================
@@ -203,73 +187,56 @@ void Settings::paint (Graphics& g)
 
 void Settings::resized()
 {
-    txt_snd_ip->setBounds (56, 80, 120, 20);
-    txt_snd_port->setBounds (56, 106, 120, 20);
-    tgl_snd_active->setBounds (24, 48, 80, 24);
-    txt_rcv_port->setBounds (56, 178, 120, 20);
-    tgl_rcv_active->setBounds (24, 152, 80, 24);
-    lbl_id->setBounds (144, 24, 57, 24);
-    slider->setBounds (57, 244, 96, 24);
+    txt_snd_ip.setBounds (56, 80, 120, 20);
+    txt_snd_port.setBounds (56, 106, 120, 20);
+    tgl_snd_active.setBounds (24, 48, 80, 24);
+    txt_rcv_port.setBounds (56, 178, 120, 20);
+    tgl_rcv_active.setBounds (24, 152, 80, 24);
+    lbl_id.setBounds (144, 24, 57, 24);
+    slider.setBounds (57, 244, 96, 24);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
 
 void Settings::updateSettings()
 {
-    tgl_rcv_active->setToggleState(_processor.osc_in, dontSendNotification);
-    
-    tgl_snd_active->setToggleState(_processor.osc_out, dontSendNotification);
-    
-    txt_snd_ip->setText(_processor.osc_out_ip);
-    
-    txt_snd_port->setText(_processor.osc_out_port);
-    
-    txt_rcv_port->setText(_processor.osc_in_port);
-    
-    slider->setValue(_processor.osc_interval);
+    tgl_rcv_active.setToggleState(_processor.osc_in, dontSendNotification);
+
+    tgl_snd_active.setToggleState(_processor.osc_out, dontSendNotification);
+
+    txt_snd_ip.setText(_processor.osc_out_ip);
+
+    txt_snd_port.setText(_processor.osc_out_port);
+
+    txt_rcv_port.setText(_processor.osc_in_port);
+
+    slider.setValue(_processor.osc_interval);
 }
 
 void Settings::buttonClicked (Button* buttonThatWasClicked)
 {
-    //[UserbuttonClicked_Pre]
-    //[/UserbuttonClicked_Pre]
-
-    if (buttonThatWasClicked == tgl_snd_active)
+    if (buttonThatWasClicked == &tgl_snd_active)
     {
-        //[UserButtonCode_tgl_snd_active] -- add your button handler code here..
-        _processor.oscOut(tgl_snd_active->getToggleState());
-        
-        _processor.myProperties.getUserSettings()->setValue("osc_out", tgl_snd_active->getToggleState());
-        
-        //[/UserButtonCode_tgl_snd_active]
-    }
-    else if (buttonThatWasClicked == tgl_rcv_active)
-    {
-        //[UserButtonCode_tgl_rcv_active] -- add your button handler code here..
-        _processor.oscIn(tgl_rcv_active->getToggleState());
-        _processor.myProperties.getUserSettings()->setValue("osc_in", tgl_rcv_active->getToggleState());
-        //[/UserButtonCode_tgl_rcv_active]
-    }
+        _processor.oscOut(tgl_snd_active.getToggleState());
 
-    //[UserbuttonClicked_Post]
-    //[/UserbuttonClicked_Post]
+        _processor.myProperties.getUserSettings()->setValue("osc_out", tgl_snd_active.getToggleState());
+
+    }
+    else if (buttonThatWasClicked == &tgl_rcv_active)
+    {
+        _processor.oscIn(tgl_rcv_active.getToggleState());
+        _processor.myProperties.getUserSettings()->setValue("osc_in", tgl_rcv_active.getToggleState());
+    }
 }
 
 void Settings::sliderValueChanged (Slider* sliderThatWasMoved)
 {
-    //[UsersliderValueChanged_Pre]
-    //[/UsersliderValueChanged_Pre]
-
-    if (sliderThatWasMoved == slider)
+    if (sliderThatWasMoved == &slider)
     {
-        //[UserSliderCode_slider] -- add your slider handling code here..
-        _processor.myProperties.getUserSettings()->setValue("osc_out_interval", (int)slider->getValue());
-        _processor.changeTimer((int)slider->getValue());
-        //[/UserSliderCode_slider]
+        _processor.myProperties.getUserSettings()->setValue("osc_out_interval", (int)slider.getValue());
+        _processor.changeTimer((int)slider.getValue());
     }
 
-    //[UsersliderValueChanged_Post]
-    //[/UsersliderValueChanged_Post]
 }
 
 void Settings::textEditorFocusLost (TextEditor& ed)
@@ -284,20 +251,20 @@ void Settings::textEditorReturnKeyPressed (TextEditor& ed)
 
 void Settings::updateOscSend()
 {
-    _processor.myProperties.getUserSettings()->setValue("osc_out_ip", txt_snd_ip->getText());
-    _processor.myProperties.getUserSettings()->setValue("osc_out_port", txt_snd_port->getText());
-    
-    
-    if (  _processor.osc_out && ( !_processor.osc_out_ip.equalsIgnoreCase(txt_snd_ip->getText()) || !_processor.osc_out_port.equalsIgnoreCase(txt_snd_port->getText()) )  ) {
-        
-        _processor.osc_out_ip = txt_snd_ip->getText();
-        _processor.osc_out_port = txt_snd_port->getText();
-        
+    _processor.myProperties.getUserSettings()->setValue("osc_out_ip", txt_snd_ip.getText());
+    _processor.myProperties.getUserSettings()->setValue("osc_out_port", txt_snd_port.getText());
+
+
+    if (  _processor.osc_out && ( !_processor.osc_out_ip.equalsIgnoreCase(txt_snd_ip.getText()) || !_processor.osc_out_port.equalsIgnoreCase(txt_snd_port.getText()) )  ) {
+
+        _processor.osc_out_ip = txt_snd_ip.getText();
+        _processor.osc_out_port = txt_snd_port.getText();
+
         _processor.oscOut(false);
         _processor.oscOut(true);
     }
-    
-    
+
+
 }
 
 

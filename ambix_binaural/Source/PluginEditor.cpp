@@ -4,7 +4,7 @@
    This file is part of the ambix Ambisonic plug-in suite.
    Copyright (c) 2013/2014 - Matthias Kronlachner
    www.matthiaskronlachner.com
-   
+
    Permission is granted to use this software under the terms of:
    the GPL v2 (or any later version)
 
@@ -26,182 +26,169 @@
 //==============================================================================
 Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_binauralAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-      label (nullptr),
-      txt_preset(nullptr),
-      label5 (nullptr),
-      txt_debug (nullptr),
-      btn_open (nullptr),
-      label2 (nullptr),
-      label3 (nullptr),
-      label4 (nullptr),
-      num_ch (nullptr),
-      num_spk (nullptr),
-      num_hrtf (nullptr),
-      btn_preset_folder (nullptr),
-#if BINAURAL_DECODER
-    tgl_load_irs(nullptr),
-    box_conv_buffer (nullptr),
-#endif
-      _width(0)
+    _width(0)
 {
-    
+    setLookAndFeel (&globalLaF);
     tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
-    
-    addAndMakeVisible (label = new Label ("new label",
-                                          "Ambisonics input channels: "));
-    label->setFont (Font (15.0000f, Font::plain));
-    label->setJustificationType (Justification::centredRight);
-    label->setEditable (false, false, false);
-    label->setColour (Label::textColourId, Colours::white);
-    label->setColour (TextEditor::textColourId, Colours::black);
-    label->setColour (TextEditor::backgroundColourId, Colour (0x0));
 
-    
-    addAndMakeVisible (txt_preset = new TextEditor ("new text editor"));
-    txt_preset->setReadOnly(true);
-    txt_preset->setPopupMenuEnabled(false);
-    
-    addAndMakeVisible (label5 = new Label ("new label",
-                                           "Preset"));
-    label5->setFont (Font (15.0000f, Font::plain));
-    label5->setJustificationType (Justification::centredRight);
-    label5->setEditable (false, false, false);
-    label5->setColour (Label::textColourId, Colours::white);
-    label5->setColour (TextEditor::textColourId, Colours::white);
-    label5->setColour (TextEditor::backgroundColourId, Colour (0x0));
+    addAndMakeVisible (label);
+    label.setText("Ambisonics input channels: ", dontSendNotification);
+    label.setFont (Font (15.0000f, Font::plain));
+    label.setJustificationType (Justification::centredRight);
+    label.setEditable (false, false, false);
+    label.setColour (Label::textColourId, Colours::white);
+    label.setColour (TextEditor::textColourId, Colours::black);
+    label.setColour (TextEditor::backgroundColourId, Colour (0x0));
 
-    addAndMakeVisible (txt_debug = new TextEditor ("new text editor"));
-    txt_debug->setMultiLine (true);
-    txt_debug->setReturnKeyStartsNewLine (false);
-    txt_debug->setReadOnly (true);
-    txt_debug->setScrollbarsShown (true);
-    txt_debug->setCaretVisible (false);
-    txt_debug->setPopupMenuEnabled (true);
-    txt_debug->setText ("debug window");
-    txt_debug->setFont(Font(10,1));
-    
-    addAndMakeVisible (btn_open = new TextButton ("new button"));
-    btn_open->setTooltip ("browse presets or open from file");
-    btn_open->setButtonText ("open");
-    btn_open->addListener (this);
-    btn_open->setColour (TextButton::buttonColourId, Colours::white);
-    btn_open->setColour (TextButton::buttonOnColourId, Colours::blue);
+    addAndMakeVisible (txt_preset);
 
-    addAndMakeVisible (label2 = new Label ("new label",
-                                           "Virtual loudspeakers: "));
+    txt_preset.setReadOnly(true);
+    txt_preset.setPopupMenuEnabled(false);
 
-    label2->setFont (Font (15.0000f, Font::plain));
-    label2->setJustificationType (Justification::centredRight);
-    label2->setEditable (false, false, false);
-    label2->setColour (Label::textColourId, Colours::white);
-    label2->setColour (TextEditor::textColourId, Colours::black);
-    label2->setColour (TextEditor::backgroundColourId, Colour (0x0));
+    addAndMakeVisible (label5);
+    label5.setText("Preset", dontSendNotification);
+    label5.setFont (Font (15.0000f, Font::plain));
+    label5.setJustificationType (Justification::centredRight);
+    label5.setEditable (false, false, false);
+    label5.setColour (Label::textColourId, Colours::white);
+    label5.setColour (TextEditor::textColourId, Colours::white);
+    label5.setColour (TextEditor::backgroundColourId, Colour (0x0));
 
-    addAndMakeVisible (label3 = new Label ("new label",
-                                           "Impulse responses: "));
-    label3->setFont (Font (15.0000f, Font::plain));
-    label3->setJustificationType (Justification::centredRight);
-    label3->setEditable (false, false, false);
-    label3->setColour (Label::textColourId, Colours::white);
-    label3->setColour (TextEditor::textColourId, Colours::black);
-    label3->setColour (TextEditor::backgroundColourId, Colour (0x0));
+    addAndMakeVisible (txt_debug);
+    txt_debug.setMultiLine (true);
+    txt_debug.setReturnKeyStartsNewLine (false);
+    txt_debug.setReadOnly (true);
+    txt_debug.setScrollbarsShown (true);
+    txt_debug.setCaretVisible (false);
+    txt_debug.setPopupMenuEnabled (true);
+    txt_debug.setText ("debug window");
+    txt_debug.setFont(Font(10,1));
+
+    addAndMakeVisible (btn_open);
+    btn_open.setTooltip ("browse presets or open from file");
+    btn_open.setButtonText ("open");
+    btn_open.addListener (this);
+    btn_open.setColour (TextButton::buttonColourId, Colours::grey);
+    btn_open.setColour (TextButton::buttonOnColourId, Colours::blue);
+    btn_open.setColour (TextButton::textColourOnId, Colours::black);
+    btn_open.setColour (TextButton::textColourOffId, Colours::black);
+
+    addAndMakeVisible (label2);
+    label2.setText("Virtual loudspeakers: ", dontSendNotification);
+    label2.setFont (Font (15.0000f, Font::plain));
+    label2.setJustificationType (Justification::centredRight);
+    label2.setEditable (false, false, false);
+    label2.setColour (Label::textColourId, Colours::white);
+    label2.setColour (TextEditor::textColourId, Colours::black);
+    label2.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (label3);
+    label3.setText("Impulse responses: ", dontSendNotification);
+    label3.setFont (Font (15.0000f, Font::plain));
+    label3.setJustificationType (Justification::centredRight);
+    label3.setEditable (false, false, false);
+    label3.setColour (Label::textColourId, Colours::white);
+    label3.setColour (TextEditor::textColourId, Colours::black);
+    label3.setColour (TextEditor::backgroundColourId, Colour (0x0));
 
 #if BINAURAL_DECODER
 #else
-    label2->setText("Loudspeakers: ", dontSendNotification);
-    label3->setText("", dontSendNotification);
+    label2.setText("Loudspeakers: ", dontSendNotification);
+    label3.setText("", dontSendNotification);
 #endif
-    
-    addAndMakeVisible (label4 = new Label ("new label",
-                                           "debug window"));
-    label4->setFont (Font (10.0000f, Font::plain));
-    label4->setJustificationType (Justification::centredLeft);
-    label4->setEditable (false, false, false);
-    label4->setColour (Label::textColourId, Colours::white);
-    label4->setColour (TextEditor::textColourId, Colours::black);
-    label4->setColour (TextEditor::backgroundColourId, Colour (0x0));
 
-    addAndMakeVisible (num_ch = new Label ("new label",
-                                           "0"));
-    num_ch->setFont (Font (15.0000f, Font::plain));
-    num_ch->setJustificationType (Justification::centredRight);
-    num_ch->setEditable (false, false, false);
-    num_ch->setColour (Label::textColourId, Colours::white);
-    num_ch->setColour (TextEditor::textColourId, Colours::black);
-    num_ch->setColour (TextEditor::backgroundColourId, Colour (0x0));
+    addAndMakeVisible (label4);
+    label4.setText("debug window", dontSendNotification);
+    label4.setFont (Font (10.0000f, Font::plain));
+    label4.setJustificationType (Justification::centredLeft);
+    label4.setEditable (false, false, false);
+    label4.setColour (Label::textColourId, Colours::white);
+    label4.setColour (TextEditor::textColourId, Colours::black);
+    label4.setColour (TextEditor::backgroundColourId, Colour (0x0));
 
-    addAndMakeVisible (num_spk = new Label ("new label",
-                                            "0"));
-    num_spk->setFont (Font (15.0000f, Font::plain));
-    num_spk->setJustificationType (Justification::centredRight);
-    num_spk->setEditable (false, false, false);
-    num_spk->setColour (Label::textColourId, Colours::white);
-    num_spk->setColour (TextEditor::textColourId, Colours::black);
-    num_spk->setColour (TextEditor::backgroundColourId, Colour (0x0));
+    addAndMakeVisible (num_ch);
+    num_ch.setText("0", dontSendNotification);
+    num_ch.setFont (Font (15.0000f, Font::plain));
+    num_ch.setJustificationType (Justification::centredRight);
+    num_ch.setEditable (false, false, false);
+    num_ch.setColour (Label::textColourId, Colours::white);
+    num_ch.setColour (TextEditor::textColourId, Colours::black);
+    num_ch.setColour (TextEditor::backgroundColourId, Colour (0x0));
 
-    addAndMakeVisible (num_hrtf = new Label ("new label",
-                                             ""));
-    num_hrtf->setFont (Font (15.0000f, Font::plain));
-    num_hrtf->setJustificationType (Justification::centredRight);
-    num_hrtf->setEditable (false, false, false);
-    num_hrtf->setColour (Label::textColourId, Colours::white);
-    num_hrtf->setColour (TextEditor::textColourId, Colours::black);
-    num_hrtf->setColour (TextEditor::backgroundColourId, Colour (0x0));
+    addAndMakeVisible (num_spk);
+    num_spk.setText("0", dontSendNotification);
+    num_spk.setFont (Font (15.0000f, Font::plain));
+    num_spk.setJustificationType (Justification::centredRight);
+    num_spk.setEditable (false, false, false);
+    num_spk.setColour (Label::textColourId, Colours::white);
+    num_spk.setColour (TextEditor::textColourId, Colours::black);
+    num_spk.setColour (TextEditor::backgroundColourId, Colour (0x0));
 
-    addAndMakeVisible (btn_preset_folder = new TextButton ("new button"));
-    btn_preset_folder->setTooltip ("choose another preset folder");
-    btn_preset_folder->setButtonText ("preset folder");
-    btn_preset_folder->addListener (this);
-    btn_preset_folder->setColour (TextButton::buttonColourId, Colours::white);
-    btn_preset_folder->setColour (TextButton::buttonOnColourId, Colours::blue);
-    
-    addAndMakeVisible (sld_gain = new Slider ("new slider"));
-    sld_gain->setTooltip (TRANS("Output Volume"));
-    sld_gain->setRange (-99, 20, 0.1);
-    sld_gain->setSliderStyle (Slider::LinearVertical);
-    sld_gain->setTextBoxStyle (Slider::TextBoxBelow, false, 45, 20);
-    sld_gain->setColour (Slider::thumbColourId, Colours::white);
-    sld_gain->addListener (this);
-    sld_gain->setSkewFactor (1.6f);
-    sld_gain->setDoubleClickReturnValue(true, 0.f);
+    addAndMakeVisible (num_hrtf);
+    num_hrtf.setText("", dontSendNotification);
+    num_hrtf.setFont (Font (15.0000f, Font::plain));
+    num_hrtf.setJustificationType (Justification::centredRight);
+    num_hrtf.setEditable (false, false, false);
+    num_hrtf.setColour (Label::textColourId, Colours::white);
+    num_hrtf.setColour (TextEditor::textColourId, Colours::black);
+    num_hrtf.setColour (TextEditor::backgroundColourId, Colour (0x0));
 
-    addAndMakeVisible(tgl_save_preset = new ToggleButton("new toggle button"));
-    tgl_save_preset->setButtonText(TRANS("Save preset within project"));
-    tgl_save_preset->setTooltip(TRANS("this will save the preset and data within the project and reload it from there; CAUTION: may slow down saving/opening your project and increases project file size!"));
-    tgl_save_preset->addListener(this);
-    tgl_save_preset->setToggleState(true, dontSendNotification);
-    tgl_save_preset->setColour(ToggleButton::textColourId, Colours::white);
+    addAndMakeVisible (btn_preset_folder);
+    btn_preset_folder.setTooltip ("choose another preset folder");
+    btn_preset_folder.setButtonText ("preset folder");
+    btn_preset_folder.addListener (this);
+    btn_preset_folder.setColour (TextButton::buttonColourId, Colours::grey);
+    btn_preset_folder.setColour (TextButton::buttonOnColourId, Colours::blue);
+    btn_preset_folder.setColour (TextButton::textColourOnId, Colours::black);
+    btn_preset_folder.setColour (TextButton::textColourOffId, Colours::black);
+
+    addAndMakeVisible (sld_gain);
+    sld_gain.setTooltip (TRANS("Output Volume"));
+    sld_gain.setRange (-99, 20, 0.1);
+    sld_gain.setSliderStyle (Slider::LinearVertical);
+    sld_gain.setTextBoxStyle (Slider::TextBoxBelow, false, 45, 20);
+    sld_gain.setColour (Slider::thumbColourId, Colours::white);
+    sld_gain.addListener (this);
+    sld_gain.setSkewFactor (1.6f);
+    sld_gain.setDoubleClickReturnValue(true, 0.f);
+
+    addAndMakeVisible(tgl_save_preset);
+    tgl_save_preset.setButtonText(TRANS("Save preset within project"));
+    tgl_save_preset.setTooltip(TRANS("this will save the preset and data within the project and reload it from there; CAUTION: may slow down saving/opening your project and increases project file size!"));
+    tgl_save_preset.addListener(this);
+    tgl_save_preset.setToggleState(true, dontSendNotification);
+    tgl_save_preset.setColour(ToggleButton::textColourId, Colours::white);
 
 #if BINAURAL_DECODER
-    addAndMakeVisible (tgl_load_irs = new ToggleButton ("new toggle button"));
-    tgl_load_irs->setTooltip (TRANS("load impulse responses if new preset being loaded - deactivate if IRs already loaded - for fast decoder matrix switching"));
-    tgl_load_irs->setButtonText (TRANS("load IRs"));
-    tgl_load_irs->addListener (this);
-    tgl_load_irs->setColour (ToggleButton::textColourId, Colours::white);
-    
-    addAndMakeVisible(box_conv_buffer = new ComboBox ("new combobox"));
-    box_conv_buffer->setTooltip("set higher buffer size to optimize CPU performance but increased latency");
-    box_conv_buffer->addListener(this);
-    box_conv_buffer->setEditableText (false);
-    box_conv_buffer->setJustificationType (Justification::centredLeft);
+    addAndMakeVisible (tgl_load_irs);
+    tgl_load_irs.setTooltip (TRANS("load impulse responses if new preset being loaded - deactivate if IRs already loaded - for fast decoder matrix switching"));
+    tgl_load_irs.setButtonText (TRANS("load IRs"));
+    tgl_load_irs.addListener (this);
+    tgl_load_irs.setColour (ToggleButton::textColourId, Colours::white);
+
+    addAndMakeVisible(box_conv_buffer);
+    box_conv_buffer.setTooltip("set higher buffer size to optimize CPU performance but increased latency");
+    box_conv_buffer.addListener(this);
+    box_conv_buffer.setEditableText (false);
+    box_conv_buffer.setJustificationType (Justification::centredLeft);
 #endif
-    
+
     setSize (350, 325);
-    
+
     DrawMeters();
 
     UpdateText();
-    
+
     UpdatePresets();
-    
-    txt_preset->setText(ownerFilter->box_preset_str);
-    txt_preset->setCaretPosition(txt_preset->getTotalNumChars()-1);
-    txt_preset->setTooltip(txt_preset->getText());
-    
-    sld_gain->setValue(ParamToDB(ownerFilter->getParameter(0)), dontSendNotification);
-    
+
+    txt_preset.setText(ownerFilter->box_preset_str);
+    txt_preset.setCaretPosition(txt_preset.getTotalNumChars()-1);
+    txt_preset.setTooltip(txt_preset.getText());
+
+    sld_gain.setValue(ParamToDB(ownerFilter->getParameter(0)), dontSendNotification);
+
     startTimer (100);
-    
+
     ownerFilter->addChangeListener(this); // listen to changes of processor
 }
 
@@ -210,33 +197,11 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
     //[Destructor_pre]. You can add your own custom destruction code here..
     //[/Destructor_pre]
     stopTimer();
-    
-    Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-    
-    ourProcessor->removeChangeListener(this);
-    
-    //_meters.clear();
-    //_labels.clear();
-    
-    label = nullptr;
-    txt_preset = nullptr;
-    label5 = nullptr;
-    txt_debug = nullptr;
-    btn_open = nullptr;
-    label2 = nullptr;
-    label3 = nullptr;
-    label4 = nullptr;
-    num_ch = nullptr;
-    num_spk = nullptr;
-    num_hrtf = nullptr;
-    btn_preset_folder = nullptr;
-    sld_gain = nullptr;
-    tgl_save_preset = nullptr;
 
-#if BINAURAL_DECODER
-    tgl_load_irs = nullptr;
-    box_conv_buffer = nullptr;
-#endif
+    Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
+
+    ourProcessor->removeChangeListener(this);
+
 
     //[Destructor]. You can add your own custom destruction code here..
     //[/Destructor]
@@ -245,7 +210,7 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
 //==============================================================================
 void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
 {
-    
+
     g.fillAll (Colours::white);
 
     g.setGradientFill (ColourGradient (Colour (0xff4e4e4e),
@@ -260,25 +225,25 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
 
     g.setColour (Colour (0x410000ff));
     g.fillRoundedRectangle (18.0f, 128.0f, 217.0f, 76.0f, 10.0000f);
-    
+
     g.setColour (Colours::white);
 
     g.setFont (Font (12.40f, Font::plain));
     g.drawText (TRANS("Volume [dB]"),
                 353, 282, 65, 23,
                 Justification::centred, true);
-    
+
     g.setFont (Font (17.2000f, Font::bold));
 #if BINAURAL_DECODER
     g.drawText ("AMBIX-BINAURAL-DECODER",
                 1, 4, 343, 30,
                 Justification::centred, true);
-  
+
   g.setFont (Font (12.4000f, Font::plain));
   g.drawText ("listening to Ambisonics with headphones",
               1, 28, 343, 30,
               Justification::centred, true);
-  
+
 #else
   g.drawText ("AMBIX-DECODER",
               1, 4, 343, 30,
@@ -289,7 +254,7 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
               Justification::centred, true);
 #endif
 
-    
+
     /* Version text */
     g.setColour (Colours::white);
     g.setFont (Font (10.00f, Font::plain));
@@ -298,30 +263,30 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
     g.drawText (version_string,
                 getWidth()-51, getHeight()-11, 50, 10,
                 Justification::bottomRight, true);
-    
+
 }
 
 void Ambix_binauralAudioProcessorEditor::resized()
 {
-    label->setBounds (16, 129, 184, 24);
-    txt_preset->setBounds (72, 64, 200, 24);
-    label5->setBounds (8, 64, 56, 24);
-    txt_debug->setBounds (16, 217, 320, 96);
-    btn_open->setBounds (280, 64, 56, 24);
-    label2->setBounds (62, 153, 137, 24);
-    label3->setBounds (48, 177, 152, 24);
-    label4->setBounds (24, 305, 64, 16);
-    num_ch->setBounds (192, 129, 40, 24);
-    num_spk->setBounds (192, 153, 40, 24);
-    num_hrtf->setBounds (192, 177, 40, 24);
-    btn_preset_folder->setBounds (248, 96, 94, 24);
-    sld_gain->setBounds (352, 18, 48, 264);
-    tgl_save_preset->setBounds(16, 92, 200, 24);
+    label.setBounds (16, 129, 184, 24);
+    txt_preset.setBounds (72, 64, 200, 24);
+    label5.setBounds (8, 64, 56, 24);
+    txt_debug.setBounds (16, 217, 320, 96);
+    btn_open.setBounds (280, 64, 56, 24);
+    label2.setBounds (62, 153, 137, 24);
+    label3.setBounds (48, 177, 152, 24);
+    label4.setBounds (24, 305, 64, 16);
+    num_ch.setBounds (192, 129, 40, 24);
+    num_spk.setBounds (192, 153, 40, 24);
+    num_hrtf.setBounds (192, 177, 40, 24);
+    btn_preset_folder.setBounds (248, 96, 94, 24);
+    sld_gain.setBounds (352, 18, 48, 264);
+    tgl_save_preset.setBounds(16, 92, 200, 24);
 #if BINAURAL_DECODER
-    tgl_load_irs->setBounds (260, 125, 80, 24);
-    box_conv_buffer->setBounds (271, 155, 65, 22);
+    tgl_load_irs.setBounds (260, 125, 80, 24);
+    box_conv_buffer.setBounds (271, 155, 65, 22);
 #endif
-    
+
 }
 
 void Ambix_binauralAudioProcessorEditor::timerCallback()
@@ -332,43 +297,43 @@ void Ambix_binauralAudioProcessorEditor::timerCallback()
 void Ambix_binauralAudioProcessorEditor::UpdateText()
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-	
-    num_spk->setText(String(ourProcessor->_AmbiSpeakers.size()), dontSendNotification);
+
+    num_spk.setText(String(ourProcessor->_AmbiSpeakers.size()), dontSendNotification);
 #if BINAURAL_DECODER
-    num_hrtf->setText(String(ourProcessor->num_conv), dontSendNotification);
+    num_hrtf.setText(String(ourProcessor->num_conv), dontSendNotification);
 #endif
-    num_ch->setText(String(ourProcessor->_AmbiChannels), dontSendNotification);
-    
-    txt_debug->setText(ourProcessor->_DebugText, true);
-    
-    txt_preset->setText(ourProcessor->box_preset_str);
-    txt_preset->setCaretPosition(txt_preset->getTotalNumChars()-1);
-    txt_preset->setTooltip(txt_preset->getText());
+    num_ch.setText(String(ourProcessor->_AmbiChannels), dontSendNotification);
 
-    tgl_save_preset->setToggleState(ourProcessor->_storeConfigDataInProject.get(), dontSendNotification);
+    txt_debug.setText(ourProcessor->_DebugText, true);
+
+    txt_preset.setText(ourProcessor->box_preset_str);
+    txt_preset.setCaretPosition(txt_preset.getTotalNumChars()-1);
+    txt_preset.setTooltip(txt_preset.getText());
+
+    tgl_save_preset.setToggleState(ourProcessor->_storeConfigDataInProject.get(), dontSendNotification);
 
 #if BINAURAL_DECODER
-    tgl_load_irs->setToggleState(ourProcessor->_load_ir, dontSendNotification);
-    
-    box_conv_buffer->clear(dontSendNotification);
-    
+    tgl_load_irs.setToggleState(ourProcessor->_load_ir, dontSendNotification);
+
+    box_conv_buffer.clear(dontSendNotification);
+
     unsigned int buf = jmax(ourProcessor->getBufferSize(), (unsigned int)1);
     unsigned int conv_buf = ourProcessor->getConvBufferSize();
-    
+
     int sel = 0;
     unsigned int val = 0;
-    
+
     for (int i=0; val < 8192; i++) {
-        
+
         val = buf*pow(2,i);
-        
-        box_conv_buffer->addItem(String(val), i+1);
-        
+
+        box_conv_buffer.addItem(String(val), i+1);
+
         if (val == conv_buf)
             sel = i;
     }
-    
-    box_conv_buffer->setSelectedItemIndex(sel, dontSendNotification);
+
+    box_conv_buffer.setSelectedItemIndex(sel, dontSendNotification);
 #endif
 }
 
@@ -376,43 +341,43 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
 void Ambix_binauralAudioProcessorEditor::UpdatePresets()
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-    
+
     popup_submenu.clear(); // contains submenus
-    
+
     popup_presets.clear(); // main menu
-    
+
     String lastSubdir;
     StringArray Subdirs; // hold name of subdirs
-    
+
     int j = 1;
-    
+
     for (int i=0; i < ourProcessor->_presetFiles.size(); i++) {
-        
+
         // add separator for new subfolder
         String subdir = ourProcessor->_presetFiles.getUnchecked(i).getParentDirectory().getFileName();
-        
+
         if (!lastSubdir.equalsIgnoreCase(subdir)) {
-            
+
             popup_submenu.add(new PopupMenu());
             Subdirs.add(subdir);
-            
+
             j++;
             lastSubdir = subdir;
         }
-        
+
         // add item to submenu
         // check if this preset is loaded
-        
+
         if (ourProcessor->_configFile == ourProcessor->_presetFiles.getUnchecked(i))
         {
             popup_submenu.getLast()->addItem(i+1, ourProcessor->_presetFiles.getUnchecked(i).getFileNameWithoutExtension(), true, true);
         } else {
             popup_submenu.getLast()->addItem(i+1, ourProcessor->_presetFiles.getUnchecked(i).getFileNameWithoutExtension());
         }
-        
-        
+
+
     }
-    
+
     // add all subdirs to main menu
     for (int i=0; i < popup_submenu.size(); i++) {
         if (Subdirs.getReference(i) == ourProcessor->_configFile.getParentDirectory().getFileName())
@@ -421,7 +386,7 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
         } else {
             popup_presets.addSubMenu(Subdirs.getReference(i), *popup_submenu.getUnchecked(i));
         }
-        
+
     }
 
     if (ourProcessor->activePreset.isNotEmpty())
@@ -432,17 +397,17 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
 
     popup_presets.addSeparator();
     popup_presets.addItem(-1, String("open from file..."));
-    
+
 }
 
 
 void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Ambix_binauralAudioProcessorEditor* demoComponent)
 {
     // std::cout << "result: " << result << std::endl;
-    
+
     Ambix_binauralAudioProcessor* ourProcessor = demoComponent->getProcessor();
-    
-    
+
+
     // file chooser....
     if (result == 0)
     {
@@ -455,11 +420,11 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
                                "*.config");
         if (myChooser.browseForFileToOpen())
         {
-            
+
             File mooseFile (myChooser.getResult());
             //ourProcessor->ScheduleConfiguration(mooseFile);
             ourProcessor->LoadConfiguration(mooseFile);
-            
+
             ourProcessor->lastDir = mooseFile.getParentDirectory();
         }
     }
@@ -482,17 +447,17 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
         ourProcessor->LoadPreset(result - 1);
         // popup_presets
     }
-    
+
 }
 
 void Ambix_binauralAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
 #if BINAURAL_DECODER
-    if (comboBoxThatHasChanged == box_conv_buffer)
+    if (comboBoxThatHasChanged == &box_conv_buffer)
     {
-        int val = box_conv_buffer->getText().getIntValue();
-        
+        int val = box_conv_buffer.getText().getIntValue();
+
         // std::cout << "set size: " << val << std::endl;
         ourProcessor->setConvBufferSize(val);
     }
@@ -502,90 +467,90 @@ void Ambix_binauralAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxThat
 void Ambix_binauralAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWasMoved)
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-    
-    if (sliderThatWasMoved == sld_gain)
+
+    if (sliderThatWasMoved == &sld_gain)
     {
-        ourProcessor->setParameterNotifyingHost(0, DbToParam(sld_gain->getValue()));
+        ourProcessor->setParameterNotifyingHost(0, DbToParam(sld_gain.getValue()));
     }
 }
 
 void Ambix_binauralAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-    
+
     /*
-    if (buttonThatWasClicked == btn_open)
+    if (buttonThatWasClicked == &btn_open)
     {
-        
+
         FileChooser myChooser ("Please select the preset file to load...",
                                ourProcessor->lastDir,
                                "*.config");
         if (myChooser.browseForFileToOpen())
         {
-            
+
             File mooseFile (myChooser.getResult());
             ourProcessor->LoadConfiguration(mooseFile);
-            
+
             UpdateText();
-            
+
             ourProcessor->lastDir = mooseFile.getParentDirectory();
         }
     }
      */
-    if (buttonThatWasClicked == btn_open)
+    if (buttonThatWasClicked == &btn_open)
     {
             popup_presets.showMenuAsync(PopupMenu::Options().withTargetComponent (btn_open), ModalCallbackFunction::forComponent (menuItemChosenCallback, this));
     }
-    else if (buttonThatWasClicked == btn_preset_folder)
+    else if (buttonThatWasClicked == &btn_preset_folder)
     {
         FileChooser myChooser ("Please select the new preset folder...",
                                ourProcessor->presetDir,
                                "");
-        
+
         if (myChooser.browseForDirectory())
         {
-            
+
             File mooseFile (myChooser.getResult());
             ourProcessor->presetDir = mooseFile;
-            
+
             ourProcessor->SearchPresets(mooseFile);
-            
+
             ourProcessor->lastDir = mooseFile.getParentDirectory();
             UpdatePresets();
         }
     }
-    else if (buttonThatWasClicked == tgl_save_preset)
+    else if (buttonThatWasClicked == &tgl_save_preset)
     {
-        ourProcessor->_storeConfigDataInProject = tgl_save_preset->getToggleState();
+        ourProcessor->_storeConfigDataInProject = tgl_save_preset.getToggleState();
     }
 #if BINAURAL_DECODER
-    else if (buttonThatWasClicked == tgl_load_irs)
+    else if (buttonThatWasClicked == &tgl_load_irs)
     {
-        ourProcessor->_load_ir = tgl_load_irs->getToggleState();
+        ourProcessor->_load_ir = tgl_load_irs.getToggleState();
     }
 #endif
-    
+
 }
 
 void Ambix_binauralAudioProcessorEditor::DrawMeters()
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-    
+
     if (_meters.size() != ourProcessor->_AmbiSpeakers.size()) {
-        
+
         int xoffset = 17;
-        
+
         // clear meters first?
         _meters.clear();
         _labels.clear();
         _scales.clear();
-        
+
         _scales.add(new MyMeterScale());
         addChildComponent(_scales.getLast());
         _scales.getLast()->setVisible(true);
         _scales.getLast()->setBounds(xoffset+370, 53, 20, 170);
-        
-        
+
+
         for (int i=0; i < ourProcessor->_AmbiSpeakers.size(); i++) {
             _meters.add(new MyMeter());
             addChildComponent(_meters.getLast());
@@ -602,17 +567,17 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
                 _labels.getUnchecked(i)->setBounds(xoffset+385 + 15*i, 222, 25, 14);
             }
         }
-        
+
         _width = _meters.size() * 15 + 87;
-        
+
         _scales.add(new MyMeterScale());
         addChildComponent(_scales.getLast());
         _scales.getLast()->setVisible(true);
         _scales.getLast()->setBounds(xoffset+350 + _width - 40, 53, 20, 170);
-            
-        
+
+
     }
-    
+
     // resize component
     setSize (350 + _width, 325);
 }
@@ -620,21 +585,21 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
 void Ambix_binauralAudioProcessorEditor::UpdateMeters()
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-    
+
     for (int i=0; i < std::min(_meters.size(), ourProcessor->_AmbiSpeakers.size()); i++) {
         //_meters.getUnchecked(i)->setPeak(ourProcessor->_AmbiSpeakers.getUnchecked(i)->getPeak());
         _meters.getUnchecked(i)->setValue(ourProcessor->_AmbiSpeakers.getUnchecked(i)->getRMS(), ourProcessor->_AmbiSpeakers.getUnchecked(i)->getPeak());
     }
-    
+
 }
 
 
 void Ambix_binauralAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-    
-    sld_gain->setValue(ParamToDB(ourProcessor->getParameter(0)), dontSendNotification);
-    
+
+    sld_gain.setValue(ParamToDB(ourProcessor->getParameter(0)), dontSendNotification);
+
     UpdateText();
     DrawMeters();
     UpdatePresets();

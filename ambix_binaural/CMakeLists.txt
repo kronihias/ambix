@@ -1,5 +1,8 @@
-ADD_SUBDIRECTORY ( ambix_binaural )
+SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_binaural )
 
-IF (BUILD_STANDALONE)
-	ADD_SUBDIRECTORY ( ambix_binaural_standalone )
-ENDIF (BUILD_STANDALONE)
+SET ( WITH_MyMeter TRUE )
+SET ( WITH_MyMeterDsp TRUE )
+
+ADD_DEFINITIONS (-DBINAURAL_DECODER=1)
+
+INCLUDE(${SRC_DIR}/Subproject.cmake)

@@ -1,5 +1,10 @@
-ADD_SUBDIRECTORY ( ambix_encoder )
+SET ( WITH_EIGEN TRUE )
+SET ( WITH_SphericalHarmonic TRUE )
+SET ( WITH_MyMeterDsp TRUE )
 
-IF (BUILD_STANDALONE)
-	ADD_SUBDIRECTORY ( ambix_encoder_standalone )
-ENDIF (BUILD_STANDALONE)
+ADD_DEFINITIONS(-DINPUT_CHANNELS=1)
+
+# SET ( SPECIFIC_PROJECTNAME ambix_encoder )
+SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_encoder )
+
+INCLUDE(${SRC_DIR}/Subproject.cmake)

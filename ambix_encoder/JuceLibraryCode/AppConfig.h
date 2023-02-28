@@ -36,24 +36,6 @@
     #define WITH_ADVANCED_CONTROL 1
 #endif
 
-#define Plugin_Name                   ambix_encoder
-#define Plugin_Code                   1095053360 // AE00
-
-// generate plugin name with ambi order
-#define QU(x) #x
-#define QUH(x) QU(x)
-
-#if INPUT_CHANNELS > 1
-    #define JucePlugin_Name                   QUH(Plugin_Name) "_i" QUH(INPUT_CHANNELS) "_o" QUH(AMBI_ORDER) 
-#else
-    #define JucePlugin_Name                   QUH(Plugin_Name) "_o" QUH(AMBI_ORDER)
-#endif
-
-#define ADD(x, y) ((x) + (y))
-
-#define Plugin_Code2                       ADD(Plugin_Code,AMBI_ORDER*10)
-#define JucePlugin_PluginCode             ADD(Plugin_Code2,INPUT_CHANNELS)
-
 //////////////////////////////////////////////
 
 // this is the formular for 3d... not meant to be changed!
@@ -237,15 +219,6 @@
 #endif
 #ifndef  JucePlugin_PluginCode
  #define JucePlugin_PluginCode             'Plug'
-#endif
-#ifndef  JucePlugin_MaxNumInputChannels
- #define JucePlugin_MaxNumInputChannels    INPUT_CHANNELS
-#endif
-#ifndef  JucePlugin_MaxNumOutputChannels
- #define JucePlugin_MaxNumOutputChannels   AMBI_CHANNELS
-#endif
-#ifndef  JucePlugin_PreferredChannelConfigurations
- #define JucePlugin_PreferredChannelConfigurations  {INPUT_CHANNELS, AMBI_CHANNELS}
 #endif
 #ifndef  JucePlugin_IsSynth
  #define JucePlugin_IsSynth                0

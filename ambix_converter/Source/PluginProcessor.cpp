@@ -4,7 +4,7 @@
    This file is part of the ambix Ambisonic plug-in suite.
    Copyright (c) 2013/2014 - Matthias Kronlachner
    www.matthiaskronlachner.com
-   
+
    Permission is granted to use this software under the terms of:
    the GPL v2 (or any later version)
 
@@ -26,6 +26,10 @@
 
 //==============================================================================
 Ambix_converterAudioProcessor::Ambix_converterAudioProcessor() :
+    AudioProcessor (BusesProperties()
+        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+    ),
     active_preset(0),
     output_buffer(16, 256),
     in_seq_param(0.f),
@@ -41,17 +45,17 @@ Ambix_converterAudioProcessor::Ambix_converterAudioProcessor() :
     ch_norm_flat(true)
 {
     // constructor
-    
+
     in_ch_seq = acn_ch_map;
     out_ch_seq = acn_ch_map;
-    
+
     in_2d_ch_seq = acn_2d_ch_map;
     out_2d_ch_seq = acn_2d_ch_map;
-    
+
     in_ch_norm = conv_norm_ones;
-    
+
     acn_cs = acn_cs_phase;
-    
+
 }
 
 Ambix_converterAudioProcessor::~Ambix_converterAudioProcessor()
@@ -83,7 +87,7 @@ float Ambix_converterAudioProcessor::getParameter (int index)
         case FlapParam:      return (float)flap_param;
         case In2DParam:      return (float)in_2d;
         case Out2DParam:      return (float)out_2d;
-            
+
 		default:            return 0.0f;
 	}
 }
@@ -102,7 +106,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
             }
             setChannelSequence();
             break;
-            
+
         case OutSeqParam:
             if (newValue < 0.33f) {
                 out_seq_param=0.0f;
@@ -113,7 +117,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
             }
             setChannelSequence();
             break;
-            
+
         case InNormParam:
             if (newValue < 0.33f) {
                 in_norm_param=0.f;
@@ -124,7 +128,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
             }
             setNormalizationScheme();
             break;
-            
+
         case OutNormParam:
             if (newValue < 0.33f) {
                 out_norm_param=0.f;
@@ -135,7 +139,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
             }
             setNormalizationScheme();
             break;
-            
+
         case FlipCsParam:
             if (newValue <= 0.5f)
             {
@@ -144,7 +148,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
                 flip_cs_phase = true;
             }
             break;
-            
+
         case FlipParam:
             if (newValue <= 0.5f)
             {
@@ -153,7 +157,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
                 flip_param = true;
             }
             break;
-            
+
         case FlopParam:
             if (newValue <= 0.5f)
             {
@@ -162,7 +166,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
                 flop_param = true;
             }
             break;
-            
+
         case FlapParam:
             if (newValue <= 0.5f)
             {
@@ -171,7 +175,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
                 flap_param = true;
             }
             break;
-            
+
         case In2DParam:
             if (newValue <= 0.5f)
             {
@@ -189,7 +193,7 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
                 out_2d = true;
             }
             break;
-            
+
 		default:
             break;
 	}
@@ -200,42 +204,42 @@ void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
 void Ambix_converterAudioProcessor::setChannelSequence()
 {
     // in ch sequence
-    
+
     if (in_seq_param < 0.33f) {
         in_ch_seq = acn_ch_map;
         in_2d_ch_seq = acn_2d_ch_map;
-        
+
     } else if (in_seq_param >= 0.33f && in_seq_param < 0.66f) {
         in_ch_seq = fuma_ch_map;
         in_2d_ch_seq = fuma_2d_ch_map;
-        
+
     } else if (in_seq_param > 0.66f) {
         in_ch_seq = sid_ch_map;
         in_2d_ch_seq = sid_2d_ch_map;
-        
+
     }
-    
+
     // out ch sequence
-    
+
     if (out_seq_param < 0.33f) {
         out_ch_seq = acn_ch_map;
         out_2d_ch_seq = acn_2d_ch_map;
-        
+
     } else if (out_seq_param >= 0.33f && out_seq_param < 0.66f) {
         out_ch_seq = fuma_ch_map;
         out_2d_ch_seq = fuma_2d_ch_map;
-        
+
     } else if (out_seq_param > 0.66f) {
         out_ch_seq = sid_ch_map;
         out_2d_ch_seq = sid_2d_ch_map;
-        
+
     }
 }
 
 void Ambix_converterAudioProcessor::setNormalizationScheme()
 {
     if (in_norm_param < 0.33f) { // in SN3D
-        
+
         if (out_norm_param < 0.33f) // out SN3D
         {
             in_ch_norm = conv_norm_ones;
@@ -251,9 +255,9 @@ void Ambix_converterAudioProcessor::setNormalizationScheme()
             in_ch_norm = conv_norm_sn3d_n3d;
             ch_norm_flat = false;
         }
-        
+
     } else if (in_norm_param >= 0.33f && in_norm_param < 0.66f) { // in FuMa
-        
+
         if (out_norm_param < 0.33f) // out SN3D
         {
             in_ch_norm = conv_norm_fuma_sn3d;
@@ -269,9 +273,9 @@ void Ambix_converterAudioProcessor::setNormalizationScheme()
             in_ch_norm = conv_norm_fuma_n3d;
             ch_norm_flat = false;
         }
-        
+
     } else if (in_norm_param > 0.66f) { // in N3D
-        
+
         if (out_norm_param < 0.33f) // out SN3D
         {
             in_ch_norm = conv_norm_n3d_sn3d;
@@ -287,7 +291,7 @@ void Ambix_converterAudioProcessor::setNormalizationScheme()
             in_ch_norm = conv_norm_ones;
             ch_norm_flat = true;
         }
-        
+
     }
 }
 
@@ -307,8 +311,8 @@ const String Ambix_converterAudioProcessor::getParameterName (int index)
         case Out2DParam:           return "OutputIs2D";
 		default:								break;
 	}
-	
-	return String::empty;
+
+	return String();
 }
 
 const String Ambix_converterAudioProcessor::getParameterText (int index)
@@ -324,7 +328,7 @@ const String Ambix_converterAudioProcessor::getParameterText (int index)
                 return "SID";
             }
             break;
-            
+
         case OutSeqParam:
             if (out_seq_param < 0.33f) {
                 return "ACN";
@@ -334,7 +338,7 @@ const String Ambix_converterAudioProcessor::getParameterText (int index)
                 return "SID";
             }
             break;
-		
+
         case InNormParam:
             if (in_norm_param < 0.33f) {
                 return "SN3D";
@@ -344,7 +348,7 @@ const String Ambix_converterAudioProcessor::getParameterText (int index)
                 return "N3D";
             }
             break;
-            
+
         case OutNormParam:
             if (out_norm_param < 0.33f) {
                 return "SN3D";
@@ -354,53 +358,53 @@ const String Ambix_converterAudioProcessor::getParameterText (int index)
                 return "N3D";
             }
             break;
-            
+
         case FlipCsParam:
             if (flip_cs_phase)
                 return "On";
             else
                 return "Off";
             break;
-            
+
         case FlipParam:
             if (flip_param)
                 return "On";
             else
                 return "Off";
             break;
-            
+
         case FlopParam:
             if (flop_param)
                 return "On";
             else
                 return "Off";
             break;
-            
+
         case FlapParam:
             if (flap_param)
                 return "On";
             else
                 return "Off";
             break;
-            
+
         case In2DParam:
             if (in_2d)
                 return "Yes";
             else
                 return "No";
             break;
-            
+
         case Out2DParam:
             if (out_2d)
                 return "Yes";
             else
                 return "No";
             break;
-            
+
 		default:								break;
 	}
-	
-	return String::empty;
+
+	return String();
 }
 
 const String Ambix_converterAudioProcessor::getInputChannelName (int channelIndex) const
@@ -467,7 +471,7 @@ void Ambix_converterAudioProcessor::setCurrentProgram (int index)
 
 const String Ambix_converterAudioProcessor::getProgramName (int index)
 {
-    return String::empty;
+    return String();
 }
 
 void Ambix_converterAudioProcessor::changeProgramName (int index, const String& newName)
@@ -488,79 +492,85 @@ void Ambix_converterAudioProcessor::releaseResources()
     // spare memory, etc.
 }
 
+bool Ambix_converterAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+{
+    return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
+            (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+}
+
 void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)
 {
     // do the audio processing....
     // defines are until 10th order 3d (121 channels)!
-    
+
     // resize output buffer if necessare
     int NumSamples = buffer.getNumSamples();
-    
+
     output_buffer.setSize(std::max(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples);
-  
+
     output_buffer.clear(); // in case of 2d where we might throw away some channels
-    
+
     // std::cout << "NumInputChannels: " << getTotalNumInputChannels() << " Buffersize: " << buffer.getNumChannels() << std::endl;
-    
+
     for (int i = 0; i < getTotalNumInputChannels(); i++) // iterate over acn channel numbering
     {
-        
+
         int l = 0; // sometimes called n
         int m = 0; // -l...l
-        
+
         ACNtoLM(i, l, m);
-        
-        
+
+
         int _in_ch_seq = in_2d ? in_2d_ch_seq[ACN3DtoACN2D(i)] : in_ch_seq[i];
         int _out_ch_seq = out_2d ? out_2d_ch_seq[ACN3DtoACN2D(i)] : out_ch_seq[i];
-        
+
         // std::cout << "InputCh: " << i << " IN_CHANNEL: " << _in_ch_seq << " OUT_CHANNEL: " << _out_ch_seq << std::endl;
-        
+
         if (_in_ch_seq < getTotalNumInputChannels() && _out_ch_seq < getTotalNumOutputChannels())
         {
             // copy input channels to output channels!
             output_buffer.copyFrom(_out_ch_seq, 0, buffer, _in_ch_seq, 0, NumSamples);
-            
+
             //  apply normalization conversion gain if different input/output scheme
             if (!ch_norm_flat) {
                 output_buffer.applyGain(_out_ch_seq, 0, NumSamples, in_ch_norm[i]);
             }
-            
+
             // do the inversions...
             if (flip_cs_phase || flip_param || flop_param || flap_param)
             {
-                
-                
+
+
                 signed int flip, flop, flap, total;
                 flip = flop = flap = total = 1;
-                
+
                 // taken from paper Symmetries of Spherical Harmonics by Michael Chapman (Ambi Symp 2009),
-                
+
                 // mirror left right
                 if ( flip_param && (m < 0) ) // m < 0 -> invert
                     flip = -1;
-                
+
                 // mirror front back
                 if ( flop_param && ( ((m < 0) && !(m % 2)) || ((m >= 0) && (m % 2)) ) ) // m < 0 and even || m >= 0 and odd
                     flop = -1;
-                
+
                 // mirror top bottom
                 if ( flap_param && ( (l + m) % 2 ) ) // l+m odd   ( (odd, even) or (even, odd) )
                     flap = -1;
-                
+
                 // compute total multiplicator
                 if (flip_cs_phase)
                     total = acn_cs[i] * flip * flop * flap;
                 else
                     total = flip * flop * flap;
-                
+
                 output_buffer.applyGain(_out_ch_seq, 0, NumSamples, (float)total);
             }
         } // index not -1
-        
+
     } // iterate over all input channels
-    
-    
+
+
     // In case we have more outputs than inputs, we'll clear any output
     // channels that didn't contain input data, (because these aren't
     // guaranteed to be empty - they may contain garbage).
@@ -570,7 +580,7 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
         output_buffer.clear (i, 0, buffer.getNumSamples());
     }
     */
-    
+
     buffer = output_buffer;
 }
 
@@ -591,13 +601,13 @@ void Ambix_converterAudioProcessor::getStateInformation (MemoryBlock& destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
-    
+
     // Create an outer XML element..
     XmlElement xml ("MYPLUGINSETTINGS");
-    
+
     // add some attributes to it..
     xml.setAttribute ("box_presets", box_presets_text);
-    
+
     xml.setAttribute("in_seq_param", in_seq_param);
     xml.setAttribute("out_seq_param", out_seq_param);
     xml.setAttribute("in_norm_param", in_norm_param);
@@ -608,8 +618,8 @@ void Ambix_converterAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute("flap_param", flap_param);
     xml.setAttribute("in_2d_param", in_2d);
     xml.setAttribute("out_2d_param", out_2d);
-    
-    
+
+
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
 }
@@ -618,17 +628,17 @@ void Ambix_converterAudioProcessor::setStateInformation (const void* data, int s
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
-    
-    ScopedPointer<XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
-    
+
+    std::unique_ptr<XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+
     if (xmlState != nullptr)
     {
-        
+
         // make sure that it's actually our type of XML object..
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
             // ok, now pull out our parameters..
-            
+
             box_presets_text = xmlState->getStringAttribute("box_presets", "");
             setParameterNotifyingHost(FlipCsParam, (float) xmlState->getDoubleAttribute("flip_cs_phase"));
             setParameterNotifyingHost(FlipParam, (float) xmlState->getDoubleAttribute("flip_param"));
@@ -641,10 +651,10 @@ void Ambix_converterAudioProcessor::setStateInformation (const void* data, int s
             setParameterNotifyingHost(In2DParam, (float) xmlState->getDoubleAttribute("in_2d_param"));
             setParameterNotifyingHost(Out2DParam, (float) xmlState->getDoubleAttribute("out_2d_param"));
         }
-        
-        
+
+
     }
-    
+
     // reset arrays...
     //setNormalizationScheme();
     //setChannelSequence();

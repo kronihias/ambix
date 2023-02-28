@@ -1,19 +1,19 @@
 /*
  ==============================================================================
- 
+
  This file is part of the ambix Ambisonic plug-in suite.
  Copyright (c) 2013/2014 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  ambix is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -28,21 +28,21 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
                             mouse_near_filter_id(-1)
 {
     tooltipWindow.setMillisecondsBeforeTipAppears (200); // tooltip delay
-    
+
     myprocessor_ = processor;
-    
+
     // this draws the rectangular/elliptical shape
     for (int i=0; i<NUM_FILTERS_VMIC; i++)
     {
         graphs_.add(new GraphComponent(i));
         addAndMakeVisible(graphs_.getLast());
     }
-    
+
     // this is the drag button
     for (int i=0; i < NUM_FILTERS_VMIC; i++)
     {
         btn_drag.add(new ImageButton (String(i)));
-        
+
         btn_drag.getLast()->addListener(this);
         btn_drag.getLast()->setImages (false, true, true,
                                        ImageCache::getFromMemory (drag_off_png, drag_off_pngSize), 1.000f, Colour (0x00000000),
@@ -53,7 +53,7 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
         String tooltip("Filter ");
         tooltip << i+1;
         btn_drag.getLast()->setTooltip(tooltip);
-        
+
         // the label
         String label(i+1);
         lbl_drag.add(new Label(label));
@@ -65,16 +65,16 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
         lbl_drag.getLast()->setColour (Label::textColourId, Colours::white);
         lbl_drag.getLast()->setColour (TextEditor::textColourId, Colours::black);
         lbl_drag.getLast()->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
-        
+
     }
-    
+
     // add to the parent component in reverse order...
     for (int i=NUM_FILTERS_VMIC-1; i >= 0; i--)
     {
         addAndMakeVisible(btn_drag.getUnchecked(i));
         addAndMakeVisible(lbl_drag.getUnchecked(i));
     }
-    
+
 }
 
 PanningGraph::~PanningGraph()
@@ -85,10 +85,10 @@ PanningGraph::~PanningGraph()
 
 void PanningGraph::paint (Graphics& g)
 {
-    
+
     int width = getWidth();
     int height = getHeight();
-    
+
     // background
     //if (one_filter_solo_)
     //{
@@ -96,21 +96,21 @@ void PanningGraph::paint (Graphics& g)
     //} else {
     //    g.setGradientFill (ColourGradient (Colour (0xff232338), width / 2, height / 2, Colour (0xff21222a), 2.5f, getHeight() / 2, true));
     //}
-    
-    
-    
+
+
+
     g.fillRoundedRectangle (lxmargin, tymargin, width - lxmargin - rxmargin, height-tymargin-bymargin, 10.000f);
-    
+
     g.setColour (Colour (0x60ffffff));
-    
+
     int elgridlines = 180/45+1;
-    
+
     for (int i=0; i < elgridlines; i++)
     {
         float deg_val = 90-i*45;
-        
+
         int ypos = degtoypos(deg_val);
-        
+
         // text
         String axislabel = String((int)deg_val);
         axislabel << "°";
@@ -118,53 +118,53 @@ void PanningGraph::paint (Graphics& g)
         g.drawText (axislabel, 0, ypos-6, 34, 12, Justification::centred, false);
         // g.drawText (String ("-") + axisLabel, 6, (int) (numHorizontalLines * (height - 5) / (numHorizontalLines + 1) + 3.5f), 45, 12, Justification::left, false);
     }
-    
+
     int azgridlines = 360/45+1;
-    
+
     for (int i=0; i < azgridlines; i++)
     {
         float deg_val = 180-i*45;
-        
+
         int xpos = degtoxpos(deg_val);
-        
+
         // text
         String axislabel = String((int)deg_val);
         axislabel << "°";
         g.setFont (Font ("Arial Rounded MT", 12.0f, Font::plain));
         g.drawText (axislabel, xpos-22, getHeight()-bymargin, 44, 12, Justification::centred, false);
     }
-    
+
     g.setColour (Colour (0x60ffffff));
     g.strokePath (path_grid, PathStrokeType (0.25f));
-    
-    
+
+
     g.setColour (Colour (0xffffffff));
     g.strokePath (path_w_grid, PathStrokeType (0.25f));
-    
+
 }
 
 void PanningGraph::resized()
 {
     int width = getWidth();
     int height = getHeight();
-    
+
     for (int i=0; i<graphs_.size(); i++) {
         graphs_.getUnchecked(i)->setBounds(0, 0, width, height);
     }
-    
+
     // create the grid path
     path_w_grid.clear();
     path_grid.clear();
-    
-    
+
+
     int el_gridlines = 180/45+1;
-    
+
     for (int i=0; i < el_gridlines; i++)
     {
         float deg_val = -90+i*45;
-        
+
         int ypos = degtoypos(deg_val);
-        
+
         if (deg_val == 0)
         {
             path_w_grid.startNewSubPath(degtoxpos(-180), ypos);
@@ -175,18 +175,18 @@ void PanningGraph::resized()
             path_grid.startNewSubPath(degtoxpos(-180), ypos);
             path_grid.lineTo(degtoxpos(180), ypos);
         }
-        
+
     }
-    
-    
+
+
     int az_gridlines = 360/45+1;
-    
+
     for (int i=0; i < az_gridlines; i++)
     {
         float deg_val = -180+i*45;
-        
+
         int xpos = degtoxpos(deg_val);
-        
+
         if (deg_val == 0)
         {
             path_w_grid.startNewSubPath(xpos, degtoypos(90));
@@ -197,37 +197,37 @@ void PanningGraph::resized()
             path_grid.startNewSubPath(xpos, degtoypos(90));
             path_grid.lineTo(xpos, degtoypos(-90));
         }
-        
+
     }
-    
-    
+
+
 }
 
 int PanningGraph::degtoypos (float deg)
 {
     float height = (float) getHeight()-tymargin-bymargin;
-    
+
     return tymargin+height*(-deg+90)/180;
 }
 
 float PanningGraph::ypostodeg (int ypos)
 {
     float height = (float) getHeight()-tymargin-bymargin;
-    
+
     return 90-(ypos-tymargin)/height*180;
 }
 
 int PanningGraph::degtoxpos (float deg)
 {
     float width = (float) getWidth()-lxmargin-rxmargin;
-    
+
     return lxmargin + width*(deg+180)/360;
 }
 
 float PanningGraph::xpostodeg (int xpos)
 {
     float width = (float) getWidth()-lxmargin-rxmargin;
-    
+
     return (xpos-lxmargin)/width*360-180;
 }
 
@@ -239,40 +239,40 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
         el = 180.f-el;
         az += 180.f;
     }
-    
+
     if (el < -90.f)
     {
         el = 180.f+el;
         az += 180.f;
     }
-    
+
     if (az > 180.f)
         az -= 360.f;
-    
+
     if (az < -180.f)
         az += 360.f;
-    
+
     // set the drag button
     btn_drag.getUnchecked(idx)->setBounds (degtoxpos(az)-8, degtoypos(el)-8, 16, 16);
-    
+
     // set the label
     lbl_drag.getUnchecked(idx)->setBounds (degtoxpos(az)-12, degtoypos(el)-12, 26, 24);
-    
+
     // create the path for the area display
-    
+
     Path filterarea;
     filterarea.clear();
-    
-    
+
+
     if (!shape) {
         // circle
         int x = degtoxpos(az);
         int y = degtoypos(el);
         int w = degtoxpos(width)-degtoxpos(0.f);
         int h = degtoypos(width)-degtoypos(0.f);
-        
+
         filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
-        
+
         // check if area goes beyond +-180
         if (az+width > 180)
         {
@@ -280,7 +280,7 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
             int y = degtoypos(el);
             int w = degtoxpos(width)-degtoxpos(0.f);
             int h = degtoypos(width)-degtoypos(0.f);
-            
+
             filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
         }
         if (az-width < -180)
@@ -289,7 +289,7 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
             int y = degtoypos(el);
             int w = degtoxpos(width)-degtoxpos(0.f);
             int h = degtoypos(width)-degtoypos(0.f);
-            
+
             filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
         }
         if (el+height > 90)
@@ -301,7 +301,7 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
             int y = degtoypos(180-el);
             int w = degtoxpos(width)-degtoxpos(0.f);
             int h = degtoypos(width)-degtoypos(0.f);
-            
+
             filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
         }
         if (el-height < -90)
@@ -313,20 +313,20 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
             int y = degtoypos(-180-el);
             int w = degtoxpos(width)-degtoxpos(0.f);
             int h = degtoypos(width)-degtoypos(0.f);
-            
+
             filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
         }
-        
+
     } else {
         // rectangle
         int x = degtoxpos(az);
         int y = degtoypos(el);
         int w = degtoxpos(width)-degtoxpos(0.f);
         int h = degtoypos(height)-degtoypos(0.f);
-        
+
         filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
-        
-        
+
+
         // check if area goes beyond +-180
         // wrapping about the poles is not done yet!
         if (az+width > 180)
@@ -335,7 +335,7 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
             int y = degtoypos(el);
             int w = degtoxpos(width)-degtoxpos(0.f);
             int h = degtoypos(height)-degtoypos(0.f);
-            
+
             filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
         }
         if (az-width < -180)
@@ -344,10 +344,10 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
             int y = degtoypos(el);
             int w = degtoxpos(width)-degtoxpos(0.f);
             int h = degtoypos(height)-degtoypos(0.f);
-            
+
             filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
         }
-        
+
         if (el+height > 90)
         {
             int newaz = az-180;
@@ -357,7 +357,7 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
             int y = degtoypos(180-el);
             int w = degtoxpos(width)-degtoxpos(0.f);
             int h = degtoypos(height)-degtoypos(0.f);
-            
+
             filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
         }
         if (el-height < -90)
@@ -369,57 +369,57 @@ void PanningGraph::setFilter(int idx, float az, float el, bool shape, float widt
             int y = degtoypos(-180-el);
             int w = degtoxpos(width)-degtoxpos(0.f);
             int h = degtoypos(height)-degtoypos(0.f);
-            
+
             filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
         }
-        
-        
+
+
     }
-    
-    
+
+
     // filterarea.lineTo(100, 100);
-    
+
     // filterarea
     //if (idx < graphs_.size())
     //{
         graphs_.getUnchecked(idx)->setPath(&filterarea, gain);
         graphs_.getUnchecked(idx)->repaint();
     //}
-    
+
 }
 
 void PanningGraph::buttonClicked (Button* buttonThatWasClicked)
 {
     float az =  xpostodeg(buttonThatWasClicked->getPosition().getX() + buttonThatWasClicked->getMouseXYRelative().getX());
-    
+
     az = jlimit(-180.f, 180.f, az);
-    
+
     float el = ypostodeg(buttonThatWasClicked->getPosition().getY() + buttonThatWasClicked->getMouseXYRelative().getY());
-    
+
     el = jlimit(-90.f, 90.f, el);
-    
+
     int i = buttonThatWasClicked->getName().getIntValue();
-    
+
     if (i != mouse_near_filter_id)
     {
         mouse_near_filter_id = i;
         sendChangeMessage();
     }
-    
-    
+
+
     myprocessor_->setParameterNotifyingHost(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::AzimuthParam, Deg360ToParam(az) );
-    
+
     myprocessor_->setParameterNotifyingHost(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ElevationParam, Deg360ToParam(el) );
-    
+
 }
 
 void PanningGraph::mouseDown(const MouseEvent &event)
 {
     // check if you are near a filter...
     // now the distance is static... could be more intuitive
-    
+
     int numfilters = btn_drag.size();
-    
+
     for (int i = 0; i < numfilters; i++) {
         if (event.getMouseDownPosition().getDistanceFrom(btn_drag.getUnchecked(i)->getPosition()) < 80)
         {
@@ -428,18 +428,18 @@ void PanningGraph::mouseDown(const MouseEvent &event)
                 mouse_near_filter_id = i;
                 sendChangeMessage();
             }
-            
+
             int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::WidthParam;
             int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::HeightParam;
-            
+
             mouse_down_width = ParamToDeg360(myprocessor_->getParameter(w_idx));
             mouse_down_height = ParamToDeg180(myprocessor_->getParameter(h_idx));
-            
+
             mouse_dir_w = btn_drag.getUnchecked(i)->getX() < event.getMouseDownX() ? 1 : -1;
             mouse_dir_h = btn_drag.getUnchecked(i)->getY() > event.getMouseDownY() ? 1 : -1;
             break;
         }
-        
+
     }
 }
 
@@ -452,46 +452,46 @@ void PanningGraph::mouseUp(const MouseEvent &event)
 void PanningGraph::mouseDrag(const MouseEvent &event)
 {
     // std::cout << "dragging x: " << event.getDistanceFromDragStartX() << " y: " << event.getDistanceFromDragStartY() << std::endl;
-    
+
     if (mouse_near_filter_id > -1)
     {
         int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::WidthParam;
-        
-        
+
+
         myprocessor_->setParameterNotifyingHost(w_idx, (float)jlimit(0.f, 1.f, Deg360ToParam( mouse_down_width + xpostodeg(mouse_dir_w*event.getDistanceFromDragStartX()+degtoxpos(0))  ) ) );
-        
+
         int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::HeightParam;
-        
+
         myprocessor_->setParameterNotifyingHost(h_idx, (float)jlimit(0.f, 1.f, Deg180ToParam( mouse_down_height + ypostodeg(mouse_dir_h*event.getDistanceFromDragStartY()+degtoypos(0))  ) ) );
     }
-    
+
 }
 
 void PanningGraph::mouseWheelMove (const MouseEvent &event, const MouseWheelDetails &wheel)
 {
-    
+
     int idx = -1;
-    
+
     for (int i=0; i<btn_drag.size(); i++)
     {
         if (btn_drag.getUnchecked(i)->getState() == 1)
             idx = i;
-        
+
     }
-    
+
     if (idx > -1)
     {
         int paridx = PARAMS_PER_FILTER*idx+Ambix_vmicAudioProcessor::GainParam;
-    
+
         myprocessor_->setParameterNotifyingHost(paridx, (float)jlimit(0.f, 1.f, myprocessor_->getParameter(paridx) +wheel.deltaY*0.4f) );
-        
+
         if (idx != mouse_near_filter_id)
         {
             mouse_near_filter_id = idx;
             sendChangeMessage();
         }
     }
-    
+
 }
 
 int PanningGraph::getCurrentId()

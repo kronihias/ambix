@@ -1,19 +1,19 @@
 /*
  ==============================================================================
- 
+
  This file is part of the ambix Ambisonic plug-in suite.
  Copyright (c) 2013/2014 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  ambix is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -39,38 +39,40 @@ public:
     ~Ambix_wideningAudioProcessor();
 
     //==============================================================================
-    void prepareToPlay (double sampleRate, int samplesPerBlock);
-    void releaseResources();
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
 
-    void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages);
+    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
 
-    //==============================================================================
-    AudioProcessorEditor* createEditor();
-    bool hasEditor() const;
+    void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;
 
     //==============================================================================
-    const String getName() const;
+    AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override;
 
-    int getNumParameters();
+    //==============================================================================
+    const String getName() const override;
 
-    float getParameter (int index);
-    void setParameter (int index, float newValue);
+    int getNumParameters() override;
 
-    const String getParameterName (int index);
-    const String getParameterText (int index);
+    float getParameter (int index) override;
+    void setParameter (int index, float newValue) override;
 
-    const String getInputChannelName (int channelIndex) const;
-    const String getOutputChannelName (int channelIndex) const;
-    bool isInputChannelStereoPair (int index) const;
-    bool isOutputChannelStereoPair (int index) const;
+    const String getParameterName (int index) override;
+    const String getParameterText (int index) override;
 
-    bool acceptsMidi() const;
-    bool producesMidi() const;
-    bool silenceInProducesSilenceOut() const;
-    double getTailLengthSeconds() const;
+    const String getInputChannelName (int channelIndex) const override;
+    const String getOutputChannelName (int channelIndex) const override;
+    bool isInputChannelStereoPair (int index) const override;
+    bool isOutputChannelStereoPair (int index) const override;
+
+    bool acceptsMidi() const override;
+    bool producesMidi() const override;
+    bool silenceInProducesSilenceOut() const override;
+    double getTailLengthSeconds() const override;
 
     int getLatencySamples() const;
-    
+
     enum Parameters
 	{
         ModDepthParam,
@@ -79,54 +81,54 @@ public:
 		SingleSideParam,
 		totalNumParams
 	};
-    
-    //==============================================================================
-    int getNumPrograms();
-    int getCurrentProgram();
-    void setCurrentProgram (int index);
-    const String getProgramName (int index);
-    void changeProgramName (int index, const String& newName);
 
     //==============================================================================
-    void getStateInformation (MemoryBlock& destData);
-    void setStateInformation (const void* data, int sizeInBytes);
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram (int index) override;
+    const String getProgramName (int index) override;
+    void changeProgramName (int index, const String& newName) override;
+
+    //==============================================================================
+    void getStateInformation (MemoryBlock& destData) override;
+    void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
-    
+
     void calcParams();
     void checkBuffer();
-    
+
     float mod_depth_param; // 0.0 -> 0deg, 1.0 -> 360deg
-    
+
     float mod_t_param, _mod_t_param; // 0.0 ->
-    
+
     // t = Q/samplerate ;  Q = t*samplerate;
     // Q=10....3000 @ 44.1kHz -> t = 0.2 ms....70ms
-    
+
     float rot_offset_param; // 0.0 -> -180deg, 1.0 -> 180deg
-    
+
     bool single_sided;
-    
+
     bool param_changed; // mod_depth or offset changed
-    
+
     int Q;
-    
+
     AudioSampleBuffer ring_buffer;
-    
+
     int _buf_write_pos;
     int _buf_read_pos[2*BESSEL_APPR+1];
     int _buf_size;
-    
+
     float cos_coeffs[AMBI_ORDER][BESSEL_APPR+1];
     float _cos_coeffs[AMBI_ORDER][BESSEL_APPR+1];
-    
+
     float sin_coeffs[AMBI_ORDER][BESSEL_APPR+1];
     float _sin_coeffs[AMBI_ORDER][BESSEL_APPR+1];
-    
-    
+
+
     //OwnedArray<Array<float>> cos_coeffs;
     //OwnedArray<Array<float>> sin_coeffs;
-    
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_wideningAudioProcessor)
 };

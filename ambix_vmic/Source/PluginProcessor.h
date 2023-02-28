@@ -1,19 +1,19 @@
 /*
  ==============================================================================
- 
+
  This file is part of the ambix Ambisonic plug-in suite.
  Copyright (c) 2013/2014 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  ambix is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -48,7 +48,7 @@ inline float dbtorms(float db)
 inline float ParamToRMS(float param)
 {
     float rms = 0.f;
-    
+
     if (param < 0.f )
     {
         rms = 0.f;
@@ -65,7 +65,7 @@ inline float ParamToRMS(float param)
     {
         rms = 10.f; // +20 dB
     }
-    
+
     return rms;
 }
 
@@ -88,7 +88,7 @@ inline float DbToParam(float db)
     else// if (db > 0.f)
     {
         // return    0.5f+sqrt(dbtorms(db)-1.f);
-        
+
         return sqrt((dbtorms(db) - 1.f) / 9.f)*0.5f+0.5f;
     }
 }
@@ -125,47 +125,49 @@ public:
     ~Ambix_vmicAudioProcessor();
 
     //==============================================================================
-    void prepareToPlay (double sampleRate, int samplesPerBlock);
-    void releaseResources();
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
 
-    void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages);
+    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
 
-    //==============================================================================
-    AudioProcessorEditor* createEditor();
-    bool hasEditor() const;
+    void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;
 
     //==============================================================================
-    const String getName() const;
-
-    int getNumParameters();
-
-    float getParameter (int index);
-    void setParameter (int index, float newValue);
-
-    const String getParameterName (int index);
-    const String getParameterText (int index);
-
-    const String getInputChannelName (int channelIndex) const;
-    const String getOutputChannelName (int channelIndex) const;
-    bool isInputChannelStereoPair (int index) const;
-    bool isOutputChannelStereoPair (int index) const;
-
-    bool acceptsMidi() const;
-    bool producesMidi() const;
-    bool silenceInProducesSilenceOut() const;
-    double getTailLengthSeconds() const;
+    AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override;
 
     //==============================================================================
-    int getNumPrograms();
-    int getCurrentProgram();
-    void setCurrentProgram (int index);
-    const String getProgramName (int index);
-    void changeProgramName (int index, const String& newName);
+    const String getName() const override;
+
+    int getNumParameters() override;
+
+    float getParameter (int index) override;
+    void setParameter (int index, float newValue) override;
+
+    const String getParameterName (int index) override;
+    const String getParameterText (int index) override;
+
+    const String getInputChannelName (int channelIndex) const override;
+    const String getOutputChannelName (int channelIndex) const override;
+    bool isInputChannelStereoPair (int index) const override;
+    bool isOutputChannelStereoPair (int index) const override;
+
+    bool acceptsMidi() const override;
+    bool producesMidi() const override;
+    bool silenceInProducesSilenceOut() const override;
+    double getTailLengthSeconds() const override;
 
     //==============================================================================
-    void getStateInformation (MemoryBlock& destData);
-    void setStateInformation (const void* data, int sizeInBytes);
-    
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram (int index) override;
+    const String getProgramName (int index) override;
+    void changeProgramName (int index, const String& newName) override;
+
+    //==============================================================================
+    void getStateInformation (MemoryBlock& destData) override;
+    void setStateInformation (const void* data, int sizeInBytes) override;
+
     enum Parameters
 	{
         AzimuthParam,
@@ -176,51 +178,51 @@ public:
         GainParam,
         WindowParam
 	};
-    
+
     int filter_sel_id_1;
     int filter_sel_id_2;
-    
+
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    
+
 private:
-    
+
     void calcParams();
-    
-    
+
+
     ArrayParam shape;
     ArrayParam width;
     ArrayParam height;
     ArrayParam gain;
     ArrayParam window;
     ArrayParam transition;
-    
+
     SphCoordParam center_sph;
-    
-    
+
+
     bool _initialized;
-    
+
     bool _param_changed; // param changed need recalculation
-    
+
     AudioSampleBuffer output_buffer;
-    
+
     SphericalHarmonic sph_h;
-    
+
     SphFilter sph_filter;
-    
+
     // Eigen stuff
-    
+
     Eigen::MatrixXd Carth_coord; // carthesian coordinates
     Eigen::MatrixXd Sph_coord; // spherical coordinates
-    
-    
+
+
     Eigen::MatrixXd Sh_matrix;
-    
+
     FilterMatrix Sh_matrix_mod; // each row is one virtual mic
-    
+
     FilterMatrix Sh_transf; // Transformation Matrix
-    
+
     FilterMatrix _Sh_transf; // Old Transformation Matrix
-    
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_vmicAudioProcessor)
 };

@@ -137,7 +137,7 @@ Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_
     box_presets->setTooltip ("choose conversion scheme from several presets");
     box_presets->setEditableText (false);
     box_presets->setJustificationType (Justification::centredLeft);
-    box_presets->setTextWhenNothingSelected (String::empty);
+    box_presets->setTextWhenNothingSelected (String());
     box_presets->setTextWhenNoChoicesAvailable ("(no presets)");
     box_presets->addItem ("Wigware/B2X -> ambix", 1);
     box_presets->addItem ("ambix -> Wigware/B2X", 2);

@@ -289,62 +289,36 @@ void Ambix_encoderAudioProcessorEditor::resized()
 
 void Ambix_encoderAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWasMoved)
 {
-    //[UsersliderValueChanged_Pre]
-    //[/UsersliderValueChanged_Pre]
 
-    if (sliderThatWasMoved == sld_el)
+    if (sliderThatWasMoved == &sld_el)
     {
-        //[UserSliderCode_sld_el] -- add your slider handling code here..
-        //[/UserSliderCode_sld_el]
     }
-    else if (sliderThatWasMoved == sld_az)
+    else if (sliderThatWasMoved == &sld_az)
     {
-        //[UserSliderCode_sld_az] -- add your slider handling code here..
-        //[/UserSliderCode_sld_az]
     }
-    else if (sliderThatWasMoved == sld_size)
+    else if (sliderThatWasMoved == &sld_size)
     {
-        //[UserSliderCode_sld_size] -- add your slider handling code here..
-        //[/UserSliderCode_sld_size]
     }
-    else if (sliderThatWasMoved == sld_width)
+    else if (sliderThatWasMoved == &sld_width)
     {
-        //[UserSliderCode_sld_width] -- add your slider handling code here..
-        //[/UserSliderCode_sld_width]
     }
-    else if (sliderThatWasMoved == sld_speed)
+    else if (sliderThatWasMoved == &sld_speed)
     {
-        //[UserSliderCode_sld_speed] -- add your slider handling code here..
-        //[/UserSliderCode_sld_speed]
     }
-    else if (sliderThatWasMoved == sld_el_move)
+    else if (sliderThatWasMoved == &sld_el_move)
     {
-        //[UserSliderCode_sld_el_move] -- add your slider handling code here..
-        //[/UserSliderCode_sld_el_move]
     }
-    else if (sliderThatWasMoved == sld_az_move)
+    else if (sliderThatWasMoved == &sld_az_move)
     {
-        //[UserSliderCode_sld_az_move] -- add your slider handling code here..
-        //[/UserSliderCode_sld_az_move]
     }
 
-    //[UsersliderValueChanged_Post]
-    //[/UsersliderValueChanged_Post]
 }
 
 void Ambix_encoderAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 {
-    //[UserbuttonClicked_Pre]
-    //[/UserbuttonClicked_Pre]
-
-    if (buttonThatWasClicked == btn_settings)
+    if (buttonThatWasClicked == &btn_settings)
     {
-        //[UserButtonCode_btn_settings] -- add your button handler code here..
-        //[/UserButtonCode_btn_settings]
     }
-
-    //[UserbuttonClicked_Post]
-    //[/UserbuttonClicked_Post]
 }
 
 

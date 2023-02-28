@@ -1,5 +1,8 @@
-ADD_SUBDIRECTORY ( ambix_vmic )
+SET( WITH_EIGEN TRUE )
+SET( WITH_SphericalHarmonic TRUE )
+SET( WITH_T_DESIGN TRUE )
+SET( WITH_SphFilter TRUE )
 
-IF (BUILD_STANDALONE)
-	ADD_SUBDIRECTORY ( ambix_vmic_standalone )
-ENDIF (BUILD_STANDALONE)
+SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_vmic )
+
+INCLUDE(${SRC_DIR}/Subproject.cmake)

@@ -1,5 +1,3 @@
-ADD_SUBDIRECTORY ( ambix_converter )
+SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_converter )
 
-IF (BUILD_STANDALONE)
-	ADD_SUBDIRECTORY ( ambix_converter_standalone )
-ENDIF (BUILD_STANDALONE)
+INCLUDE(${SRC_DIR}/Subproject.cmake)

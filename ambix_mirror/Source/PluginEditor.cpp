@@ -1,19 +1,19 @@
 /*
  ==============================================================================
- 
+
  This file is part of the ambix Ambisonic plug-in suite.
  Copyright (c) 2013/2014 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  ambix is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -30,313 +30,282 @@
 //==============================================================================
 Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirrorAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-    box_presets (nullptr),
-    label5 (nullptr),
-    sld_x_even (nullptr),
-    label (nullptr),
-    label2 (nullptr),
-    tgl_x_even_inv (nullptr),
-    sld_x_odd (nullptr),
-    label3 (nullptr),
-    tgl_x_odd_inv (nullptr),
-    sld_y_even (nullptr),
-    label6 (nullptr),
-    tgl_y_even_inv (nullptr),
-    sld_y_odd (nullptr),
-    label7 (nullptr),
-    tgl_y_odd_inv (nullptr),
-    sld_z_even (nullptr),
-    label9 (nullptr),
-    tgl_z_even_inv (nullptr),
-    sld_z_odd (nullptr),
-    label10 (nullptr),
-    tgl_z_odd_inv (nullptr),
-    lbl_x_even (nullptr),
-    lbl_x_odd (nullptr),
-    lbl_y_even (nullptr),
-    lbl_y_odd (nullptr),
-    lbl_z_even (nullptr),
-    lbl_z_odd (nullptr),
-    label4 (nullptr),
-    label8 (nullptr),
-    sld_circular (nullptr),
-    label11 (nullptr),
-    tgl_circular_inv (nullptr),
-    lbl_circular (nullptr),
     cachedImage_coordinate_system_png (nullptr)
 {
-    tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
-    
-    addAndMakeVisible (box_presets = new ComboBox ("new combo box"));
-    box_presets->setTooltip ("choose conversion scheme from several presets");
-    box_presets->setEditableText (false);
-    box_presets->setJustificationType (Justification::centredLeft);
-    box_presets->setTextWhenNothingSelected (" ");
-    box_presets->setTextWhenNoChoicesAvailable ("(no presets)");
-    box_presets->addItem (" ", 1);
-    box_presets->addItem ("no change", 2);
-    box_presets->addItem ("flip left <> right", 3);
-    box_presets->addItem ("flop front <> back", 4);
-    box_presets->addItem ("flap top <> bottom", 5);
-    box_presets->addItem ("merge left + right", 6);
-    box_presets->addItem ("merge front + back", 7);
-    box_presets->addItem ("merge top + bottom", 8);
-    box_presets->addListener (this);
-    
-    addAndMakeVisible (label5 = new Label ("new label",
-                                           "Presets"));
-    label5->setFont (Font (15.0000f, Font::plain));
-    label5->setJustificationType (Justification::centredRight);
-    label5->setEditable (false, false, false);
-    label5->setColour (Label::textColourId, Colours::azure);
-    label5->setColour (TextEditor::textColourId, Colours::black);
-    label5->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (sld_x_even = new Slider ("new slider"));
-    sld_x_even->setRange (0, 1, 0);
-    sld_x_even->setSliderStyle (Slider::LinearHorizontal);
-    sld_x_even->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    sld_x_even->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_x_even->addListener (this);
-    sld_x_even->setDoubleClickReturnValue(true, 0.75f);
-    
-    addAndMakeVisible (label = new Label ("new label",
-                                          "x axis symmetries"));
-    label->setFont (Font (15.0000f, Font::italic));
-    label->setJustificationType (Justification::centred);
-    label->setEditable (false, false, false);
-    label->setColour (Label::textColourId, Colour (0x66ffffff));
-    label->setColour (TextEditor::textColourId, Colours::black);
-    label->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (label2 = new Label ("new label",
-                                           "X even"));
-    label2->setFont (Font (15.0000f, Font::plain));
-    label2->setJustificationType (Justification::centredLeft);
-    label2->setEditable (false, false, false);
-    label2->setColour (Label::textColourId, Colours::white);
-    label2->setColour (TextEditor::textColourId, Colours::black);
-    label2->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (tgl_x_even_inv = new ToggleButton ("new toggle button"));
-    tgl_x_even_inv->setButtonText ("invert");
-    tgl_x_even_inv->addListener (this);
-    tgl_x_even_inv->setColour (ToggleButton::textColourId, Colours::white);
-    
-    addAndMakeVisible (sld_x_odd = new Slider ("new slider"));
-    sld_x_odd->setRange (0, 1, 0);
-    sld_x_odd->setSliderStyle (Slider::LinearHorizontal);
-    sld_x_odd->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    sld_x_odd->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_x_odd->addListener (this);
-    sld_x_odd->setDoubleClickReturnValue(true, 0.75f);
-    
-    addAndMakeVisible (label3 = new Label ("new label",
-                                           "X odd"));
-    label3->setFont (Font (15.0000f, Font::plain));
-    label3->setJustificationType (Justification::centredLeft);
-    label3->setEditable (false, false, false);
-    label3->setColour (Label::textColourId, Colours::white);
-    label3->setColour (TextEditor::textColourId, Colours::black);
-    label3->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (tgl_x_odd_inv = new ToggleButton ("new toggle button"));
-    tgl_x_odd_inv->setButtonText ("invert");
-    tgl_x_odd_inv->addListener (this);
-    tgl_x_odd_inv->setColour (ToggleButton::textColourId, Colours::white);
-    
-    addAndMakeVisible (sld_y_even = new Slider ("new slider"));
-    sld_y_even->setRange (0, 1, 0);
-    sld_y_even->setSliderStyle (Slider::LinearHorizontal);
-    sld_y_even->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    sld_y_even->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_y_even->addListener (this);
-    sld_y_even->setDoubleClickReturnValue(true, 0.75f);
-    
-    addAndMakeVisible (label6 = new Label ("new label",
-                                           "Y even"));
-    label6->setFont (Font (15.0000f, Font::plain));
-    label6->setJustificationType (Justification::centredLeft);
-    label6->setEditable (false, false, false);
-    label6->setColour (Label::textColourId, Colours::white);
-    label6->setColour (TextEditor::textColourId, Colours::black);
-    label6->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (tgl_y_even_inv = new ToggleButton ("new toggle button"));
-    tgl_y_even_inv->setButtonText ("invert");
-    tgl_y_even_inv->addListener (this);
-    tgl_y_even_inv->setColour (ToggleButton::textColourId, Colours::white);
-    
-    addAndMakeVisible (sld_y_odd = new Slider ("new slider"));
-    sld_y_odd->setRange (0, 1, 0);
-    sld_y_odd->setSliderStyle (Slider::LinearHorizontal);
-    sld_y_odd->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    sld_y_odd->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_y_odd->addListener (this);
-    sld_y_odd->setDoubleClickReturnValue(true, 0.75f);
-    
-    addAndMakeVisible (label7 = new Label ("new label",
-                                           "Y odd"));
-    label7->setFont (Font (15.0000f, Font::plain));
-    label7->setJustificationType (Justification::centredLeft);
-    label7->setEditable (false, false, false);
-    label7->setColour (Label::textColourId, Colours::white);
-    label7->setColour (TextEditor::textColourId, Colours::black);
-    label7->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (tgl_y_odd_inv = new ToggleButton ("new toggle button"));
-    tgl_y_odd_inv->setButtonText ("invert");
-    tgl_y_odd_inv->addListener (this);
-    tgl_y_odd_inv->setColour (ToggleButton::textColourId, Colours::white);
-    
-    addAndMakeVisible (sld_z_even = new Slider ("new slider"));
-    sld_z_even->setRange (0, 1, 0);
-    sld_z_even->setSliderStyle (Slider::LinearHorizontal);
-    sld_z_even->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    sld_z_even->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_z_even->addListener (this);
-    sld_z_even->setDoubleClickReturnValue(true, 0.75f);
-    
-    addAndMakeVisible (label9 = new Label ("new label",
-                                           "Z even"));
-    label9->setFont (Font (15.0000f, Font::plain));
-    label9->setJustificationType (Justification::centredLeft);
-    label9->setEditable (false, false, false);
-    label9->setColour (Label::textColourId, Colours::white);
-    label9->setColour (TextEditor::textColourId, Colours::black);
-    label9->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (tgl_z_even_inv = new ToggleButton ("new toggle button"));
-    tgl_z_even_inv->setButtonText ("invert");
-    tgl_z_even_inv->addListener (this);
-    tgl_z_even_inv->setColour (ToggleButton::textColourId, Colours::white);
-    
-    addAndMakeVisible (sld_z_odd = new Slider ("new slider"));
-    sld_z_odd->setRange (0, 1, 0);
-    sld_z_odd->setSliderStyle (Slider::LinearHorizontal);
-    sld_z_odd->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    sld_z_odd->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_z_odd->addListener (this);
-    sld_z_odd->setDoubleClickReturnValue(true, 0.75f);
-    
-    addAndMakeVisible (label10 = new Label ("new label",
-                                            "Z odd"));
-    label10->setFont (Font (15.0000f, Font::plain));
-    label10->setJustificationType (Justification::centredLeft);
-    label10->setEditable (false, false, false);
-    label10->setColour (Label::textColourId, Colours::white);
-    label10->setColour (TextEditor::textColourId, Colours::black);
-    label10->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (tgl_z_odd_inv = new ToggleButton ("new toggle button"));
-    tgl_z_odd_inv->setButtonText ("invert");
-    tgl_z_odd_inv->addListener (this);
-    tgl_z_odd_inv->setColour (ToggleButton::textColourId, Colours::white);
-    
-    addAndMakeVisible (lbl_x_even = new Label ("new label",
-                                               "-99 dB"));
-    lbl_x_even->setFont (Font (15.0000f, Font::plain));
-    lbl_x_even->setJustificationType (Justification::centredRight);
-    lbl_x_even->setEditable (false, false, false);
-    lbl_x_even->setColour (Label::textColourId, Colours::yellow);
-    lbl_x_even->setColour (TextEditor::textColourId, Colours::black);
-    lbl_x_even->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (lbl_x_odd = new Label ("new label",
-                                              "-99 dB"));
-    lbl_x_odd->setFont (Font (15.0000f, Font::plain));
-    lbl_x_odd->setJustificationType (Justification::centredRight);
-    lbl_x_odd->setEditable (false, false, false);
-    lbl_x_odd->setColour (Label::textColourId, Colours::yellow);
-    lbl_x_odd->setColour (TextEditor::textColourId, Colours::black);
-    lbl_x_odd->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (lbl_y_even = new Label ("new label",
-                                               "-99 dB"));
-    lbl_y_even->setFont (Font (15.0000f, Font::plain));
-    lbl_y_even->setJustificationType (Justification::centredRight);
-    lbl_y_even->setEditable (false, false, false);
-    lbl_y_even->setColour (Label::textColourId, Colours::yellow);
-    lbl_y_even->setColour (TextEditor::textColourId, Colours::black);
-    lbl_y_even->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (lbl_y_odd = new Label ("new label",
-                                              "-99 dB"));
-    lbl_y_odd->setFont (Font (15.0000f, Font::plain));
-    lbl_y_odd->setJustificationType (Justification::centredRight);
-    lbl_y_odd->setEditable (false, false, false);
-    lbl_y_odd->setColour (Label::textColourId, Colours::yellow);
-    lbl_y_odd->setColour (TextEditor::textColourId, Colours::black);
-    lbl_y_odd->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (lbl_z_even = new Label ("new label",
-                                               "-99 dB"));
-    lbl_z_even->setFont (Font (15.0000f, Font::plain));
-    lbl_z_even->setJustificationType (Justification::centredRight);
-    lbl_z_even->setEditable (false, false, false);
-    lbl_z_even->setColour (Label::textColourId, Colours::yellow);
-    lbl_z_even->setColour (TextEditor::textColourId, Colours::black);
-    lbl_z_even->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (lbl_z_odd = new Label ("new label",
-                                              "-99 dB"));
-    lbl_z_odd->setFont (Font (15.0000f, Font::plain));
-    lbl_z_odd->setJustificationType (Justification::centredRight);
-    lbl_z_odd->setEditable (false, false, false);
-    lbl_z_odd->setColour (Label::textColourId, Colours::yellow);
-    lbl_z_odd->setColour (TextEditor::textColourId, Colours::black);
-    lbl_z_odd->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (label4 = new Label ("new label",
-                                           "y axis symmetries"));
-    label4->setFont (Font (15.0000f, Font::italic));
-    label4->setJustificationType (Justification::centred);
-    label4->setEditable (false, false, false);
-    label4->setColour (Label::textColourId, Colour (0x66ffffff));
-    label4->setColour (TextEditor::textColourId, Colours::black);
-    label4->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (label8 = new Label ("new label",
-                                           "z axis symmetries"));
-    label8->setFont (Font (15.0000f, Font::italic));
-    label8->setJustificationType (Justification::centred);
-    label8->setEditable (false, false, false);
-    label8->setColour (Label::textColourId, Colour (0x66ffffff));
-    label8->setColour (TextEditor::textColourId, Colours::black);
-    label8->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (sld_circular = new Slider ("new slider"));
-    sld_circular->setRange (0, 1, 0);
-    sld_circular->setSliderStyle (Slider::LinearHorizontal);
-    sld_circular->setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
-    sld_circular->setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_circular->addListener (this);
-    sld_circular->setDoubleClickReturnValue(true, 0.75f);
-    
-    addAndMakeVisible (label11 = new Label ("new label",
-                                            "Circular"));
-    label11->setFont (Font (15.0000f, Font::plain));
-    label11->setJustificationType (Justification::centredLeft);
-    label11->setEditable (false, false, false);
-    label11->setColour (Label::textColourId, Colours::white);
-    label11->setColour (TextEditor::textColourId, Colours::black);
-    label11->setColour (TextEditor::backgroundColourId, Colour (0x0));
-    
-    addAndMakeVisible (tgl_circular_inv = new ToggleButton ("new toggle button"));
-    tgl_circular_inv->setButtonText ("invert");
-    tgl_circular_inv->addListener (this);
-    tgl_circular_inv->setColour (ToggleButton::textColourId, Colours::white);
-    
-    addAndMakeVisible (lbl_circular = new Label ("new label",
-                                                 "-99 dB"));
-    lbl_circular->setFont (Font (15.0000f, Font::plain));
-    lbl_circular->setJustificationType (Justification::centredRight);
-    lbl_circular->setEditable (false, false, false);
-    lbl_circular->setColour (Label::textColourId, Colours::yellow);
-    lbl_circular->setColour (TextEditor::textColourId, Colours::black);
-    lbl_circular->setColour (TextEditor::backgroundColourId, Colour (0x0));
+    setLookAndFeel (&globalLaF);
 
-    
+    tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
+
+    addAndMakeVisible (box_presets);
+    box_presets.setTooltip ("choose conversion scheme from several presets");
+    box_presets.setEditableText (false);
+    box_presets.setJustificationType (Justification::centredLeft);
+    box_presets.setTextWhenNothingSelected (" ");
+    box_presets.setTextWhenNoChoicesAvailable ("(no presets)");
+    box_presets.addItem (" ", 1);
+    box_presets.addItem ("no change", 2);
+    box_presets.addItem ("flip left <> right", 3);
+    box_presets.addItem ("flop front <> back", 4);
+    box_presets.addItem ("flap top <> bottom", 5);
+    box_presets.addItem ("merge left + right", 6);
+    box_presets.addItem ("merge front + back", 7);
+    box_presets.addItem ("merge top + bottom", 8);
+    box_presets.addListener (this);
+
+    addAndMakeVisible (label5);
+    label5.setText("Presets", dontSendNotification);
+    label5.setFont (Font (15.0000f, Font::plain));
+    label5.setJustificationType (Justification::centredRight);
+    label5.setEditable (false, false, false);
+    label5.setColour (Label::textColourId, Colours::azure);
+    label5.setColour (TextEditor::textColourId, Colours::black);
+    label5.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (sld_x_even);
+    sld_x_even.setRange (0, 1, 0);
+    sld_x_even.setSliderStyle (Slider::LinearHorizontal);
+    sld_x_even.setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    sld_x_even.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
+    sld_x_even.addListener (this);
+    sld_x_even.setDoubleClickReturnValue(true, 0.75f);
+
+    addAndMakeVisible (label);
+    label.setText("x axis symmetries", dontSendNotification);
+    label.setFont (Font (15.0000f, Font::italic));
+    label.setJustificationType (Justification::centred);
+    label.setEditable (false, false, false);
+    label.setColour (Label::textColourId, Colour (0x66ffffff));
+    label.setColour (TextEditor::textColourId, Colours::black);
+    label.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (label2);
+    label2.setText("X even", dontSendNotification);
+    label2.setFont (Font (15.0000f, Font::plain));
+    label2.setJustificationType (Justification::centredLeft);
+    label2.setEditable (false, false, false);
+    label2.setColour (Label::textColourId, Colours::white);
+    label2.setColour (TextEditor::textColourId, Colours::black);
+    label2.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (tgl_x_even_inv);
+    tgl_x_even_inv.setButtonText ("invert");
+    tgl_x_even_inv.addListener (this);
+    tgl_x_even_inv.setColour (ToggleButton::textColourId, Colours::white);
+
+    addAndMakeVisible (sld_x_odd);
+    sld_x_odd.setRange (0, 1, 0);
+    sld_x_odd.setSliderStyle (Slider::LinearHorizontal);
+    sld_x_odd.setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    sld_x_odd.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
+    sld_x_odd.addListener (this);
+    sld_x_odd.setDoubleClickReturnValue(true, 0.75f);
+
+    addAndMakeVisible (label3);
+    label3.setText( "X odd", dontSendNotification);
+    label3.setFont (Font (15.0000f, Font::plain));
+    label3.setJustificationType (Justification::centredLeft);
+    label3.setEditable (false, false, false);
+    label3.setColour (Label::textColourId, Colours::white);
+    label3.setColour (TextEditor::textColourId, Colours::black);
+    label3.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (tgl_x_odd_inv);
+    tgl_x_odd_inv.setButtonText ("invert");
+    tgl_x_odd_inv.addListener (this);
+    tgl_x_odd_inv.setColour (ToggleButton::textColourId, Colours::white);
+
+    addAndMakeVisible (sld_y_even);
+    sld_y_even.setRange (0, 1, 0);
+    sld_y_even.setSliderStyle (Slider::LinearHorizontal);
+    sld_y_even.setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    sld_y_even.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
+    sld_y_even.addListener (this);
+    sld_y_even.setDoubleClickReturnValue(true, 0.75f);
+
+    addAndMakeVisible (label6);
+    label6.setText("Y even", dontSendNotification);
+    label6.setFont (Font (15.0000f, Font::plain));
+    label6.setJustificationType (Justification::centredLeft);
+    label6.setEditable (false, false, false);
+    label6.setColour (Label::textColourId, Colours::white);
+    label6.setColour (TextEditor::textColourId, Colours::black);
+    label6.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (tgl_y_even_inv);
+    tgl_y_even_inv.setButtonText ("invert");
+    tgl_y_even_inv.addListener (this);
+    tgl_y_even_inv.setColour (ToggleButton::textColourId, Colours::white);
+
+    addAndMakeVisible (sld_y_odd);
+    sld_y_odd.setRange (0, 1, 0);
+    sld_y_odd.setSliderStyle (Slider::LinearHorizontal);
+    sld_y_odd.setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    sld_y_odd.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
+    sld_y_odd.addListener (this);
+    sld_y_odd.setDoubleClickReturnValue(true, 0.75f);
+
+    addAndMakeVisible (label7);
+    label7.setText("Y odd", dontSendNotification);
+    label7.setFont (Font (15.0000f, Font::plain));
+    label7.setJustificationType (Justification::centredLeft);
+    label7.setEditable (false, false, false);
+    label7.setColour (Label::textColourId, Colours::white);
+    label7.setColour (TextEditor::textColourId, Colours::black);
+    label7.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (tgl_y_odd_inv);
+    tgl_y_odd_inv.setButtonText ("invert");
+    tgl_y_odd_inv.addListener (this);
+    tgl_y_odd_inv.setColour (ToggleButton::textColourId, Colours::white);
+
+    addAndMakeVisible (sld_z_even);
+    sld_z_even.setRange (0, 1, 0);
+    sld_z_even.setSliderStyle (Slider::LinearHorizontal);
+    sld_z_even.setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    sld_z_even.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
+    sld_z_even.addListener (this);
+    sld_z_even.setDoubleClickReturnValue(true, 0.75f);
+
+    addAndMakeVisible (label9);
+    label9.setText("Z even", dontSendNotification);
+    label9.setFont (Font (15.0000f, Font::plain));
+    label9.setJustificationType (Justification::centredLeft);
+    label9.setEditable (false, false, false);
+    label9.setColour (Label::textColourId, Colours::white);
+    label9.setColour (TextEditor::textColourId, Colours::black);
+    label9.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (tgl_z_even_inv);
+    tgl_z_even_inv.setButtonText ("invert");
+    tgl_z_even_inv.addListener (this);
+    tgl_z_even_inv.setColour (ToggleButton::textColourId, Colours::white);
+
+    addAndMakeVisible (sld_z_odd);
+    sld_z_odd.setRange (0, 1, 0);
+    sld_z_odd.setSliderStyle (Slider::LinearHorizontal);
+    sld_z_odd.setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    sld_z_odd.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
+    sld_z_odd.addListener (this);
+    sld_z_odd.setDoubleClickReturnValue(true, 0.75f);
+
+    addAndMakeVisible (label10);
+    label10.setText("Z odd", dontSendNotification);
+    label10.setFont (Font (15.0000f, Font::plain));
+    label10.setJustificationType (Justification::centredLeft);
+    label10.setEditable (false, false, false);
+    label10.setColour (Label::textColourId, Colours::white);
+    label10.setColour (TextEditor::textColourId, Colours::black);
+    label10.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (tgl_z_odd_inv);
+    tgl_z_odd_inv.setButtonText ("invert");
+    tgl_z_odd_inv.addListener (this);
+    tgl_z_odd_inv.setColour (ToggleButton::textColourId, Colours::white);
+
+    addAndMakeVisible (lbl_x_even);
+    lbl_x_even.setText("-99 dB", dontSendNotification);
+    lbl_x_even.setFont (Font (15.0000f, Font::plain));
+    lbl_x_even.setJustificationType (Justification::centredRight);
+    lbl_x_even.setEditable (false, false, false);
+    lbl_x_even.setColour (Label::textColourId, Colours::yellow);
+    lbl_x_even.setColour (TextEditor::textColourId, Colours::black);
+    lbl_x_even.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (lbl_x_odd);
+    lbl_x_odd.setText("-99 dB", dontSendNotification);
+    lbl_x_odd.setFont (Font (15.0000f, Font::plain));
+    lbl_x_odd.setJustificationType (Justification::centredRight);
+    lbl_x_odd.setEditable (false, false, false);
+    lbl_x_odd.setColour (Label::textColourId, Colours::yellow);
+    lbl_x_odd.setColour (TextEditor::textColourId, Colours::black);
+    lbl_x_odd.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (lbl_y_even);
+    lbl_y_even.setText("-99 dB", dontSendNotification);
+    lbl_y_even.setFont (Font (15.0000f, Font::plain));
+    lbl_y_even.setJustificationType (Justification::centredRight);
+    lbl_y_even.setEditable (false, false, false);
+    lbl_y_even.setColour (Label::textColourId, Colours::yellow);
+    lbl_y_even.setColour (TextEditor::textColourId, Colours::black);
+    lbl_y_even.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (lbl_y_odd);
+    lbl_y_odd.setText("-99 dB", dontSendNotification);
+    lbl_y_odd.setFont (Font (15.0000f, Font::plain));
+    lbl_y_odd.setJustificationType (Justification::centredRight);
+    lbl_y_odd.setEditable (false, false, false);
+    lbl_y_odd.setColour (Label::textColourId, Colours::yellow);
+    lbl_y_odd.setColour (TextEditor::textColourId, Colours::black);
+    lbl_y_odd.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (lbl_z_even);
+    lbl_z_even.setText("-99 dB", dontSendNotification);
+    lbl_z_even.setFont (Font (15.0000f, Font::plain));
+    lbl_z_even.setJustificationType (Justification::centredRight);
+    lbl_z_even.setEditable (false, false, false);
+    lbl_z_even.setColour (Label::textColourId, Colours::yellow);
+    lbl_z_even.setColour (TextEditor::textColourId, Colours::black);
+    lbl_z_even.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (lbl_z_odd);
+    lbl_z_odd.setText("-99 dB", dontSendNotification);
+    lbl_z_odd.setFont (Font (15.0000f, Font::plain));
+    lbl_z_odd.setJustificationType (Justification::centredRight);
+    lbl_z_odd.setEditable (false, false, false);
+    lbl_z_odd.setColour (Label::textColourId, Colours::yellow);
+    lbl_z_odd.setColour (TextEditor::textColourId, Colours::black);
+    lbl_z_odd.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (label4);
+    label4.setText("y axis symmetries", dontSendNotification);
+    label4.setFont (Font (15.0000f, Font::italic));
+    label4.setJustificationType (Justification::centred);
+    label4.setEditable (false, false, false);
+    label4.setColour (Label::textColourId, Colour (0x66ffffff));
+    label4.setColour (TextEditor::textColourId, Colours::black);
+    label4.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (label8);
+    label8.setText("z axis symmetries", dontSendNotification);
+    label8.setFont (Font (15.0000f, Font::italic));
+    label8.setJustificationType (Justification::centred);
+    label8.setEditable (false, false, false);
+    label8.setColour (Label::textColourId, Colour (0x66ffffff));
+    label8.setColour (TextEditor::textColourId, Colours::black);
+    label8.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (sld_circular);
+    sld_circular.setRange (0, 1, 0);
+    sld_circular.setSliderStyle (Slider::LinearHorizontal);
+    sld_circular.setTextBoxStyle (Slider::NoTextBox, true, 80, 20);
+    sld_circular.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
+    sld_circular.addListener (this);
+    sld_circular.setDoubleClickReturnValue(true, 0.75f);
+
+    addAndMakeVisible (label11);
+    label11.setText("Circular", dontSendNotification);
+    label11.setFont (Font (15.0000f, Font::plain));
+    label11.setJustificationType (Justification::centredLeft);
+    label11.setEditable (false, false, false);
+    label11.setColour (Label::textColourId, Colours::white);
+    label11.setColour (TextEditor::textColourId, Colours::black);
+    label11.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+    addAndMakeVisible (tgl_circular_inv);
+    tgl_circular_inv.setButtonText ("invert");
+    tgl_circular_inv.addListener (this);
+    tgl_circular_inv.setColour (ToggleButton::textColourId, Colours::white);
+
+    addAndMakeVisible (lbl_circular);
+    lbl_circular.setText("-99 dB", dontSendNotification);
+    lbl_circular.setFont (Font (15.0000f, Font::plain));
+    lbl_circular.setJustificationType (Justification::centredRight);
+    lbl_circular.setEditable (false, false, false);
+    lbl_circular.setColour (Label::textColourId, Colours::yellow);
+    lbl_circular.setColour (TextEditor::textColourId, Colours::black);
+    lbl_circular.setColour (TextEditor::backgroundColourId, Colour (0x0));
+
+
     cachedImage_coordinate_system_png = ImageCache::getFromMemory (coordinate_system_png, coordinate_system_pngSize);
 
     setSize (410, 410);
@@ -344,50 +313,15 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     ownerFilter->addChangeListener(this);
     getParamsFromHost();
-    
+
 }
 
 Ambix_mirrorAudioProcessorEditor::~Ambix_mirrorAudioProcessorEditor()
 {
     Ambix_mirrorAudioProcessor* ourProcessor = getProcessor();
-    
+
     // remove listener!!
     ourProcessor->removeChangeListener(this);
-
-    box_presets = nullptr;
-    label5 = nullptr;
-    sld_x_even = nullptr;
-    label = nullptr;
-    label2 = nullptr;
-    tgl_x_even_inv = nullptr;
-    sld_x_odd = nullptr;
-    label3 = nullptr;
-    tgl_x_odd_inv = nullptr;
-    sld_y_even = nullptr;
-    label6 = nullptr;
-    tgl_y_even_inv = nullptr;
-    sld_y_odd = nullptr;
-    label7 = nullptr;
-    tgl_y_odd_inv = nullptr;
-    sld_z_even = nullptr;
-    label9 = nullptr;
-    tgl_z_even_inv = nullptr;
-    sld_z_odd = nullptr;
-    label10 = nullptr;
-    tgl_z_odd_inv = nullptr;
-    lbl_x_even = nullptr;
-    lbl_x_odd = nullptr;
-    lbl_y_even = nullptr;
-    lbl_y_odd = nullptr;
-    lbl_z_even = nullptr;
-    lbl_z_odd = nullptr;
-    label4 = nullptr;
-    label8 = nullptr;
-    sld_circular = nullptr;
-    label11 = nullptr;
-    tgl_circular_inv = nullptr;
-    lbl_circular = nullptr;
-
 
 }
 
@@ -398,48 +332,48 @@ void Ambix_mirrorAudioProcessorEditor::paint (Graphics& g)
     //[/UserPrePaint]
 
     g.fillAll (Colours::white);
-    
+
     g.setGradientFill (ColourGradient (Colour (0xff4e4e4e),
                                        (float) (proportionOfWidth (0.6400f)), (float) (proportionOfHeight (0.6933f)),
                                        Colours::black,
                                        (float) (proportionOfWidth (0.1143f)), (float) (proportionOfHeight (0.0800f)),
                                        true));
     g.fillRect (0, 0, 410, 410);
-    
+
     g.setColour (Colours::black);
     g.drawRect (0, 0, 410, 410, 1);
-    
+
     g.setColour (Colour (0x95808080));
     g.fillRoundedRectangle (8.0f, 100.0f, 392.0f, 76.0f, 10.0000f);
-    
+
     g.setColour (Colours::azure);
     g.setFont (Font (17.2000f, Font::bold));
     g.drawText ("AMBIX-MIRROR",
                 18, 2, 380, 30,
                 Justification::centred, true);
-    
+
     g.setColour (Colours::azure);
     g.setFont (Font (12.4000f, Font::plain));
     g.drawText ("adjusts symmetric components in Ambisonics streams",
                 -27, 25, 380, 30,
                 Justification::centred, true);
-    
+
     g.setColour (Colour (0x932b1d69));
     g.fillRoundedRectangle (11.0f, 188.0f, 392.0f, 76.0f, 10.0000f);
-    
+
     g.setColour (Colour (0x84ff1a30));
     g.fillRoundedRectangle (11.0f, 272.0f, 392.0f, 76.0f, 10.0000f);
-    
+
     g.setColour (Colour (0x84fffefe));
     g.fillRoundedRectangle (11.0f, 360.0f, 392.0f, 38.0f, 10.0000f);
-    
+
     g.setColour (Colours::black);
     g.drawImageWithin (cachedImage_coordinate_system_png,
                        312, 5, 91, 89,
                        RectanglePlacement::centred | RectanglePlacement::onlyReduceInSize,
                        false);
-    
-    
+
+
     /* Version text */
     g.setColour (Colours::white);
     g.setFont (Font (10.00f, Font::plain));
@@ -452,40 +386,40 @@ void Ambix_mirrorAudioProcessorEditor::paint (Graphics& g)
 
 void Ambix_mirrorAudioProcessorEditor::resized()
 {
-    box_presets->setBounds (64, 64, 232, 24);
-    label5->setBounds (8, 64, 56, 24);
-    sld_x_even->setBounds (64, 104, 199, 24);
-    label->setBounds (120, 128, 150, 16);
-    label2->setBounds (10, 104, 54, 24);
-    tgl_x_even_inv->setBounds (336, 104, 64, 24);
-    sld_x_odd->setBounds (64, 144, 199, 24);
-    label3->setBounds (10, 144, 54, 24);
-    tgl_x_odd_inv->setBounds (336, 144, 64, 24);
-    sld_y_even->setBounds (64, 192, 199, 24);
-    label6->setBounds (10, 192, 54, 24);
-    tgl_y_even_inv->setBounds (336, 192, 64, 24);
-    sld_y_odd->setBounds (64, 232, 199, 24);
-    label7->setBounds (10, 232, 54, 24);
-    tgl_y_odd_inv->setBounds (336, 232, 64, 24);
-    sld_z_even->setBounds (64, 280, 199, 24);
-    label9->setBounds (10, 280, 54, 24);
-    tgl_z_even_inv->setBounds (336, 280, 64, 24);
-    sld_z_odd->setBounds (64, 320, 199, 24);
-    label10->setBounds (10, 320, 54, 24);
-    tgl_z_odd_inv->setBounds (336, 320, 64, 24);
-    lbl_x_even->setBounds (264, 104, 64, 24);
-    lbl_x_odd->setBounds (264, 144, 64, 24);
-    lbl_y_even->setBounds (264, 192, 64, 24);
-    lbl_y_odd->setBounds (264, 232, 64, 24);
-    lbl_z_even->setBounds (264, 280, 64, 24);
-    lbl_z_odd->setBounds (264, 320, 64, 24);
-    label4->setBounds (120, 216, 150, 16);
-    label8->setBounds (112, 304, 150, 16);
-    sld_circular->setBounds (64, 368, 199, 24);
-    label11->setBounds (10, 368, 62, 24);
-    tgl_circular_inv->setBounds (336, 368, 64, 24);
-    lbl_circular->setBounds (264, 368, 64, 24);
-    
+    box_presets.setBounds (64, 64, 232, 24);
+    label5.setBounds (8, 64, 56, 24);
+    sld_x_even.setBounds (64, 104, 199, 24);
+    label.setBounds (120, 128, 150, 16);
+    label2.setBounds (10, 104, 54, 24);
+    tgl_x_even_inv.setBounds (336, 104, 64, 24);
+    sld_x_odd.setBounds (64, 144, 199, 24);
+    label3.setBounds (10, 144, 54, 24);
+    tgl_x_odd_inv.setBounds (336, 144, 64, 24);
+    sld_y_even.setBounds (64, 192, 199, 24);
+    label6.setBounds (10, 192, 54, 24);
+    tgl_y_even_inv.setBounds (336, 192, 64, 24);
+    sld_y_odd.setBounds (64, 232, 199, 24);
+    label7.setBounds (10, 232, 54, 24);
+    tgl_y_odd_inv.setBounds (336, 232, 64, 24);
+    sld_z_even.setBounds (64, 280, 199, 24);
+    label9.setBounds (10, 280, 54, 24);
+    tgl_z_even_inv.setBounds (336, 280, 64, 24);
+    sld_z_odd.setBounds (64, 320, 199, 24);
+    label10.setBounds (10, 320, 54, 24);
+    tgl_z_odd_inv.setBounds (336, 320, 64, 24);
+    lbl_x_even.setBounds (264, 104, 64, 24);
+    lbl_x_odd.setBounds (264, 144, 64, 24);
+    lbl_y_even.setBounds (264, 192, 64, 24);
+    lbl_y_odd.setBounds (264, 232, 64, 24);
+    lbl_z_even.setBounds (264, 280, 64, 24);
+    lbl_z_odd.setBounds (264, 320, 64, 24);
+    label4.setBounds (120, 216, 150, 16);
+    label8.setBounds (112, 304, 150, 16);
+    sld_circular.setBounds (64, 368, 199, 24);
+    label11.setBounds (10, 368, 62, 24);
+    tgl_circular_inv.setBounds (336, 368, 64, 24);
+    lbl_circular.setBounds (264, 368, 64, 24);
+
 }
 
 String ParamToString(float param)
@@ -495,81 +429,81 @@ String ParamToString(float param)
     {
         text = String(ParamToDB(param));
         text = text.substring(0, text.indexOf(".") + 2); // keep one number after dot
-        
+
         text << " dB";
     } else {
         text << "-inf dB";
     }
-    
+
     return text;
 }
 void Ambix_mirrorAudioProcessorEditor::getParamsFromHost()
 {
     Ambix_mirrorAudioProcessor* ourProcessor = getProcessor();
-	
-    sld_x_even->setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XEvenParam), dontSendNotification);
-    sld_x_odd->setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XOddParam), dontSendNotification);
-    
-    sld_y_even->setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YEvenParam), dontSendNotification);
-    sld_y_odd->setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YOddParam), dontSendNotification);
-    
-    sld_z_even->setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZEvenParam), dontSendNotification);
-    sld_z_odd->setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZOddParam), dontSendNotification);
-    
-    sld_circular->setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::CircularParam), dontSendNotification);
-    
-    
+
+    sld_x_even.setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XEvenParam), dontSendNotification);
+    sld_x_odd.setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XOddParam), dontSendNotification);
+
+    sld_y_even.setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YEvenParam), dontSendNotification);
+    sld_y_odd.setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YOddParam), dontSendNotification);
+
+    sld_z_even.setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZEvenParam), dontSendNotification);
+    sld_z_odd.setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZOddParam), dontSendNotification);
+
+    sld_circular.setValue(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::CircularParam), dontSendNotification);
+
+
     if (ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XEvenInvParam) < 0.5f)
-        tgl_x_even_inv->setToggleState(false, dontSendNotification);
+        tgl_x_even_inv.setToggleState(false, dontSendNotification);
     else
-        tgl_x_even_inv->setToggleState(true, dontSendNotification);
-    
+        tgl_x_even_inv.setToggleState(true, dontSendNotification);
+
     if (ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XOddInvParam) < 0.5f)
-        tgl_x_odd_inv->setToggleState(false, dontSendNotification);
+        tgl_x_odd_inv.setToggleState(false, dontSendNotification);
     else
-        tgl_x_odd_inv->setToggleState(true, dontSendNotification);
-    
-    
+        tgl_x_odd_inv.setToggleState(true, dontSendNotification);
+
+
     if (ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YEvenInvParam) < 0.5f)
-        tgl_y_even_inv->setToggleState(false, dontSendNotification);
+        tgl_y_even_inv.setToggleState(false, dontSendNotification);
     else
-        tgl_y_even_inv->setToggleState(true, dontSendNotification);
-    
+        tgl_y_even_inv.setToggleState(true, dontSendNotification);
+
     if (ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YOddInvParam) < 0.5f)
-        tgl_y_odd_inv->setToggleState(false, dontSendNotification);
+        tgl_y_odd_inv.setToggleState(false, dontSendNotification);
     else
-        tgl_y_odd_inv->setToggleState(true, dontSendNotification);
-    
-    
+        tgl_y_odd_inv.setToggleState(true, dontSendNotification);
+
+
     if (ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZEvenInvParam) < 0.5f)
-        tgl_z_even_inv->setToggleState(false, dontSendNotification);
+        tgl_z_even_inv.setToggleState(false, dontSendNotification);
     else
-        tgl_z_even_inv->setToggleState(true, dontSendNotification);
-    
+        tgl_z_even_inv.setToggleState(true, dontSendNotification);
+
     if (ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZOddInvParam) < 0.5f)
-        tgl_z_odd_inv->setToggleState(false, dontSendNotification);
+        tgl_z_odd_inv.setToggleState(false, dontSendNotification);
     else
-        tgl_z_odd_inv->setToggleState(true, dontSendNotification);
- 
-    
+        tgl_z_odd_inv.setToggleState(true, dontSendNotification);
+
+
     if (ourProcessor->getParameter(Ambix_mirrorAudioProcessor::CircularInvParam) < 0.5f)
-        tgl_circular_inv->setToggleState(false, dontSendNotification);
+        tgl_circular_inv.setToggleState(false, dontSendNotification);
     else
-        tgl_circular_inv->setToggleState(true, dontSendNotification);
-    
-    
-    lbl_x_even->setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XEvenParam)), dontSendNotification);
-    lbl_x_odd->setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XOddParam)), dontSendNotification);
-    
-    lbl_y_even->setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YEvenParam)), dontSendNotification);
-    lbl_y_odd->setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YOddParam)), dontSendNotification);
-    
-    lbl_z_even->setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZEvenParam)), dontSendNotification);
-    lbl_z_odd->setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZOddParam)), dontSendNotification);
-    
-    lbl_circular->setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::CircularParam)), dontSendNotification);
-    
-    box_presets->setSelectedId((int)(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::PresetParam) * NUM_PRESETS), dontSendNotification);
+        tgl_circular_inv.setToggleState(true, dontSendNotification);
+
+
+    lbl_x_even.setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XEvenParam)), dontSendNotification);
+    lbl_x_odd.setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::XOddParam)), dontSendNotification);
+
+    lbl_y_even.setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YEvenParam)), dontSendNotification);
+    lbl_y_odd.setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::YOddParam)), dontSendNotification);
+
+    lbl_z_even.setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZEvenParam)), dontSendNotification);
+    lbl_z_odd.setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::ZOddParam)), dontSendNotification);
+
+    lbl_circular.setText(ParamToString(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::CircularParam)), dontSendNotification);
+
+    box_presets.setSelectedId((int)(ourProcessor->getParameter(Ambix_mirrorAudioProcessor::PresetParam) * NUM_PRESETS), dontSendNotification);
 }
 
 void Ambix_mirrorAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
@@ -580,10 +514,10 @@ void Ambix_mirrorAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster
 void Ambix_mirrorAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 {
     Ambix_mirrorAudioProcessor* ourProcessor = getProcessor();
-    
-    if (comboBoxThatHasChanged == box_presets)
+
+    if (comboBoxThatHasChanged == &box_presets)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::PresetParam, (float)box_presets->getSelectedId() / (float)NUM_PRESETS);
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::PresetParam, (float)box_presets.getSelectedId() / (float)NUM_PRESETS);
     }
 
 }
@@ -593,34 +527,34 @@ void Ambix_mirrorAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWas
     Ambix_mirrorAudioProcessor* ourProcessor = getProcessor();
 
     ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::PresetParam, 0.f);
-    
-    if (sliderThatWasMoved == sld_x_even)
+
+    if (sliderThatWasMoved == &sld_x_even)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XEvenParam, (float)sld_x_even->getValue());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XEvenParam, (float)sld_x_even.getValue());
     }
-    else if (sliderThatWasMoved == sld_x_odd)
+    else if (sliderThatWasMoved == &sld_x_odd)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XOddParam, (float)sld_x_odd->getValue());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XOddParam, (float)sld_x_odd.getValue());
     }
-    else if (sliderThatWasMoved == sld_y_even)
+    else if (sliderThatWasMoved == &sld_y_even)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YEvenParam, (float)sld_y_even->getValue());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YEvenParam, (float)sld_y_even.getValue());
     }
-    else if (sliderThatWasMoved == sld_y_odd)
+    else if (sliderThatWasMoved == &sld_y_odd)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YOddParam, (float)sld_y_odd->getValue());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YOddParam, (float)sld_y_odd.getValue());
     }
-    else if (sliderThatWasMoved == sld_z_even)
+    else if (sliderThatWasMoved == &sld_z_even)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZEvenParam, (float)sld_z_even->getValue());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZEvenParam, (float)sld_z_even.getValue());
     }
-    else if (sliderThatWasMoved == sld_z_odd)
+    else if (sliderThatWasMoved == &sld_z_odd)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZOddParam, (float)sld_z_odd->getValue());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZOddParam, (float)sld_z_odd.getValue());
     }
-    else if (sliderThatWasMoved == sld_circular)
+    else if (sliderThatWasMoved == &sld_circular)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::CircularParam, (float)sld_circular->getValue());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::CircularParam, (float)sld_circular.getValue());
     }
 
 }
@@ -628,36 +562,36 @@ void Ambix_mirrorAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWas
 void Ambix_mirrorAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 {
     Ambix_mirrorAudioProcessor* ourProcessor = getProcessor();
-    
+
     ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::PresetParam, 0.f);
-    
-    if (buttonThatWasClicked == tgl_x_even_inv)
+
+    if (buttonThatWasClicked == &tgl_x_even_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XEvenInvParam, (float)tgl_x_even_inv->getToggleState());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XEvenInvParam, (float)tgl_x_even_inv.getToggleState());
     }
-    else if (buttonThatWasClicked == tgl_x_odd_inv)
+    else if (buttonThatWasClicked == &tgl_x_odd_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XOddInvParam, (float)tgl_x_odd_inv->getToggleState());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XOddInvParam, (float)tgl_x_odd_inv.getToggleState());
     }
-    else if (buttonThatWasClicked == tgl_y_even_inv)
+    else if (buttonThatWasClicked == &tgl_y_even_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YEvenInvParam, (float)tgl_y_even_inv->getToggleState());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YEvenInvParam, (float)tgl_y_even_inv.getToggleState());
     }
-    else if (buttonThatWasClicked == tgl_y_odd_inv)
+    else if (buttonThatWasClicked == &tgl_y_odd_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YOddInvParam, (float)tgl_y_odd_inv->getToggleState());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YOddInvParam, (float)tgl_y_odd_inv.getToggleState());
     }
-    else if (buttonThatWasClicked == tgl_z_even_inv)
+    else if (buttonThatWasClicked == &tgl_z_even_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZEvenInvParam, (float)tgl_z_even_inv->getToggleState());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZEvenInvParam, (float)tgl_z_even_inv.getToggleState());
     }
-    else if (buttonThatWasClicked == tgl_z_odd_inv)
+    else if (buttonThatWasClicked == &tgl_z_odd_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZOddInvParam, (float)tgl_z_odd_inv->getToggleState());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZOddInvParam, (float)tgl_z_odd_inv.getToggleState());
     }
-    else if (buttonThatWasClicked == tgl_circular_inv)
+    else if (buttonThatWasClicked == &tgl_circular_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::CircularInvParam, (float)tgl_circular_inv->getToggleState());
+        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::CircularInvParam, (float)tgl_circular_inv.getToggleState());
     }
 
 }

@@ -37,8 +37,8 @@
                                                                     //[/Comments]
 */
 class Ambix_converterAudioProcessorEditor  : public AudioProcessorEditor,
-                                             public ComboBoxListener,
-                                             public ButtonListener
+                                             public ComboBox::Listener,
+                                             public Button::Listener
 {
 public:
     //==============================================================================
@@ -49,10 +49,10 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
 
-    void paint (Graphics& g);
-    void resized();
-    void comboBoxChanged (ComboBox* comboBoxThatHasChanged);
-    void buttonClicked (Button* buttonThatWasClicked);
+    void paint (Graphics& g) override;
+    void resized() override;
+    void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
+    void buttonClicked (Button* buttonThatWasClicked) override;
 
 
 
