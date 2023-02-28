@@ -23,38 +23,9 @@
     #define AMBI_ORDER 5   // N
 #endif
 
-#ifndef    BINAURAL_DECODER
-    #define BINAURAL_DECODER 1  // if 0 use as normal decoder without convolution
-    #warning BINAURAL_DECODER was not defined - falling back to TRUE
-#endif
-
 #ifndef    NUM_OUTPUTS
-    #define NUM_OUTPUTS 48 // number of outputs for non-binaural decoder
+    #define NUM_OUTPUTS 64 // number of outputs for non-binaural decoder
 #endif
-
-#ifdef Plugin_Name
-    #undef Plugin_Name
-#endif
-
-// quotes for our plugin name
-#define QU(x) #x
-#define QUH(x) QU(x)
-
-// generate plugin name with ambi order
-#if BINAURAL_DECODER
-    #define Plugin_Name                   ambix_binaural_o
-    #define Plugin_Code                    1094871344 // ABi0
-#else
-    #define Plugin_Name                   ambix_decoder_o
-    #define Plugin_Code                    1095001392 // ADe0
-#endif
-
-
-#define JucePlugin_Name                   QUH(Plugin_Name) QUH(AMBI_ORDER)
-
-#define ADD(x, y) ((x) + (y))
-
-#define JucePlugin_PluginCode             ADD(Plugin_Code,AMBI_ORDER)
 
 //////////////////////////////////////////////
 
@@ -237,26 +208,6 @@
 #endif
 #ifndef  JucePlugin_PluginCode
  #define JucePlugin_PluginCode             'ABi5'
-#endif
-#ifndef  JucePlugin_MaxNumInputChannels
- #define JucePlugin_MaxNumInputChannels    AMBI_CHANNELS
-#endif
-#ifndef  JucePlugin_MaxNumOutputChannels
-
-    #if BINAURAL_DECODER
-        #define JucePlugin_MaxNumOutputChannels   2
-    #else
-        #define JucePlugin_MaxNumOutputChannels   NUM_OUTPUTS
-    #endif
- 
-#endif
-#ifndef  JucePlugin_PreferredChannelConfigurations
- 
-    #if BINAURAL_DECODER
-        #define JucePlugin_PreferredChannelConfigurations  {AMBI_CHANNELS, 2}
-    #else
-            #define JucePlugin_PreferredChannelConfigurations  {AMBI_CHANNELS, NUM_OUTPUTS}
-    #endif
 #endif
 #ifndef  JucePlugin_IsSynth
  #define JucePlugin_IsSynth                0

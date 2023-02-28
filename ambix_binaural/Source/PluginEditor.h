@@ -4,7 +4,7 @@
    This file is part of the ambix Ambisonic plug-in suite.
    Copyright (c) 2013/2014 - Matthias Kronlachner
    www.matthiaskronlachner.com
-   
+
    Permission is granted to use this software under the terms of:
    the GPL v2 (or any later version)
 
@@ -37,11 +37,11 @@
                                                                     //[/Comments]
 */
 class Ambix_binauralAudioProcessorEditor  : public AudioProcessorEditor,
-                                            public ButtonListener,
+                                            public Button::Listener,
                                             public Timer,
                                             public ChangeListener,
-                                            public ComboBoxListener,
-                                            public SliderListener
+                                            public ComboBox::Listener,
+                                            public Slider::Listener
 {
 public:
     //==============================================================================
@@ -52,64 +52,65 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
 
-    void paint (Graphics& g);
-    void resized();
-    void buttonClicked (Button* buttonThatWasClicked);
+    void paint (Graphics& g) override;
+    void resized() override;
+    void buttonClicked (Button* buttonThatWasClicked) override;
 
-    void changeListenerCallback (ChangeBroadcaster *source);
-    
-    void comboBoxChanged (ComboBox* comboBoxThatHasChanged);
-    
-    void sliderValueChanged (Slider* sliderThatWasMoved);
-    
+    void changeListenerCallback (ChangeBroadcaster *source) override;
+
+    void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
+
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
+
     static void menuItemChosenCallback (int result, Ambix_binauralAudioProcessorEditor* demoComponent);
-    
+
     void UpdatePresets();
-    
-    void timerCallback();
+
+    void timerCallback() override;
 
     void UpdateText();
-    
+
     void DrawMeters();
     void UpdateMeters();
-    
+
 private:
-    
+
     Ambix_binauralAudioProcessor* getProcessor() const
     {
         return static_cast <Ambix_binauralAudioProcessor*> (getAudioProcessor());
     }
+    LookAndFeel_V3 globalLaF;
     TooltipWindow tooltipWindow;
 
     //==============================================================================
-    ScopedPointer<Label> label;
-    ScopedPointer<TextEditor> txt_preset;
+    Label label;
+    TextEditor txt_preset;
     PopupMenu popup_presets;
     OwnedArray<PopupMenu> popup_submenu;
-    ScopedPointer<Label> label5;
-    ScopedPointer<TextEditor> txt_debug;
-    ScopedPointer<TextButton> btn_open;
-    ScopedPointer<Label> label2;
-    ScopedPointer<Label> label3;
-    ScopedPointer<Label> label4;
-    ScopedPointer<Label> num_ch;
-    ScopedPointer<Label> num_spk;
-    ScopedPointer<Label> num_hrtf;
-    ScopedPointer<TextButton> btn_preset_folder;
-    ScopedPointer<Slider> sld_gain;
-    ScopedPointer<ToggleButton> tgl_save_preset;
+    Label label5;
+    TextEditor txt_debug;
+    TextButton btn_open;
+    Label label2;
+    Label label3;
+    Label label4;
+    Label num_ch;
+    Label num_spk;
+    Label num_hrtf;
+    TextButton btn_preset_folder;
+    Slider sld_gain;
+    ToggleButton tgl_save_preset;
 
 #if BINAURAL_DECODER
-    ScopedPointer<ToggleButton> tgl_load_irs;
-    ScopedPointer<ComboBox> box_conv_buffer;
+    ToggleButton tgl_load_irs;
+    ComboBox box_conv_buffer;
 #endif
-    
+
     OwnedArray<MyMeter> _meters;
-    
+
     OwnedArray<Label> _labels;
-    
+
     OwnedArray<MyMeterScale> _scales;
-    
+
     int _width;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_binauralAudioProcessorEditor)

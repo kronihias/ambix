@@ -1,5 +1,7 @@
-ADD_SUBDIRECTORY ( ambix_rotator )
+SET( WITH_EIGEN TRUE )
+SET( WITH_SphericalHarmonic TRUE )
+SET( WITH_T_DESIGN TRUE )
 
-IF (BUILD_STANDALONE)
-	ADD_SUBDIRECTORY ( ambix_rotator_standalone )
-ENDIF (BUILD_STANDALONE)
+SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_rotator )
+
+INCLUDE(${SRC_DIR}/Subproject.cmake)

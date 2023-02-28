@@ -1,5 +1,3 @@
-ADD_SUBDIRECTORY ( ambix_mirror )
+SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_mirror )
 
-IF (BUILD_STANDALONE)
-	ADD_SUBDIRECTORY ( ambix_mirror_standalone )
-ENDIF (BUILD_STANDALONE)
+INCLUDE(${SRC_DIR}/Subproject.cmake)

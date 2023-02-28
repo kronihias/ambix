@@ -35,7 +35,7 @@ public:
 
     //==============================================================================
     // This is just a standard Juce paint method...
-    void paint (Graphics& g);
+    void paint (Graphics& g) override;
 };
 
 

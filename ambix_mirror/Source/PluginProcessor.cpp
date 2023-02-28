@@ -1,19 +1,19 @@
 /*
  ==============================================================================
- 
+
  This file is part of the ambix Ambisonic plug-in suite.
  Copyright (c) 2013/2014 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  ambix is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -24,6 +24,10 @@
 
 //==============================================================================
 Ambix_mirrorAudioProcessor::Ambix_mirrorAudioProcessor() :
+    AudioProcessor (BusesProperties()
+        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+    ),
     x_even_param(0.75f),
     x_even_inv_param(0.f),
     x_odd_param(0.75f),
@@ -43,7 +47,7 @@ Ambix_mirrorAudioProcessor::Ambix_mirrorAudioProcessor() :
 {
     _gain_factors.resize(AMBI_CHANNELS);
     gain_factors.resize(AMBI_CHANNELS);
-    
+
     for (int i=0; i<gain_factors.size(); i++) {
         gain_factors.set(i, 1.f);
         _gain_factors.set(i, 1.f);
@@ -52,7 +56,7 @@ Ambix_mirrorAudioProcessor::Ambix_mirrorAudioProcessor() :
 
 Ambix_mirrorAudioProcessor::~Ambix_mirrorAudioProcessor()
 {
-    
+
 }
 
 //==============================================================================
@@ -143,7 +147,7 @@ void Ambix_mirrorAudioProcessor::setParameter (int index, float newValue)
 		default:
             break;
 	}
-    
+
     // notify gui
     sendChangeMessage();
 }
@@ -169,15 +173,15 @@ const String Ambix_mirrorAudioProcessor::getParameterName (int index)
         case PresetParam:           return "Preset";
 		default:								break;
 	}
-	
-	return String::empty;
+
+	return String();
 }
 
 const String Ambix_mirrorAudioProcessor::getParameterText (int index)
 {
-    
+
     String text;
-    
+
     switch (index)
 	{
         case XEvenParam:
@@ -250,25 +254,25 @@ const String Ambix_mirrorAudioProcessor::getParameterText (int index)
             else
                 text = "No";
             break;
-            
+
         case PresetParam:
             text = preset_name;
             break;
 		default:
             break;
 	}
-    
+
 	return text;
 }
 
 void Ambix_mirrorAudioProcessor::SwitchPreset()
 {
-    
+
     int active_preset = (int)(preset_param * NUM_PRESETS);
-    
+
     // 1 do nothing...
     preset_name = "";
-    
+
     // first set all zero
     if (active_preset > 1)
     {
@@ -276,67 +280,67 @@ void Ambix_mirrorAudioProcessor::SwitchPreset()
         setParameterNotifyingHost(XEvenInvParam, 0.f);
         setParameterNotifyingHost(XOddParam, 0.75f);
         setParameterNotifyingHost(XOddInvParam, 0.f);
-        
+
         setParameterNotifyingHost(YEvenParam, 0.75f);
         setParameterNotifyingHost(YEvenInvParam, 0.f);
         setParameterNotifyingHost(YOddParam, 0.75f);
         setParameterNotifyingHost(YOddInvParam, 0.f);
-        
+
         setParameterNotifyingHost(ZEvenParam, 0.75f);
         setParameterNotifyingHost(ZEvenInvParam, 0.f);
         setParameterNotifyingHost(ZOddParam, 0.75f);
         setParameterNotifyingHost(ZOddInvParam, 0.f);
-        
+
         setParameterNotifyingHost(CircularParam, 0.75f);
         setParameterNotifyingHost(CircularInvParam, 0.f);
     }
-    
+
     switch (active_preset) {
         case 2:
             // all zero done...
             preset_name = "no change";
             break;
-            
+
         case 3: // flip left right -> invert Y Odd
             setParameterNotifyingHost(YOddInvParam, 1.f);
             preset_name = "flip left <> right";
             break;
-            
+
         case 4: // flop front back -> invert X Odd
             setParameterNotifyingHost(XOddInvParam, 1.f);
             preset_name = "flop front <> back";
             break;
-            
+
         case 5: // flap top bottom -> invert Z Odd
             setParameterNotifyingHost(ZOddInvParam, 1.f);
             preset_name = "flap top <> bottom";
             break;
-            
+
         case 6: // merge left+right
             setParameterNotifyingHost(YOddParam, 0.f); // zero
             setParameterNotifyingHost(YEvenParam, 1.f); // +6 dB
             setParameterNotifyingHost(CircularParam, 0.530959f); // -6 dB
             preset_name = "merge left + right";
             break;
-            
+
         case 7: // merge front+back
             setParameterNotifyingHost(XOddParam, 0.f); // zero
             setParameterNotifyingHost(XEvenParam, 1.f); // +6 dB
             setParameterNotifyingHost(CircularParam, 0.530959f); // -6 dB
             preset_name = "merge front+back";
             break;
-            
+
         case 8: // merge top+bottom
             setParameterNotifyingHost(ZOddParam, 0.f); // zero
             setParameterNotifyingHost(ZEvenParam, 1.f); // +6 dB
             setParameterNotifyingHost(CircularParam, 0.530959f); // -6 dB
             preset_name = "merge top+bottom";
             break;
-            
+
         default:
             break;
     }
-    
+
 }
 
 const String Ambix_mirrorAudioProcessor::getInputChannelName (int channelIndex) const
@@ -403,7 +407,7 @@ void Ambix_mirrorAudioProcessor::setCurrentProgram (int index)
 
 const String Ambix_mirrorAudioProcessor::getProgramName (int index)
 {
-    return String::empty;
+    return String();
 }
 
 void Ambix_mirrorAudioProcessor::changeProgramName (int index, const String& newName)
@@ -418,8 +422,8 @@ void Ambix_mirrorAudioProcessor::prepareToPlay (double sampleRate, int samplesPe
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-    
-    
+
+
 }
 
 void Ambix_mirrorAudioProcessor::releaseResources()
@@ -433,24 +437,24 @@ void Ambix_mirrorAudioProcessor::calcParams()
     for (int i=0; i < gain_factors.size(); i++) {
         gain_factors.set(i, 1.f);
     }
-    
+
     for (int acn = 0; acn < AMBI_CHANNELS; acn++)
     {
-        
+
         float* g = &gain_factors.getReference(acn);
-        
+
         int l = 0; // manchmal auch n
         int m = 0;
-        
+
         ACNtoLM(acn, l, m);
-        
+
         ///////////////
         // Z SYMMETRY
         // z even symmetry
         if (acn == 0)
         {
             *g *= ParamToRMS(z_even_param);
-            
+
             if (z_even_inv_param >= 0.5)
                 *g *= -1;
         }
@@ -460,11 +464,11 @@ void Ambix_mirrorAudioProcessor::calcParams()
         //else if ( ((l % 2) && (m % 2)) || (!(l % 2) && !(m % 2)) )
         {
             *g *= ParamToRMS(z_even_param);
-            
+
             if (z_even_inv_param >= 0.5)
                 *g *= -1;
         }
-        
+
         // z odd symmetry
         if (acn == 0)
         {
@@ -476,18 +480,18 @@ void Ambix_mirrorAudioProcessor::calcParams()
         //else if ( ((l % 2) && !(m % 2)) ||  (!(l % 2) && (m % 2)))
         {
             *g *= ParamToRMS(z_odd_param);
-            
+
             if (z_odd_inv_param >= 0.5)
                 *g *= -1;
         }
-        
+
         /////////////////
         // Y SYMMETRY
         // y even symmetry
         if (m >= 0)
         {
             *g *= ParamToRMS(y_even_param);
-            
+
             if (y_even_inv_param >= 0.5)
                 *g *= -1;
         }
@@ -495,12 +499,12 @@ void Ambix_mirrorAudioProcessor::calcParams()
         if (m < 0)
         {
             *g *= ParamToRMS(y_odd_param);
-            
+
             if (y_odd_inv_param >= 0.5)
                 *g *= -1;
         }
-        
-        
+
+
         /////////////////
         // X SYMMETRY
         // x even symmetry
@@ -508,7 +512,7 @@ void Ambix_mirrorAudioProcessor::calcParams()
         if ( ((m < 0) && (m % 2)) || ((m >= 0) && !(m % 2)) )
         {
             *g *= ParamToRMS(x_even_param);
-            
+
             if (x_even_inv_param >= 0.5)
                 *g *= -1;
         }
@@ -517,42 +521,48 @@ void Ambix_mirrorAudioProcessor::calcParams()
         if ( ((m < 0) && !(m % 2)) || ((m >= 0) && (m % 2)) )
         {
             *g *= ParamToRMS(x_odd_param);
-            
+
             if (x_odd_inv_param >= 0.5)
                 *g *= -1;
         }
-        
+
         /////////////////
         // BOOST 2D (RING)
-        
+
         if (l == m || l == -m)
         {
             *g *= ParamToRMS(circular_param);
-            
+
             if (circular_inv_param >= 0.5)
                 *g *= -1;
         }
     }
 }
 
+bool Ambix_mirrorAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+{
+    return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
+            (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+}
+
 void Ambix_mirrorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)
 {
-    
+
     int NumSamples = buffer.getNumSamples();
-    
-    
+
+
     // save old parameters for interpolation (start ramp)
     _gain_factors = gain_factors;
-    
+
     calcParams();
-    
-    
+
+
     for (int acn = 0; acn < getTotalNumInputChannels(); acn++)
     {
         buffer.applyGainRamp(acn, 0, NumSamples, _gain_factors.getUnchecked(acn), gain_factors.getUnchecked(acn));
-        
+
     }
-    
+
 }
 
 //==============================================================================
@@ -573,15 +583,15 @@ void Ambix_mirrorAudioProcessor::getStateInformation (MemoryBlock& destData)
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
     // Create an outer XML element..
-    
+
     XmlElement xml ("MYPLUGINSETTINGS");
-    
+
     // add some attributes to it..
     for (int i=0; i < getNumParameters(); i++)
     {
         xml.setAttribute (String(i), getParameter(i));
     }
-    
+
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
 }
@@ -590,9 +600,9 @@ void Ambix_mirrorAudioProcessor::setStateInformation (const void* data, int size
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
-    
-    ScopedPointer<XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
-    
+
+    std::unique_ptr<XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+
     if (xmlState != nullptr)
     {
         // make sure that it's actually our type of XML object..
@@ -602,7 +612,7 @@ void Ambix_mirrorAudioProcessor::setStateInformation (const void* data, int size
                 setParameter(i, xmlState->getDoubleAttribute(String(i)));
             }
         }
-        
+
     }
 }
 

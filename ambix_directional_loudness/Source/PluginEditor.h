@@ -1,19 +1,19 @@
 /*
  ==============================================================================
- 
+
  This file is part of the ambix Ambisonic plug-in suite.
  Copyright (c) 2013/2014 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  ambix is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -39,7 +39,7 @@
 */
 class Ambix_directional_loudnessAudioProcessorEditor  : public AudioProcessorEditor,
                                                         public ChangeListener,
-                                                        public ButtonListener
+                                                        public Button::Listener
 {
 public:
     //==============================================================================
@@ -50,12 +50,12 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
 
-    void paint (Graphics& g);
-    void resized();
-    
-    void changeListenerCallback (ChangeBroadcaster *source);
-    
-    void buttonClicked (Button* buttonThatWasClicked);
+    void paint (Graphics& g) override;
+    void resized() override;
+
+    void changeListenerCallback (ChangeBroadcaster *source) override;
+
+    void buttonClicked (Button* buttonThatWasClicked) override;
 
     void selectFilterTab(int id);
 
@@ -66,31 +66,30 @@ public:
     static const int solo_symbol_over_pngSize;
     static const char* solo_symbol_act_png;
     static const int solo_symbol_act_pngSize;
-    
+
 private:
-    //[UserVariables]   -- You can add your own custom variables in this section.
-    //[/UserVariables]
+    LookAndFeel_V3 globalLaF;
 
     //==============================================================================
-    ScopedPointer<Label> lbl_gd;
-    ScopedPointer<Component> filtergraph;
-    
-    ScopedPointer<TabbedComponent> tabbedComponent;
-    ScopedPointer<TabbedComponent> tabbedComponent2;
-    
+    Label lbl_gd;
+    Component filtergraph;
+
+    TabbedComponent tabbedComponent;
+    TabbedComponent tabbedComponent2;
+
     OwnedArray<FilterTab> _filtertabs;
-    
-    ScopedPointer<PanningGraph> panninggraph;
-    
-    ScopedPointer<ImageButton> btn_solo_reset;
-    
+
+    PanningGraph panninggraph;
+
+    ImageButton btn_solo_reset;
+
     TooltipWindow tooltipWindow;
-    
+
     Ambix_directional_loudnessAudioProcessor* getProcessor() const
     {
         return static_cast <Ambix_directional_loudnessAudioProcessor*> (getAudioProcessor());
     }
-    
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_directional_loudnessAudioProcessorEditor)
 };

@@ -1,19 +1,19 @@
 /*
  ==============================================================================
- 
+
  This file is part of the ambix Ambisonic plug-in suite.
  Copyright (c) 2013/2014 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  ambix is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -26,21 +26,25 @@
 
 //==============================================================================
 Ambix_maxreAudioProcessor::Ambix_maxreAudioProcessor() :
-apply_param(0.5f),
-_apply_param(0.5f),
-order_param(1.f),
-order(AMBI_ORDER),
-_order(-1)
+    AudioProcessor (BusesProperties()
+        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+    ),
+    apply_param(0.5f),
+    _apply_param(0.5f),
+    order_param(1.f),
+    order(AMBI_ORDER),
+    _order(-1)
 {
     weights.resize(AMBI_ORDER+1);
-    
+
     // set all weights
     for (int i=0; i < weights.size(); i++) {
         weights.set(i, 1.f);
     }
-    
+
     CalcParams();
-    
+
 }
 
 Ambix_maxreAudioProcessor::~Ambix_maxreAudioProcessor()
@@ -66,7 +70,7 @@ float Ambix_maxreAudioProcessor::getParameter (int index)
             return apply_param;
         case OrderParam:
             return order_param;
-            
+
 		default:
             return 0.f;
 	}
@@ -91,7 +95,7 @@ void Ambix_maxreAudioProcessor::setParameter (int index, float newValue)
             order_param = newValue;
             order = (int)round(order_param*AMBI_ORDER); // AMBI_ORDER is maximum
             break;
-            
+
 		default:
             break;
 	}
@@ -105,9 +109,9 @@ const String Ambix_maxreAudioProcessor::getParameterName (int index)
             return "apply";
         case OrderParam:
             return "order";
-            
+
 		default:
-            return String::empty;
+            return String();
 	}
 }
 
@@ -127,11 +131,11 @@ const String Ambix_maxreAudioProcessor::getParameterText (int index)
             }
         case OrderParam:
             return String(order);
-            
+
 		default:
-            return String::empty;
+            return String();
 	}
-    
+
 }
 
 const String Ambix_maxreAudioProcessor::getInputChannelName (int channelIndex) const
@@ -198,7 +202,7 @@ void Ambix_maxreAudioProcessor::setCurrentProgram (int index)
 
 const String Ambix_maxreAudioProcessor::getProgramName (int index)
 {
-    return String::empty;
+    return String();
 }
 
 void Ambix_maxreAudioProcessor::changeProgramName (int index, const String& newName)
@@ -208,12 +212,12 @@ void Ambix_maxreAudioProcessor::changeProgramName (int index, const String& newN
 //==============================================================================
 void Ambix_maxreAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    
+
 }
 
 void Ambix_maxreAudioProcessor::releaseResources()
 {
-    
+
 }
 
 inline double calccostheta(int N)
@@ -227,10 +231,10 @@ void Ambix_maxreAudioProcessor::CalcParams()
     if (_order != order || _apply_param != apply_param)
     {
         costheta = calccostheta(order); // 137.9°/(N+1.51)
-        
+
         legendre_u.Calc(order, costheta);
         Pn = legendre_u.Get();
-        
+
         if (apply_param < 0.33f) // apply reciprokal
         {
             for (int i=0; i < Pn.size(); i++) {
@@ -241,12 +245,12 @@ void Ambix_maxreAudioProcessor::CalcParams()
                 weights.set(i, (float)Pn(i));
             }
         }
-        
+
         for (int i=Pn.size(); i < weights.size(); i++)
         {
             weights.set(i, 0.f);
         }
-        
+
         /*
         std::cout << "weights: ";
         for (int i=0; i < weights.size(); i++)
@@ -255,32 +259,38 @@ void Ambix_maxreAudioProcessor::CalcParams()
         }
         std::cout << std::endl;
         */
-        
+
         _order = order;
         _apply_param = apply_param;
     }
-    
+
+}
+
+bool Ambix_maxreAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+{
+    return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
+            (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
 }
 
 void Ambix_maxreAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)
 {
     CalcParams();
-    
+
     // do scaling only if weighting wanted
     if (apply_param < 0.33f || apply_param > 0.66f) {
-        
+
         int numSamples = buffer.getNumSamples();
         int l = 0; // 0, 1, 2, 3, 4, ......
         int m = 0;
-        
+
         for (int i=0; i < buffer.getNumChannels(); i++) {
-            
+
             ACNtoLM(i, l, m); // get order depending on ACN
-            
+
             // weight the channel, no interpolation!
-            
+
             buffer.applyGain(i, 0, numSamples, weights.getUnchecked(l));
-            
+
         }
     }
 }

@@ -47,33 +47,33 @@ public:
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
 
-    void paint (Graphics& g);
-    void resized();
-    void mouseUp (const MouseEvent& e);
+    void paint (Graphics& g) override;
+    void resized() override;
+    void mouseUp (const MouseEvent& e) override;
     void setValue(float rms, float dpk);
     void reset();
-    
+
     // Binary resources:
     static const char* meter_gradient_png;
     static const int meter_gradient_pngSize;
     static const char* meter_gradient_off_png;
     static const int meter_gradient_off_pngSize;
-    
-    
-    
+
+
+
     bool _peak_hold;
 private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     //[/UserVariables]
 
     //==============================================================================
-    
-    Image cachedImage_meter_gradient_png;
-    
-    Image cachedImage_meter_gradient_off_png;
-    
 
-    
+    Image cachedImage_meter_gradient_png;
+
+    Image cachedImage_meter_gradient_off_png;
+
+
+
     float dpk_scale;
     float rms_scale;
     float dpk_hold_scale;
@@ -90,25 +90,25 @@ public:
     //==============================================================================
     MyMeterScale ();
     ~MyMeterScale();
-    
+
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
     //[/UserMethods]
-    
-    void paint (Graphics& g);
-    // void resized();
-    
+
+    void paint (Graphics& g) override;
+    // void resized() override;
+
     // Binary resources:
-    
+
     static const char* meter_scale_png;
     static const int meter_scale_pngSize;
-    
+
 private:
-    
+
     //==============================================================================
-    
+
     Image cachedImage_meter_scale_png;
-    
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MyMeterScale);
 };

@@ -1,18 +1,18 @@
 /*
  ==============================================================================
- 
+
  Copyright (c) 2013/2015 - Matthias Kronlachner
  www.matthiaskronlachner.com
- 
+
  Permission is granted to use this software under the terms of:
  the GPL v2 (or any later version)
- 
+
  Details of these licenses can be found at: www.gnu.org/licenses
- 
+
  mcfx is distributed in the hope that it will be useful, but WITHOUT ANY
  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
- 
+
  ==============================================================================
  */
 
@@ -35,13 +35,9 @@
 #endif
 
 
-// #if JUCE_USE_SSE_INTRINSICS
-#if JUCE_WINDOWS
-    #include <intrin.h>
-#else
-    #include <x86intrin.h>
+#if JUCE_USE_SSE_INTRINSICS
+    #include <xmmintrin.h>
 #endif
-// #endif
 
 
 // Aligned Memory Allocation and Deallocation
@@ -62,7 +58,7 @@ inline void aligned_free(void *ptr) {
 #else
     free(ptr);
 #endif
-    
+
 }
 
 
@@ -72,18 +68,18 @@ inline void aligned_free(void *ptr) {
 class InNode
 {
 public:
-    
+
     InNode(int in, int numpartitions, int partitionsize); // allocates memory
-    
+
     ~InNode(); // deallocates memory
-    
+
 private:
-    
+
     friend class MtxConvSlave;
-    
+
     int                 in_; // input channel assignment
     int                 numpartitions_; // number of partitions (length of FDL)
-    
+
     // complex fft data
 #if SPLIT_COMPLEX
     float               **a_re_; // N/2+1
@@ -91,7 +87,7 @@ private:
 #else
     fftwf_complex       **a_c_; // N+1 -> interleaved complex data
 #endif
-    
+
 };
 
 ////////////////////////////
@@ -100,19 +96,19 @@ private:
 class FilterNode
 {
 public:
-    
+
     FilterNode(InNode *innode, int numpartitions, int partitionsize); // allocates memory
-    
+
     ~FilterNode(); // deallocates memory
-    
+
 private:
-    
+
     friend class MtxConvSlave;
-    
+
     InNode              *innode_; // assigned input node
-    
+
     int numpartitions_; // number of partitions (length of FDL)
-    
+
     // complex fft data
 #if SPLIT_COMPLEX
     float               **b_re_; // N/2+1
@@ -120,7 +116,7 @@ private:
 #else
     fftwf_complex       **b_c_; // N+1 -> interleaved complex data
 #endif
-    
+
 };
 
 ////////////////////////////
@@ -129,7 +125,7 @@ private:
 class OutNode
 {
 public:
-    
+
     OutNode(int out, int partitionsize, int numpartitions) // resize buffer
     {
         numpartitions_ = numpartitions;
@@ -137,7 +133,7 @@ public:
         out_ = out;
         outbuf_.setSize(1, partitionsize);
         outbuf_.clear();
-        
+
         // allocate complex output for each partition stage
 #if SPLIT_COMPLEX
         c_re_ = new float* [numpartitions_];
@@ -153,25 +149,25 @@ public:
             // vdsp framework needs N split complex samples
             c_re_[i] = reinterpret_cast<float*>( aligned_malloc( (partitionsize+1)*sizeof(float), 16 ) );
             c_im_[i] = reinterpret_cast<float*>( aligned_malloc( (partitionsize+1)*sizeof(float), 16 ) );
-            
-            
+
+
             FloatVectorOperations::clear(c_re_[i], partitionsize+1);
             FloatVectorOperations::clear(c_im_[i], partitionsize+1);
-        
+
 #else
             // fftw needs N+1 complex samples
             c_c_[i] = reinterpret_cast<fftwf_complex*>( aligned_malloc( (partitionsize+1)*sizeof(fftwf_complex), 16 ) );
-            
+
             FloatVectorOperations::clear((float*)c_c_[i], 2*(partitionsize+1));
-#endif  
+#endif
         }
-        
+
     };
-    
+
     ~OutNode()
     {
         filternodes_.clear();
-        
+
         // free memory in destructor
         for (int i=0; i<numpartitions_; i++)
         {
@@ -193,19 +189,19 @@ public:
         delete[] c_c_;
 #endif
     };
-    
+
 private:
-    
+
     friend class MtxConvSlave;
-    
+
     int                 out_; // output channel assignement
-    
+
     Array<FilterNode*>  filternodes_; // a list of all assigned filternodes
-    
+
     AudioSampleBuffer   outbuf_; // output samples, 1 channels (no concur. access problem)
-    
+
     int                 numpartitions_;
-    
+
         // complex fft data
 #if SPLIT_COMPLEX
     float               **c_re_; // N/2+1
@@ -224,16 +220,16 @@ class MtxConvSlave : public Thread
 {
 public:
     MtxConvSlave ();
-    
+
     ~MtxConvSlave ();
-    
+
 private:
     friend class MtxConvMaster;
-    
-    
+
+
     // threadfunct
     void run ();
-    
+
     // this is called by the callback or thread to perform convolution of one input signal partition
     void Process (int filt_part_idx);
 
@@ -250,49 +246,49 @@ private:
     // returns true if all partitions finished in time, false if some have been skipped
     // if forcesync = true this will wait until all partitions are finished
     bool ReadOutput(int numsamples, bool forcesync);
-    
+
     // start/stop thread
     void StartProc();
     void StopProc();
-    
+
     bool Configure ( int partitionsize,
                      int numpartitions,
                      int offset,
                      int priority,
                      AudioSampleBuffer *inbuf,
                      AudioSampleBuffer *outbuf );
-    
+
     void SetBufsize ( int inbufsize, int outbufsize, int blocksize );
-    
+
     bool AddFilter ( int in,
                      int out,
                      const AudioSampleBuffer& data);
-    
+
     int CheckInNode (int in, bool create); // return InNode ID if found, otherwise returns id of newly created or -1 if not available
     int CheckOutNode (int out, bool create); // return OutNode ID if found, otherwise returns id of newly created or -1 if not available
-    
+
     // Set all Input/Output Buffers to Zero
     void Reset ();
-    
+
     // Destroy all allocated Memory....
     void Cleanup ();
-    
+
     // print debug info
     void DebugInfo();
-    
+
 	// write to debug file
 	void WriteLog(String &text);
-	
-	
+
+
     AudioSampleBuffer   *inbuf_;            // Shared Input Buffer
     AudioSampleBuffer   *outbuf_;           // Shared Output Buffer
-	
+
 	int					inbufsize_;			// size of time domain input buffer (2*maxpart_)
 	int                 outbufsize_;        // size of time domain output buffer (2*maxsize_)
 
     int                 inoffset_;          // current input ring buffer offset
     int                 outoffset_;         // current output ring buffer offset (of shared output buf)
-    
+
     int                 numnewinsamples_;   // number of new samples in the input buffer since last process
     int                 outnodeoffset_;     // offset in the outnode buffer
 
@@ -311,11 +307,11 @@ private:
 
     float               *fft_t_;             // time data for fft/ifft -> 2*N
     float               fft_norm_;           // normalization for fft
-    
+
 #if SPLIT_COMPLEX
     FFTSetup            vdsp_fft_setup_;     // Apple vDSP FFT plan
     DSPSplitComplex     splitcomplex_;
-    
+
     float               *fft_re_;            // N+1
     float               *fft_im_;            // N+1
     int                 vdsp_log2_;      // vDSP needs the exponent of two
@@ -325,12 +321,12 @@ private:
     float               *fftwf_t_data_;      // FFTWF buffer for time domain signal (2*N)
     fftwf_complex       *fft_c_;             // FFTWF buffer for complex signal (N+1)
 #endif
-    
+
     OwnedArray<InNode> innodes_;            // holds input nodes
     OwnedArray<FilterNode> filternodes_;    // holds filter nodes
     OwnedArray<OutNode> outnodes_;          // holds output nodes
-    
-	ScopedPointer<FileOutputStream>	debug_out_; // Debug output Text File
+
+	std::unique_ptr<FileOutputStream>	debug_out_; // Debug output Text File
 };
 
 
@@ -339,17 +335,17 @@ private:
 
 class MtxConvMaster
 {
-    
-    
+
+
 public:
-    
+
     friend class MtxConvSlave;
-    
-    
+
+
     MtxConvMaster();
     ~MtxConvMaster();
-    
-    
+
+
     // Configure the Convolution Machine with fixed In/Out Configuration,
     // Blocksize and Max Impulse Response length
     bool Configure ( int numins,
@@ -359,36 +355,36 @@ public:
                      int minpart,
                      int maxpart,
                      bool safemode=false); // will add a delay of minpart_ samples to make sure there is never a buffer underrun for hosts that dare to send partial blocks(Adobe and Steinberg)
-    
+
     // Add an Impulse Response with dedicated Input/Output assignement
     bool AddFilter ( int in,
                      int out,
                      const AudioSampleBuffer& data );
-    
+
     // Start the Processing
     void StartProc();
-    
+
     // Stop the Processing
     void StopProc();
-    
+
     // Do the processing
     // forcesync = true will make sure that all partitions are going to be finished - use this for offline rendering!
     void processBlock(AudioSampleBuffer& inbuf, juce::AudioSampleBuffer &outbuf, int numsamples, bool forcesync=true);
-    
-    
+
+
     // Set all Input/Output Buffers to Zero
     void Reset ();
-    
-    
+
+
     // Remove all Filter and Set Buffers to zero
     void Cleanup ();
-    
+
     // print debug info
     void DebugInfo();
-    
+
 	// write to debug file
 	void WriteLog(String &text);
-	
+
     // get the number of skipped cycles due to unfinished partitions
     int getSkipCount()
     {
@@ -433,7 +429,7 @@ private:
 
     OwnedArray<MtxConvSlave>    partitions_;// these are my partitions with different size
 
-	ScopedPointer<FileOutputStream>	debug_out_; // Debug output Text File
+	std::unique_ptr<FileOutputStream>	debug_out_; // Debug output Text File
 };
 
 
