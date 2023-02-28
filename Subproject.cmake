@@ -94,11 +94,6 @@ ENDIF(WITH_LegendreU)
 #SORT IT
 LIST ( SORT SOURCE )
 
-IF(NOT APPLE)
-	SET ( WITH_FFTW3 TRUE )
-ENDIF(NOT APPLE)
-
-
 juce_add_plugin (${SUBPROJECT_NAME}
     PLUGIN_MANUFACTURER_CODE Kron
     PLUGIN_CODE ABi5
@@ -137,3 +132,10 @@ target_link_libraries (${SUBPROJECT_NAME} PRIVATE
     juce::juce_recommended_lto_flags
     #juce::juce_recommended_warning_flags
 	)
+
+IF(WITH_FFTW3)
+	target_link_libraries (${SUBPROJECT_NAME} PRIVATE
+		${FFTW3F_LIBRARY}
+		${FFTW3F_THREADS_LIBRARY}
+	)
+ENDIF(WITH_FFTW3)
