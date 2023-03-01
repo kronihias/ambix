@@ -27,17 +27,6 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-#ifdef __APPLE__
-  #include <OpenGL/gl.h> //OS x libs
-  #include <OpenGL/glu.h>
-#else
-    #ifdef _WIN32
-      #include <windows.h>
-    #endif
-  #include <GL/gl.h>
-  #include <GL/glu.h>
-#endif
-
 using namespace ::juce::gl;
 
 class SolidSphere
