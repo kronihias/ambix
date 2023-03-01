@@ -68,10 +68,8 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     btn_open.setTooltip ("browse presets or open from file");
     btn_open.setButtonText ("open");
     btn_open.addListener (this);
-    btn_open.setColour (TextButton::buttonColourId, Colours::grey);
+    btn_open.setColour (TextButton::buttonColourId, Colours::white);
     btn_open.setColour (TextButton::buttonOnColourId, Colours::blue);
-    btn_open.setColour (TextButton::textColourOnId, Colours::black);
-    btn_open.setColour (TextButton::textColourOffId, Colours::black);
 
     addAndMakeVisible (label2);
     label2.setText("Virtual loudspeakers: ", dontSendNotification);
@@ -137,10 +135,8 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     btn_preset_folder.setTooltip ("choose another preset folder");
     btn_preset_folder.setButtonText ("preset folder");
     btn_preset_folder.addListener (this);
-    btn_preset_folder.setColour (TextButton::buttonColourId, Colours::grey);
+    btn_preset_folder.setColour (TextButton::buttonColourId, Colours::white);
     btn_preset_folder.setColour (TextButton::buttonOnColourId, Colours::blue);
-    btn_preset_folder.setColour (TextButton::textColourOnId, Colours::black);
-    btn_preset_folder.setColour (TextButton::textColourOffId, Colours::black);
 
     addAndMakeVisible (sld_gain);
     sld_gain.setTooltip (TRANS("Output Volume"));
