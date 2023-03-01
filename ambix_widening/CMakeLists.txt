@@ -1,1 +1,3 @@
+SET( PLUGIN_CODE AWi${AMBI_ORDER})
+
 INCLUDE(${SRC_DIR}/Subproject.cmake)

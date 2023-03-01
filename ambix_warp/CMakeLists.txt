@@ -3,4 +3,6 @@ SET( WITH_SphericalHarmonic TRUE )
 SET( WITH_SphFilter TRUE )
 SET( WITH_T_DESIGN TRUE )
 
+SET( PLUGIN_CODE AWa${AMBI_ORDER})
+
 INCLUDE(${SRC_DIR}/Subproject.cmake)

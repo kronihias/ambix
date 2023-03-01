@@ -1,4 +1,6 @@
 SET( WITH_EIGEN TRUE )
 SET( WITH_LegendreU TRUE )
 
+SET( PLUGIN_CODE AMr${AMBI_ORDER})
+
 INCLUDE(${SRC_DIR}/Subproject.cmake)

@@ -5,4 +5,6 @@ SET( WITH_SphFilter TRUE )
 
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_directional_loudness )
 
+SET( PLUGIN_CODE ADl${AMBI_ORDER})
+
 INCLUDE(${SRC_DIR}/Subproject.cmake)

@@ -1,3 +1,5 @@
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_mirror )
 
+SET( PLUGIN_CODE AMi${AMBI_ORDER})
+
 INCLUDE(${SRC_DIR}/Subproject.cmake)
