@@ -36,7 +36,11 @@
 
 
 #if JUCE_USE_SSE_INTRINSICS
-    #include <xmmintrin.h>
+    #if JUCE_LINUX
+        #include <x86intrin.h>
+    #else
+        #include <xmmintrin.h>
+    #endif
 #endif
 
 
