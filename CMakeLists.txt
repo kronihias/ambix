@@ -100,16 +100,22 @@ set_directory_properties (PROPERTIES JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 set_directory_properties (PROPERTIES JUCE_VST_COPY_DIR "${BIN_DIR}/vst")
 set_directory_properties (PROPERTIES JUCE_LV2_COPY_DIR "${BIN_DIR}/lv2")
 
-IF(APPLE)
-SET(CMAKE_BUILD_TYPE MinSizeRel)
-    SET( CMAKE_OSX_ARCHITECTURES arm64;x86_64 )
-    SET( CMAKE_OSX_DEPLOYMENT_TARGET 10.9 )
+IF (APPLE)
+    SET (CMAKE_BUILD_TYPE MinSizeRel)
+    SET (CMAKE_OSX_ARCHITECTURES arm64;x86_64)
+    SET (CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
 
-    SET ( LINK_FLAGS MINSIZEREL "-dead_strip" )
+    SET (LINK_FLAGS MINSIZEREL "-dead_strip")
 ELSE (APPLE)
-    SET(CMAKE_BUILD_TYPE Release)
-
+    SET (CMAKE_BUILD_TYPE Release)
 ENDIF (APPLE)
+
+
+IF (UNIX)
+    # this is to make the convolver build under linux happy
+    SET (CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -msse3")
+    SET (CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -msse3")
+ENDIF (UNIX)
 
 ################################################
 # INCLUDES
