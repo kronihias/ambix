@@ -4,4 +4,6 @@ SET( WITH_T_DESIGN TRUE )
 
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_rotator )
 
+SET( PLUGIN_CODE ARo${AMBI_ORDER})
+
 INCLUDE(${SRC_DIR}/Subproject.cmake)

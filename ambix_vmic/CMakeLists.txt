@@ -5,4 +5,6 @@ SET( WITH_SphFilter TRUE )
 
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_vmic )
 
+SET( PLUGIN_CODE AVm${AMBI_ORDER})
+
 INCLUDE(${SRC_DIR}/Subproject.cmake)

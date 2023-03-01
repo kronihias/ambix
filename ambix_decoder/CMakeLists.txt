@@ -12,4 +12,6 @@ SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_binaural )
 SET ( IGNORE_SRC_FILES MtxConv.cpp
     ConvolverData.cpp)
 
+SET( PLUGIN_CODE ADe${AMBI_ORDER})
+
 INCLUDE(${SRC_DIR}/Subproject.cmake)
