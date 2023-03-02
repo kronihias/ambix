@@ -394,8 +394,7 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
     part_idx_ = 0;
 
 #if SPLIT_COMPLEX
-    fft_norm_ = 0.5f / ( 2.f*(float)partitionsize_ ); // vDSP has a factor 2 different scaling
-
+    fft_norm_ = 0.25f / ( 2.f*(float)partitionsize_ ); // vDSP has a different scaling factors for fft/ifft than fftw
 #else
     fft_norm_ = 1.f / ( 2.f*(float)partitionsize_ );
 #endif
