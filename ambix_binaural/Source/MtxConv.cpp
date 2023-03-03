@@ -1056,8 +1056,16 @@ void MtxConvSlave::Process(int filt_part_idx)
 				outnode->c_c_[out_part_idx][partitionsize_][0] += filternode->innode_->a_c_[part_idx_] [partitionsize_][0] * filternode->b_c_[filt_part_idx] [partitionsize_][0];
 				// fft_c_ [partitionsize_][1] = 0; // should be zero anyway
     #else
-    // TODO: Fallback version!
+            // fallback to not simd
+            fftwf_complex *A = filternode->innode_->a_c_[part_idx_];
+            fftwf_complex *B = filternode->b_c_[filt_part_idx];
+            fftwf_complex *C = outnode->c_c_[out_part_idx];
 
+            for (int k = 0; k <= partitionsize_; k++)
+            {
+                C[k][0] += A[k][0] * B[k][0] - A[k][1] * B[k][1];
+                C[k][1] += A[k][0] * B[k][1] + A[k][1] * B[k][0];
+            }
     #endif
 #endif
 
