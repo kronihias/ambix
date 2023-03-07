@@ -20,8 +20,8 @@
 #include "PluginEditor.h"
 
 
-//[MiscUserDefs] You can add your own user definitions and misc code here...
-//[/MiscUserDefs]
+#define Q(x) #x
+#define QUOTE(x) Q(x)
 
 //==============================================================================
 Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_binauralAudioProcessor* ownerFilter)

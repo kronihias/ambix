@@ -20,6 +20,8 @@
 
 #include "PluginEditor.h"
 
+#define Q(x) #x
+#define QUOTE(x) Q(x)
 
 //==============================================================================
 Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioProcessorEditor (Ambix_directional_loudnessAudioProcessor* ownerFilter)

@@ -19,6 +19,9 @@
 
 #include "PluginEditor.h"
 
+#define Q(x) #x
+#define QUOTE(x) Q(x)
+
 // Sliders are slightly longer than needed,
 // to account for overshooting (so we can easily wrap the values).
 // On my Debian/xfce4 system, the mouse-wheel increment is

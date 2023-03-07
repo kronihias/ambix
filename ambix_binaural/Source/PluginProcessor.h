@@ -23,6 +23,8 @@
 #include "JuceHeader.h"
 #include "AmbiSpeaker.h"
 
+#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
+
 #if BINAURAL_DECODER
     #if WITH_ZITA_CONVOLVER
         #include <zita-convolver.h>

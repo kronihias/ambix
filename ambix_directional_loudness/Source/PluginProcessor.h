@@ -20,11 +20,19 @@
 #ifndef PLUGINPROCESSOR_H_INCLUDED
 #define PLUGINPROCESSOR_H_INCLUDED
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include "JuceHeader.h"
 #include "SphericalHarmonic/SphericalHarmonic.h"
 #include "SphFilter/SphFilter.h"
 
 #include <Eigen/Eigen>
+
+#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
+
+#ifndef NUM_FILTERS
+    #define NUM_FILTERS 8 // number of directional filters that can be controlled
+#endif
+
+#define PARAMS_PER_FILTER 7
 
 
 typedef Eigen::Array<float, NUM_FILTERS, 1> ArrayParam;

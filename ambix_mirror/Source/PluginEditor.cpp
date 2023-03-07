@@ -24,8 +24,8 @@
 #include "PluginEditor.h"
 
 
-//[MiscUserDefs] You can add your own user definitions and misc code here...
-//[/MiscUserDefs]
+#define Q(x) #x
+#define QUOTE(x) Q(x)
 
 //==============================================================================
 Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirrorAudioProcessor* ownerFilter)

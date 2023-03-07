@@ -66,7 +66,7 @@ ADD_DEFINITIONS(-DAMBI_ORDER=${AMBI_ORDER})
 set (AMBIX_FORMATS "")
 
 if (BUILD_VST)
-    SET (VST2SDKPATH "/usr/include" CACHE PATH "Path to the VST2 SDK")
+    SET (VST2SDKPATH "~/SDKs/vstsdk2.4" CACHE PATH "Path to the VST2 SDK")
     # checking VST2 SDK
     if (VST2SDKPATH STREQUAL "/usr/include")
         CHECK_INCLUDE_FILES(pluginterfaces/vst2.x/aeffectx.h HAVE_VST2_HEADERS)

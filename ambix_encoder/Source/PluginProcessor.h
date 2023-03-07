@@ -20,10 +20,6 @@
 #ifndef __PLUGINPROCESSOR_H_58CE358E__
 #define __PLUGINPROCESSOR_H_58CE358E__
 
-//////////////////////////////////////////////
-// CHANGE AMBISONICS ORDER IN AppConfig.h !!!!
-//////////////////////////////////////////////
-
 #include "JuceHeader.h"
 
 #include "AmbixEncoder.h"

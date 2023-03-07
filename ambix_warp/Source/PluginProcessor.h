@@ -23,10 +23,11 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include "JuceHeader.h"
 #include "SphericalHarmonic/SphericalHarmonic.h"
 #include <Eigen/Eigen>
-// #include <fstream>
+
+#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
 
 //==============================================================================
 /**
