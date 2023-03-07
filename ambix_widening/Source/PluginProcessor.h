@@ -20,13 +20,15 @@
 #ifndef PLUGINPROCESSOR_H_INCLUDED
 #define PLUGINPROCESSOR_H_INCLUDED
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include "JuceHeader.h"
 
 // approximation order
 #define BESSEL_APPR 8
 // #define TRUNCATE 0.0316227766016838 // set coefficients to zero below -30dB
 // #define TRUNCATE 0.01 // -40dB
 #define TRUNCATE 0.001 // -60dB
+
+#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
 
 //==============================================================================
 /**

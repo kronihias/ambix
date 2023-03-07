@@ -20,6 +20,8 @@
 
 #include "PluginEditor.h"
 
+#define Q(x) #x
+#define QUOTE(x) Q(x)
 
 //==============================================================================
 Ambix_vmicAudioProcessorEditor::Ambix_vmicAudioProcessorEditor (Ambix_vmicAudioProcessor* ownerFilter)

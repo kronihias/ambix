@@ -19,6 +19,8 @@
 
 #include "PluginEditor.h"
 
+#define Q(x) #x
+#define QUOTE(x) Q(x)
 
 //==============================================================================
 Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_converterAudioProcessor* ownerFilter)

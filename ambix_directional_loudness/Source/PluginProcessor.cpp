@@ -22,6 +22,7 @@
 
 #include "t_design.h"
 
+#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
 
 //==============================================================================
 Ambix_directional_loudnessAudioProcessor::Ambix_directional_loudnessAudioProcessor() :

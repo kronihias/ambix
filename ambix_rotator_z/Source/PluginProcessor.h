@@ -22,7 +22,7 @@
 
 #include "JuceHeader.h"
 
-// AMBISONICS ORDER IS DEFINED IN AppConfig.h!!!!!
+#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
 
 #define _2PI 6.2831853071795
 

@@ -19,6 +19,7 @@
 
 #include "FilterTab.h"
 
+#define PARAMS_PER_FILTER 7
 
 FilterTab::FilterTab(int id, Ambix_directional_loudnessAudioProcessor* myProcessor)
 {
