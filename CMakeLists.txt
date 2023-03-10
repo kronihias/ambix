@@ -97,8 +97,8 @@ SET (BIN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 # set output path
 set_directory_properties (PROPERTIES JUCE_COPY_PLUGIN_AFTER_BUILD ON)
-set_directory_properties (PROPERTIES JUCE_VST_COPY_DIR "${BIN_DIR}/vst")
-set_directory_properties (PROPERTIES JUCE_LV2_COPY_DIR "${BIN_DIR}/lv2")
+set_directory_properties (PROPERTIES JUCE_VST_COPY_DIR "${BIN_DIR}/vst_o${AMBI_ORDER}")
+set_directory_properties (PROPERTIES JUCE_LV2_COPY_DIR "${BIN_DIR}/lv2_o${AMBI_ORDER}")
 
 IF (APPLE)
     SET (CMAKE_BUILD_TYPE MinSizeRel)
