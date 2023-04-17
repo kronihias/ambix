@@ -12,8 +12,7 @@ ambiX Ambisonic plug-in suite
 More information: http://www.juce.com
 
 > other libraries being used:
-> Eigen (MPL2, http://eigen.tuxfamily.org), 
-> libsoxr (LGPL, http://soxr.sourceforge.net)
+> Eigen (MPL2, http://eigen.tuxfamily.org),
 > fftw under Linux and Windows (GPL, http://www.fftw.org)
 > libzita-convolver3 optional for Linux (GPL v3)
 
@@ -40,7 +39,7 @@ plug-in reference:
 * ambix_encoder - panning plug-in with different numbers of input channels - a width parameter spreads those channels equally along the azimuth
 
 * ambix_maxre - apply or reciprocal apply spherical max_re weighting to suppress sidelobes according to Zotter, Frank - "All-Round Ambisonic Panning and Decoding"
- 
+
 * ambix_mirror - invert or mirror soundfield about x/y/z axis
 
 * ambix_rotator_z - rotation around z axis
@@ -64,26 +63,27 @@ prerequisites for building
 
 Install LINUX dependencies (Debian, Ubuntu):
 --------------
-*$ sudo apt-get install libasound-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxcursor-dev libxrandr-dev libeigen3-dev freeglut3-dev libxmu-dev libxi-dev libsoxr-dev libfftw3-dev libzita-convolver3 libzita-convolver-dev*
-
-Fedora:
---------------
-*$ sudo dnf install alsa-lib-devel freetype-devel mesa-libGL-devel libX11-devel libXext-devel libXinerama-devel libXcursor-devel eigen3-devel freeglut-devel libXmu-devel libXi-devel soxr-devel fftw3-devel libXrandr-devel jack-audio-connection-kit-devel*
-
-*$ sudo dnf groupinstall "Development Tools"*
-
-*$ sudo dnf groupinstall "C Development Tools and Libraries"*
-
+```sudo apt install libasound2-dev libjack-jackd2-dev \
+    ladspa-sdk \
+    libcurl4-openssl-dev  \
+    libfreetype6-dev \
+    libx11-dev libxcomposite-dev libxcursor-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev \
+    libwebkit2gtk-4.0-dev \
+    libglu1-mesa-dev mesa-common-dev \
+	libfftw3-dev \
+	libzita-convolver3 \
+	libzita-convolver-dev
+```
 
 Install MacOSX dependencies (through MacPorts):
 --------------
 
-*$ sudo port install eigen3-devel soxr*
+```sudo port install eigen3-devel```
 
 
 Install Windows dependencies
 --------------
-*getting the dependencies for Windows is a little bit more tricky. you have to get fftw3, libsoxr and Eigen.*
+*getting the dependencies for Windows is a little bit more tricky. you have to get fftw3 and Eigen.*
 
 
 howto build ambix yourself:
@@ -95,25 +95,25 @@ howto build ambix yourself:
 
 **TERMINAL:**
 
-- create a folder in the *ambix* folder eg. *BUILD*
+- create a folder in the `ambix` folder eg. `BUILD`
 
 *ambix/BUILD> $ ccmake ..*
 
-- adjust parameters 
+- adjust parameters
 
 then
 *ambix/BUILD> $ make*
 
-*(if you have a multicore processor you can speed up the make process by using make -j #CPUCORESx1.5)*
+*(if you have a multicore processor you can speed up the make process by using `make -j #CPUCORESx1.5`)*
 
 - find the binaries in the *ambix/BUILD/_bin* folder and copy to system VST folder
 
 **VST installation folders:**
 
 
-- MacOSX: /Library/Audio/Plug-Ins/VST or ~/Library/Audio/Plug-Ins/VST
-- Windows: eg. C:\Programm Files\Steinberg\VstPlugins
-- Linux: /usr/lib/lxvst or /usr/local/lib/lxvst
+- MacOSX: `/Library/Audio/Plug-Ins/VST or ~/Library/Audio/Plug-Ins/VST`
+- Windows: eg. `C:\Programm Files\Steinberg\VstPlugins`
+- Linux: `/usr/lib/lxvst` or `/usr/local/lib/lxvst`
 
 LV2 plug-in
 -----------
@@ -147,6 +147,9 @@ http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_st
 
 changelog
 -----------
+* v0.3.0 (2022-04-16)
+new builds optimized for Apple Silicon and 64 bit Intel Mac; Win 64 bit; Update to JUCE 7, removed soxr dependency to simplify build
+
 * v0.2.10 (2020-02-06)
 amibx_binaural: fix dropouts/artifacts for hosts that send incomplete block sizes (eg. Adobe, Steinberg); option to store preset within the project -> allows to exchange a DAW (eg. Reaper) project without need to provide the preset files extra, allow to export stored preset as .zip file for recovering it from the project
 
@@ -157,7 +160,7 @@ amibx_warp: fixed crash
 ambix_binaural: fftw threadsafty improved: fix crash during startup if other plugin uses fftw
 ambix_rotator: add quaternion input
 
-* v0.2.7 (2017-03-22) 
+* v0.2.7 (2017-03-22)
 ambix_binaural: improved performance, various bugfixes
 ambix_rotator: improved performance
 ambix_encoder: adjustable custom id for remote control
@@ -197,7 +200,7 @@ several people and institutions contributed to this software in one or another w
 
 author
 -----------
-2013-2016 Matthias Kronlachner
+2013-2022 Matthias Kronlachner
 
 m.kronlachner@gmail.com
 www.matthiaskronlachner.com
