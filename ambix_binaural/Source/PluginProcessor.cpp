@@ -453,6 +453,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
     DebugPrint(debug);
 
     activePreset = configFile.getFileName(); // store filename only, on restart search preset folder for it!
+    box_preset_str = configFile.getFileNameWithoutExtension();
 
     Array<File> configFileAndDataFiles;
     configFileAndDataFiles.add(configFile);

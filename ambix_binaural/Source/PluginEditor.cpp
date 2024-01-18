@@ -290,6 +290,27 @@ void Ambix_binauralAudioProcessorEditor::timerCallback()
     UpdateMeters();
 }
 
+bool Ambix_binauralAudioProcessorEditor::isInterestedInFileDrag(StringArray const& files)
+{
+    // we allow dropping single .config files
+    return (files.size() == 1) && (File(files[0]).getFileExtension() == ".config");
+}
+
+void Ambix_binauralAudioProcessorEditor::filesDropped(StringArray const& files, int /*x*/, int /*y*/)
+{
+    auto droppedFile = File(files[0]);
+
+    if (!droppedFile.existsAsFile()) {
+        return;
+    }
+
+    if (droppedFile.getFileExtension() == ".config") {
+        Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
+        ourProcessor->LoadConfiguration(droppedFile);
+        ourProcessor->lastDir = droppedFile.getParentDirectory();
+    }
+}
+
 void Ambix_binauralAudioProcessorEditor::UpdateText()
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();

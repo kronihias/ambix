@@ -41,7 +41,8 @@ class Ambix_binauralAudioProcessorEditor  : public AudioProcessorEditor,
                                             public Timer,
                                             public ChangeListener,
                                             public ComboBox::Listener,
-                                            public Slider::Listener
+                                            public Slider::Listener,
+                                            public FileDragAndDropTarget
 {
 public:
     //==============================================================================
@@ -72,6 +73,9 @@ public:
 
     void DrawMeters();
     void UpdateMeters();
+
+    bool isInterestedInFileDrag(StringArray const& files) override;
+    void filesDropped(StringArray const& files, int x, int y) override;
 
 private:
 
