@@ -73,7 +73,8 @@ sudo apt install libasound2-dev libjack-jackd2-dev \
     libglu1-mesa-dev mesa-common-dev \
 	libfftw3-dev \
 	libzita-convolver3 \
-	libzita-convolver-dev
+	libzita-convolver-dev \
+	libeigen3-dev
 ```
 
 Install MacOSX dependencies (through MacPorts):
@@ -96,14 +97,20 @@ howto build ambix yourself:
 
 **TERMINAL:**
 
-- create a folder in the `ambix` folder eg. `BUILD`
-
-*ambix/BUILD> $ ccmake ..*
+```
+git submodule init
+git submodule update
+mkdir build
+cd build
+ccmake ..
+```
 
 - adjust parameters
 
 then
-*ambix/BUILD> $ make*
+```
+make
+```
 
 *(if you have a multicore processor you can speed up the make process by using `make -j #CPUCORESx1.5`)*
 
@@ -201,7 +208,7 @@ several people and institutions contributed to this software in one or another w
 
 author
 -----------
-2013-2022 Matthias Kronlachner
+2013-2024 Matthias Kronlachner
 
 m.kronlachner@gmail.com
 www.matthiaskronlachner.com
