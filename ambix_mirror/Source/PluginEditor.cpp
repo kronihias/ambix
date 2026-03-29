@@ -19,6 +19,7 @@
 
 
 #include "PluginProcessor.h"
+#include "../../common/JuceCompat.h"
 
 
 #include "PluginEditor.h"
@@ -517,7 +518,7 @@ void Ambix_mirrorAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxThatHa
 
     if (comboBoxThatHasChanged == &box_presets)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::PresetParam, (float)box_presets.getSelectedId() / (float)NUM_PRESETS);
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::PresetParam, (float)box_presets.getSelectedId() / (float)NUM_PRESETS);
     }
 
 }
@@ -526,35 +527,35 @@ void Ambix_mirrorAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWas
 {
     Ambix_mirrorAudioProcessor* ourProcessor = getProcessor();
 
-    ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::PresetParam, 0.f);
+    setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::PresetParam, 0.f);
 
     if (sliderThatWasMoved == &sld_x_even)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XEvenParam, (float)sld_x_even.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::XEvenParam, (float)sld_x_even.getValue());
     }
     else if (sliderThatWasMoved == &sld_x_odd)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XOddParam, (float)sld_x_odd.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::XOddParam, (float)sld_x_odd.getValue());
     }
     else if (sliderThatWasMoved == &sld_y_even)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YEvenParam, (float)sld_y_even.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::YEvenParam, (float)sld_y_even.getValue());
     }
     else if (sliderThatWasMoved == &sld_y_odd)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YOddParam, (float)sld_y_odd.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::YOddParam, (float)sld_y_odd.getValue());
     }
     else if (sliderThatWasMoved == &sld_z_even)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZEvenParam, (float)sld_z_even.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::ZEvenParam, (float)sld_z_even.getValue());
     }
     else if (sliderThatWasMoved == &sld_z_odd)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZOddParam, (float)sld_z_odd.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::ZOddParam, (float)sld_z_odd.getValue());
     }
     else if (sliderThatWasMoved == &sld_circular)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::CircularParam, (float)sld_circular.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::CircularParam, (float)sld_circular.getValue());
     }
 
 }
@@ -563,35 +564,35 @@ void Ambix_mirrorAudioProcessorEditor::buttonClicked (Button* buttonThatWasClick
 {
     Ambix_mirrorAudioProcessor* ourProcessor = getProcessor();
 
-    ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::PresetParam, 0.f);
+    setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::PresetParam, 0.f);
 
     if (buttonThatWasClicked == &tgl_x_even_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XEvenInvParam, (float)tgl_x_even_inv.getToggleState());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::XEvenInvParam, (float)tgl_x_even_inv.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_x_odd_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::XOddInvParam, (float)tgl_x_odd_inv.getToggleState());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::XOddInvParam, (float)tgl_x_odd_inv.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_y_even_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YEvenInvParam, (float)tgl_y_even_inv.getToggleState());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::YEvenInvParam, (float)tgl_y_even_inv.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_y_odd_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::YOddInvParam, (float)tgl_y_odd_inv.getToggleState());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::YOddInvParam, (float)tgl_y_odd_inv.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_z_even_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZEvenInvParam, (float)tgl_z_even_inv.getToggleState());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::ZEvenInvParam, (float)tgl_z_even_inv.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_z_odd_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::ZOddInvParam, (float)tgl_z_odd_inv.getToggleState());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::ZOddInvParam, (float)tgl_z_odd_inv.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_circular_inv)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_mirrorAudioProcessor::CircularInvParam, (float)tgl_circular_inv.getToggleState());
+        setParameterNotifyingHost(ourProcessor, Ambix_mirrorAudioProcessor::CircularInvParam, (float)tgl_circular_inv.getToggleState());
     }
 
 }

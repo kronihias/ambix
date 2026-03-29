@@ -19,6 +19,7 @@
 
 //[Headers] You can add your own extra header files here...
 #include "PluginProcessor.h"
+#include "../../common/JuceCompat.h"
 //[/Headers]
 
 #include "PluginEditor.h"
@@ -399,15 +400,15 @@ void Ambix_rotatorAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWa
 
     if (sliderThatWasMoved == &sld_yaw)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::YawParam, (sliderWrap(sld_yaw)+180.f)/360.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::YawParam, (sliderWrap(sld_yaw)+180.f)/360.f);
     }
     else if (sliderThatWasMoved == &sld_pitch)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::PitchParam, (sliderWrap(sld_pitch)+180.f)/360.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::PitchParam, (sliderWrap(sld_pitch)+180.f)/360.f);
     }
     else if (sliderThatWasMoved == &sld_roll)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RollParam, (sliderWrap(sld_roll)+180.f)/360.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::RollParam, (sliderWrap(sld_roll)+180.f)/360.f);
     }
 
 }
@@ -418,15 +419,15 @@ void Ambix_rotatorAudioProcessorEditor::buttonClicked (Button* buttonThatWasClic
 
     if (buttonThatWasClicked == &toggleButton)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RotOrderParam, 0.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::RotOrderParam, 0.f);
     }
     else if (buttonThatWasClicked == &toggleButton2)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RotOrderParam, 1.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::RotOrderParam, 1.f);
     }
     else if (buttonThatWasClicked == &tgl_qinvert)
     {
-      ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Qinvert, (float)tgl_qinvert.getToggleState());
+      setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Qinvert, (float)tgl_qinvert.getToggleState());
     }
 
 }
@@ -445,18 +446,18 @@ void Ambix_rotatorAudioProcessorEditor::textEditorReturnKeyPressed(TextEditor &e
 
   if (&editorChanged == &txt_q0)
   {
-    ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q0Param, val);
+    setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Q0Param, val);
   } else if (&editorChanged == &txt_q1)
   {
-    ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q1Param, val);
+    setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Q1Param, val);
   }
   else if (&editorChanged == &txt_q2)
   {
-    ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q2Param, val);
+    setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Q2Param, val);
   }
   else if (&editorChanged == &txt_q3)
   {
-    ourProcessor->setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q3Param, val);
+    setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Q3Param, val);
   }
 
 }

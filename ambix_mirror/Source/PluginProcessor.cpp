@@ -18,6 +18,7 @@
  */
 
 #include "PluginProcessor.h"
+#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 #include "SphericalHarmonic/tools.h"
 
@@ -276,23 +277,23 @@ void Ambix_mirrorAudioProcessor::SwitchPreset()
     // first set all zero
     if (active_preset > 1)
     {
-        setParameterNotifyingHost(XEvenParam, 0.75f);
-        setParameterNotifyingHost(XEvenInvParam, 0.f);
-        setParameterNotifyingHost(XOddParam, 0.75f);
-        setParameterNotifyingHost(XOddInvParam, 0.f);
+        setParameterNotifyingHost(this, XEvenParam, 0.75f);
+        setParameterNotifyingHost(this, XEvenInvParam, 0.f);
+        setParameterNotifyingHost(this, XOddParam, 0.75f);
+        setParameterNotifyingHost(this, XOddInvParam, 0.f);
 
-        setParameterNotifyingHost(YEvenParam, 0.75f);
-        setParameterNotifyingHost(YEvenInvParam, 0.f);
-        setParameterNotifyingHost(YOddParam, 0.75f);
-        setParameterNotifyingHost(YOddInvParam, 0.f);
+        setParameterNotifyingHost(this, YEvenParam, 0.75f);
+        setParameterNotifyingHost(this, YEvenInvParam, 0.f);
+        setParameterNotifyingHost(this, YOddParam, 0.75f);
+        setParameterNotifyingHost(this, YOddInvParam, 0.f);
 
-        setParameterNotifyingHost(ZEvenParam, 0.75f);
-        setParameterNotifyingHost(ZEvenInvParam, 0.f);
-        setParameterNotifyingHost(ZOddParam, 0.75f);
-        setParameterNotifyingHost(ZOddInvParam, 0.f);
+        setParameterNotifyingHost(this, ZEvenParam, 0.75f);
+        setParameterNotifyingHost(this, ZEvenInvParam, 0.f);
+        setParameterNotifyingHost(this, ZOddParam, 0.75f);
+        setParameterNotifyingHost(this, ZOddInvParam, 0.f);
 
-        setParameterNotifyingHost(CircularParam, 0.75f);
-        setParameterNotifyingHost(CircularInvParam, 0.f);
+        setParameterNotifyingHost(this, CircularParam, 0.75f);
+        setParameterNotifyingHost(this, CircularInvParam, 0.f);
     }
 
     switch (active_preset) {
@@ -302,38 +303,38 @@ void Ambix_mirrorAudioProcessor::SwitchPreset()
             break;
 
         case 3: // flip left right -> invert Y Odd
-            setParameterNotifyingHost(YOddInvParam, 1.f);
+            setParameterNotifyingHost(this, YOddInvParam, 1.f);
             preset_name = "flip left <> right";
             break;
 
         case 4: // flop front back -> invert X Odd
-            setParameterNotifyingHost(XOddInvParam, 1.f);
+            setParameterNotifyingHost(this, XOddInvParam, 1.f);
             preset_name = "flop front <> back";
             break;
 
         case 5: // flap top bottom -> invert Z Odd
-            setParameterNotifyingHost(ZOddInvParam, 1.f);
+            setParameterNotifyingHost(this, ZOddInvParam, 1.f);
             preset_name = "flap top <> bottom";
             break;
 
         case 6: // merge left+right
-            setParameterNotifyingHost(YOddParam, 0.f); // zero
-            setParameterNotifyingHost(YEvenParam, 1.f); // +6 dB
-            setParameterNotifyingHost(CircularParam, 0.530959f); // -6 dB
+            setParameterNotifyingHost(this, YOddParam, 0.f); // zero
+            setParameterNotifyingHost(this, YEvenParam, 1.f); // +6 dB
+            setParameterNotifyingHost(this, CircularParam, 0.530959f); // -6 dB
             preset_name = "merge left + right";
             break;
 
         case 7: // merge front+back
-            setParameterNotifyingHost(XOddParam, 0.f); // zero
-            setParameterNotifyingHost(XEvenParam, 1.f); // +6 dB
-            setParameterNotifyingHost(CircularParam, 0.530959f); // -6 dB
+            setParameterNotifyingHost(this, XOddParam, 0.f); // zero
+            setParameterNotifyingHost(this, XEvenParam, 1.f); // +6 dB
+            setParameterNotifyingHost(this, CircularParam, 0.530959f); // -6 dB
             preset_name = "merge front+back";
             break;
 
         case 8: // merge top+bottom
-            setParameterNotifyingHost(ZOddParam, 0.f); // zero
-            setParameterNotifyingHost(ZEvenParam, 1.f); // +6 dB
-            setParameterNotifyingHost(CircularParam, 0.530959f); // -6 dB
+            setParameterNotifyingHost(this, ZOddParam, 0.f); // zero
+            setParameterNotifyingHost(this, ZEvenParam, 1.f); // +6 dB
+            setParameterNotifyingHost(this, CircularParam, 0.530959f); // -6 dB
             preset_name = "merge top+bottom";
             break;
 

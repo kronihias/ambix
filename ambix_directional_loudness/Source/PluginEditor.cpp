@@ -19,6 +19,7 @@
 
 
 #include "PluginEditor.h"
+#include "../../common/JuceCompat.h"
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)
@@ -199,7 +200,7 @@ void Ambix_directional_loudnessAudioProcessorEditor::buttonClicked (Button* butt
         Ambix_directional_loudnessAudioProcessor* ourProcessor = getProcessor();
 
         for (int i=0; i<NUM_FILTERS; i++) {
-            ourProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WindowParam, 0.f);
+            setParameterNotifyingHost(ourProcessor, PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WindowParam, 0.f);
         }
     }
 }

@@ -18,6 +18,7 @@
  */
 
 #include "PluginEditor.h"
+#include "../../common/JuceCompat.h"
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)
@@ -356,35 +357,35 @@ void Ambix_encoderAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWa
 
     if (sliderThatWasMoved == &sld_el)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::ElevationParam, (sliderWrap(sld_el) + 180) / 360.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_encoderAudioProcessor::ElevationParam, (sliderWrap(sld_el) + 180) / 360.f);
     }
     else if (sliderThatWasMoved == &sld_az)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::AzimuthParam, (sliderWrap(sld_az) + 180) / 360.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_encoderAudioProcessor::AzimuthParam, (sliderWrap(sld_az) + 180) / 360.f);
     }
     else if (sliderThatWasMoved == &sld_size)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::SizeParam, (float)sld_size.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_encoderAudioProcessor::SizeParam, (float)sld_size.getValue());
     }
 #if INPUT_CHANNELS > 1
     // if multiple sources
     else if (sliderThatWasMoved == &sld_width)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::WidthParam, (float)sld_width.getValue() / 360.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_encoderAudioProcessor::WidthParam, (float)sld_width.getValue() / 360.f);
     }
 #endif
 
     else if (sliderThatWasMoved == &sld_az_move)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::AzimuthMvParam, (float)sld_az_move.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_encoderAudioProcessor::AzimuthMvParam, (float)sld_az_move.getValue());
     }
     else if (sliderThatWasMoved == &sld_el_move)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::ElevationMvParam, (float)sld_el_move.getValue());
+        setParameterNotifyingHost(ourProcessor, Ambix_encoderAudioProcessor::ElevationMvParam, (float)sld_el_move.getValue());
     }
     else if (sliderThatWasMoved == &sld_speed)
     {
-        ourProcessor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::SpeedParam, (float)sld_speed.getValue()/360.f);
+        setParameterNotifyingHost(ourProcessor, Ambix_encoderAudioProcessor::SpeedParam, (float)sld_speed.getValue()/360.f);
     }
 }
 

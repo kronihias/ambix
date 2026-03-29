@@ -18,6 +18,7 @@
  */
 
 #include "PanningGraph.h"
+#include "../../common/JuceCompat.h"
 
 
 PanningGraph::PanningGraph (AudioProcessor* processor) :
@@ -407,9 +408,9 @@ void PanningGraph::buttonClicked (Button* buttonThatWasClicked)
     }
 
 
-    myprocessor_->setParameterNotifyingHost(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::AzimuthParam, Deg360ToParam(az) );
+    setParameterNotifyingHost(myprocessor_, PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::AzimuthParam, Deg360ToParam(az) );
 
-    myprocessor_->setParameterNotifyingHost(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ElevationParam, Deg360ToParam(el) );
+    setParameterNotifyingHost(myprocessor_, PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ElevationParam, Deg360ToParam(el) );
 
 }
 
@@ -458,11 +459,11 @@ void PanningGraph::mouseDrag(const MouseEvent &event)
         int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::WidthParam;
 
 
-        myprocessor_->setParameterNotifyingHost(w_idx, (float)jlimit(0.f, 1.f, Deg360ToParam( mouse_down_width + xpostodeg(mouse_dir_w*event.getDistanceFromDragStartX()+degtoxpos(0))  ) ) );
+        setParameterNotifyingHost(myprocessor_, w_idx, (float)jlimit(0.f, 1.f, Deg360ToParam( mouse_down_width + xpostodeg(mouse_dir_w*event.getDistanceFromDragStartX()+degtoxpos(0))  ) ) );
 
         int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::HeightParam;
 
-        myprocessor_->setParameterNotifyingHost(h_idx, (float)jlimit(0.f, 1.f, Deg180ToParam( mouse_down_height + ypostodeg(mouse_dir_h*event.getDistanceFromDragStartY()+degtoypos(0))  ) ) );
+        setParameterNotifyingHost(myprocessor_, h_idx, (float)jlimit(0.f, 1.f, Deg180ToParam( mouse_down_height + ypostodeg(mouse_dir_h*event.getDistanceFromDragStartY()+degtoypos(0))  ) ) );
     }
 
 }
@@ -483,7 +484,7 @@ void PanningGraph::mouseWheelMove (const MouseEvent &event, const MouseWheelDeta
     {
         int paridx = PARAMS_PER_FILTER*idx+Ambix_vmicAudioProcessor::GainParam;
 
-        myprocessor_->setParameterNotifyingHost(paridx, (float)jlimit(0.f, 1.f, myprocessor_->getParameter(paridx) +wheel.deltaY*0.4f) );
+        setParameterNotifyingHost(myprocessor_, paridx, (float)jlimit(0.f, 1.f, myprocessor_->getParameter(paridx) +wheel.deltaY*0.4f) );
 
         if (idx != mouse_near_filter_id)
         {

@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 
 int Ambix_encoderAudioProcessor::getNumParameters()
@@ -100,7 +101,7 @@ void Ambix_encoderAudioProcessor::setParameter (int index, float newValue)
 
         case AzimuthSetParam: // set Azimuth if NOT moving!
             if ((newValue != azimuth_set_param) && ((azimuth_mv_param > 0.48f) && (azimuth_mv_param < 0.52f)))
-                setParameterNotifyingHost(AzimuthParam, newValue);
+                setParameterNotifyingHost(this, AzimuthParam, newValue);
             azimuth_set_param=newValue;
             break;
 
@@ -113,7 +114,7 @@ void Ambix_encoderAudioProcessor::setParameter (int index, float newValue)
                 } else if (tempvalue > 1.0f){
                     tempvalue = tempvalue - 1.0f;
                 }
-                setParameterNotifyingHost(AzimuthParam, tempvalue);
+                setParameterNotifyingHost(this, AzimuthParam, tempvalue);
             }
             azimuth_set_rel_param=newValue;
             break;
@@ -125,7 +126,7 @@ void Ambix_encoderAudioProcessor::setParameter (int index, float newValue)
 
         case ElevationSetParam:
             if ((newValue != elevation_set_param) && ((elevation_mv_param > 0.48f) && (elevation_mv_param < 0.52f)))
-                setParameterNotifyingHost(ElevationParam, newValue);
+                setParameterNotifyingHost(this, ElevationParam, newValue);
             elevation_set_param=newValue;
             break;
 
@@ -138,7 +139,7 @@ void Ambix_encoderAudioProcessor::setParameter (int index, float newValue)
                 } else if (tempvalue > 1.0f){
                     tempvalue = tempvalue - 1.0f;
                 }
-                setParameterNotifyingHost(ElevationParam, tempvalue);
+                setParameterNotifyingHost(this, ElevationParam, tempvalue);
             }
             elevation_set_rel_param=newValue;
             break;
@@ -402,7 +403,7 @@ void Ambix_encoderAudioProcessor::calcNewParameters(double SampleRate, int Buffe
 			newval = 1.f;
 		if (newval > 1.f)
 			newval = 0.f;
-		setParameterNotifyingHost(AzimuthParam, newval);
+		setParameterNotifyingHost(this, AzimuthParam, newval);
 	}
 
     if ((elevation_mv_param <= 0.45f) || (elevation_mv_param >= 0.55f))
@@ -417,7 +418,7 @@ void Ambix_encoderAudioProcessor::calcNewParameters(double SampleRate, int Buffe
 			newval = 1.f;
 		if (newval > 1.f)
 			newval = 0.f;
-		setParameterNotifyingHost(ElevationParam, newval);
+		setParameterNotifyingHost(this, ElevationParam, newval);
 	}
 
 }

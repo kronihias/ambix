@@ -18,6 +18,7 @@
 */
 
 #include "PluginEditor.h"
+#include "../../common/JuceCompat.h"
 
 
 #define Q(x) #x
@@ -487,7 +488,7 @@ void Ambix_binauralAudioProcessorEditor::sliderValueChanged (Slider* sliderThatW
 
     if (sliderThatWasMoved == &sld_gain)
     {
-        ourProcessor->setParameterNotifyingHost(0, DbToParam(sld_gain.getValue()));
+        setParameterNotifyingHost(ourProcessor, 0, DbToParam(sld_gain.getValue()));
     }
 }
 

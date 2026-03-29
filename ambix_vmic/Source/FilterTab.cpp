@@ -18,6 +18,7 @@
  */
 
 #include "FilterTab.h"
+#include "../../common/JuceCompat.h"
 
 
 FilterTab::FilterTab(int id, Ambix_vmicAudioProcessor* myProcessor)
@@ -163,23 +164,23 @@ void FilterTab::sliderValueChanged (Slider* sliderThatWasMoved)
 {
     if (sliderThatWasMoved == &sld_az)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::AzimuthParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::AzimuthParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_el)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::ElevationParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::ElevationParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_w)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::WidthParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::WidthParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_h)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::HeightParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::HeightParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_gain)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::GainParam, DbToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::GainParam, DbToParam(sliderThatWasMoved->getValue()) );
     }
 }
 
@@ -187,7 +188,7 @@ void FilterTab::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 {
     if (comboBoxThatHasChanged == &box_shape)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::ShapeParam, (float)comboBoxThatHasChanged->getSelectedId()-1.f);
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_vmicAudioProcessor::ShapeParam, (float)comboBoxThatHasChanged->getSelectedId()-1.f);
     }
 }
 

@@ -18,6 +18,7 @@
  */
 
 #include "SphereOpenGL.h"
+#include "../../common/JuceCompat.h"
 
 using namespace ::juce::gl;
 
@@ -241,8 +242,8 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
     // notify host
     if (processor)
     {
-        processor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::AzimuthParam, mPhi/(2*(float)M_PI) + 0.5f);
-        processor->setParameterNotifyingHost(Ambix_encoderAudioProcessor::ElevationParam, mTheta/(2*(float)M_PI) + 0.5f);
+        setParameterNotifyingHost(processor, Ambix_encoderAudioProcessor::AzimuthParam, mPhi/(2*(float)M_PI) + 0.5f);
+        setParameterNotifyingHost(processor, Ambix_encoderAudioProcessor::ElevationParam, mTheta/(2*(float)M_PI) + 0.5f);
     }
 }
 

@@ -18,6 +18,7 @@
  */
 
 #include "FilterTab.h"
+#include "../../common/JuceCompat.h"
 
 #define PARAMS_PER_FILTER 7
 
@@ -174,7 +175,7 @@ void FilterTab::buttonClicked (Button* buttonThatWasClicked)
 {
     if (buttonThatWasClicked == &btn_solo)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::WindowParam, buttonThatWasClicked->getToggleState() ? 1.f : 0.f);
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::WindowParam, buttonThatWasClicked->getToggleState() ? 1.f : 0.f);
     }
 }
 
@@ -182,23 +183,23 @@ void FilterTab::sliderValueChanged (Slider* sliderThatWasMoved)
 {
     if (sliderThatWasMoved == &sld_az)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::AzimuthParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::AzimuthParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_el)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::ElevationParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::ElevationParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_w)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::WidthParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::WidthParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_h)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::HeightParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::HeightParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_gain)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::GainParam, DbToParam(sliderThatWasMoved->getValue()) );
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::GainParam, DbToParam(sliderThatWasMoved->getValue()) );
     }
 }
 
@@ -206,7 +207,7 @@ void FilterTab::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 {
     if (comboBoxThatHasChanged == &box_shape)
     {
-        _myProcessor->setParameterNotifyingHost(PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::ShapeParam, (float)comboBoxThatHasChanged->getSelectedId()-1.f);
+        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::ShapeParam, (float)comboBoxThatHasChanged->getSelectedId()-1.f);
     }
 }
 

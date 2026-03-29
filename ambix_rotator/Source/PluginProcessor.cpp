@@ -18,6 +18,7 @@
  */
 
 #include "PluginProcessor.h"
+#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 #include "Ressources/t_design.h"
 
@@ -46,9 +47,9 @@ void Ambix_rotatorAudioProcessor::oscMessageReceived (const OSCMessage& message)
 
         }
 
-        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::PitchParam, jlimit(0.f, 1.f, val[0]/360.f+0.5f));
-        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::YawParam, jlimit(0.f, 1.f, val[1]/360.f+0.5f));
-        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RollParam, jlimit(0.f, 1.f, val[2]/360.f+0.5f));
+        setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::PitchParam, jlimit(0.f, 1.f, val[0]/360.f+0.5f));
+        setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::YawParam, jlimit(0.f, 1.f, val[1]/360.f+0.5f));
+        setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::RollParam, jlimit(0.f, 1.f, val[2]/360.f+0.5f));
 
     } else if (message.getAddressPattern() == OSCAddressPattern("/head_pose")) {
         // /head_pose [User_ID] [x] [y] [z] [pitch] [yaw] [roll]
@@ -71,9 +72,9 @@ void Ambix_rotatorAudioProcessor::oscMessageReceived (const OSCMessage& message)
 
         }
 
-        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::PitchParam, jlimit(0.f, 1.f, val[4]/360.f+0.5f));
-        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::YawParam, jlimit(0.f, 1.f, val[5]/360.f+0.5f));
-        setParameterNotifyingHost(Ambix_rotatorAudioProcessor::RollParam, jlimit(0.f, 1.f, val[6]/360.f+0.5f));
+        setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::PitchParam, jlimit(0.f, 1.f, val[4]/360.f+0.5f));
+        setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::YawParam, jlimit(0.f, 1.f, val[5]/360.f+0.5f));
+        setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::RollParam, jlimit(0.f, 1.f, val[6]/360.f+0.5f));
 
     }
     else if (message.getAddressPattern() == OSCAddressPattern("/quaternion")) {
@@ -96,10 +97,10 @@ void Ambix_rotatorAudioProcessor::oscMessageReceived (const OSCMessage& message)
 
       }
 
-      setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q0Param, jlimit(0.f, 1.f, (val[0] + 1.f) / 2.f));
-      setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q1Param, jlimit(0.f, 1.f, (val[1] + 1.f) / 2.f));
-      setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q2Param, jlimit(0.f, 1.f, (val[2] + 1.f) / 2.f));
-      setParameterNotifyingHost(Ambix_rotatorAudioProcessor::Q3Param, jlimit(0.f, 1.f, (val[3] + 1.f) / 2.f));
+      setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::Q0Param, jlimit(0.f, 1.f, (val[0] + 1.f) / 2.f));
+      setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::Q1Param, jlimit(0.f, 1.f, (val[1] + 1.f) / 2.f));
+      setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::Q2Param, jlimit(0.f, 1.f, (val[2] + 1.f) / 2.f));
+      setParameterNotifyingHost(this, Ambix_rotatorAudioProcessor::Q3Param, jlimit(0.f, 1.f, (val[3] + 1.f) / 2.f));
     }
 
     // debug the message

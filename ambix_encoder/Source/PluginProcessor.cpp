@@ -18,6 +18,7 @@
  */
 
 #include "PluginProcessor.h"
+#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 
 
@@ -201,9 +202,9 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
 
     }
 
-    setParameterNotifyingHost(Ambix_encoderAudioProcessor::AzimuthParam, jlimit(0.f, 1.f, (val[2]+180.f)/360.f) );
-    setParameterNotifyingHost(Ambix_encoderAudioProcessor::ElevationParam, jlimit(0.f, 1.f, (val[3]+180.f)/360.f) );
-	setParameterNotifyingHost(Ambix_encoderAudioProcessor::SizeParam, jlimit(0.f, 1.f, val[4]));
+    setParameterNotifyingHost(this, Ambix_encoderAudioProcessor::AzimuthParam, jlimit(0.f, 1.f, (val[2]+180.f)/360.f) );
+    setParameterNotifyingHost(this, Ambix_encoderAudioProcessor::ElevationParam, jlimit(0.f, 1.f, (val[3]+180.f)/360.f) );
+	setParameterNotifyingHost(this, Ambix_encoderAudioProcessor::SizeParam, jlimit(0.f, 1.f, val[4]));
 
 }
 
