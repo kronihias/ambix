@@ -126,6 +126,7 @@ void Ambix_warpAudioProcessor::setParameter (int index, float newValue)
 		default:
             break;
 	}
+    sendChangeMessage();
 }
 
 const String Ambix_warpAudioProcessor::getParameterName (int index)
@@ -594,13 +595,12 @@ void Ambix_warpAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
 //==============================================================================
 bool Ambix_warpAudioProcessor::hasEditor() const
 {
-    return false; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 AudioProcessorEditor* Ambix_warpAudioProcessor::createEditor()
 {
-    //return new Ambix_warpAudioProcessorEditor (this);
-    return nullptr;
+    return new Ambix_warpAudioProcessorEditor (this);
 }
 
 //==============================================================================
