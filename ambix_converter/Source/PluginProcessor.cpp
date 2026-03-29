@@ -18,6 +18,7 @@
 */
 
 #include "PluginProcessor.h"
+#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 #include "SphericalHarmonic/ch_sequence.h" // defines channel mappings
 #include "SphericalHarmonic/normalization.h" // defines conversion between normalization schemes
@@ -640,16 +641,16 @@ void Ambix_converterAudioProcessor::setStateInformation (const void* data, int s
             // ok, now pull out our parameters..
 
             box_presets_text = xmlState->getStringAttribute("box_presets", "");
-            setParameterNotifyingHost(FlipCsParam, (float) xmlState->getDoubleAttribute("flip_cs_phase"));
-            setParameterNotifyingHost(FlipParam, (float) xmlState->getDoubleAttribute("flip_param"));
-            setParameterNotifyingHost(FlopParam, (float) xmlState->getDoubleAttribute("flop_param"));
-            setParameterNotifyingHost(FlapParam, (float) xmlState->getDoubleAttribute("flap_param"));
-            setParameterNotifyingHost(InSeqParam, (float) xmlState->getDoubleAttribute("in_seq_param"));
-            setParameterNotifyingHost(OutSeqParam, (float) xmlState->getDoubleAttribute("out_seq_param"));
-            setParameterNotifyingHost(InNormParam, (float) xmlState->getDoubleAttribute("in_norm_param"));
-            setParameterNotifyingHost(OutNormParam, (float) xmlState->getDoubleAttribute("out_norm_param"));
-            setParameterNotifyingHost(In2DParam, (float) xmlState->getDoubleAttribute("in_2d_param"));
-            setParameterNotifyingHost(Out2DParam, (float) xmlState->getDoubleAttribute("out_2d_param"));
+            setParameterNotifyingHost(this, FlipCsParam, (float) xmlState->getDoubleAttribute("flip_cs_phase"));
+            setParameterNotifyingHost(this, FlipParam, (float) xmlState->getDoubleAttribute("flip_param"));
+            setParameterNotifyingHost(this, FlopParam, (float) xmlState->getDoubleAttribute("flop_param"));
+            setParameterNotifyingHost(this, FlapParam, (float) xmlState->getDoubleAttribute("flap_param"));
+            setParameterNotifyingHost(this, InSeqParam, (float) xmlState->getDoubleAttribute("in_seq_param"));
+            setParameterNotifyingHost(this, OutSeqParam, (float) xmlState->getDoubleAttribute("out_seq_param"));
+            setParameterNotifyingHost(this, InNormParam, (float) xmlState->getDoubleAttribute("in_norm_param"));
+            setParameterNotifyingHost(this, OutNormParam, (float) xmlState->getDoubleAttribute("out_norm_param"));
+            setParameterNotifyingHost(this, In2DParam, (float) xmlState->getDoubleAttribute("in_2d_param"));
+            setParameterNotifyingHost(this, Out2DParam, (float) xmlState->getDoubleAttribute("out_2d_param"));
         }
 
 

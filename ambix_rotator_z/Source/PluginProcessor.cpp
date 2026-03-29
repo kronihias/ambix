@@ -18,6 +18,7 @@
  */
 
 #include "PluginProcessor.h"
+#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 
 #include "SphericalHarmonic/tools.h"
@@ -40,7 +41,7 @@ void Ambix_rotator_zAudioProcessor::oscMessageReceived (const OSCMessage& messag
             val = (float)message[1].getInt32();
         }
 
-        setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::RotZParam, jlimit(0.f, 1.f, val/360.f+0.5f));
+        setParameterNotifyingHost(this, Ambix_rotator_zAudioProcessor::RotZParam, jlimit(0.f, 1.f, val/360.f+0.5f));
 
 
     } else if (message.getAddressPattern() == OSCAddressPattern("/head_pose")) {
@@ -57,7 +58,7 @@ void Ambix_rotator_zAudioProcessor::oscMessageReceived (const OSCMessage& messag
             val = (float)message[5].getInt32();
         }
 
-        setParameterNotifyingHost(Ambix_rotator_zAudioProcessor::RotZParam, jlimit(0.f, 1.f, val/360.f+0.5f));
+        setParameterNotifyingHost(this, Ambix_rotator_zAudioProcessor::RotZParam, jlimit(0.f, 1.f, val/360.f+0.5f));
     }
 
 // debug the message
