@@ -22,21 +22,59 @@
 
 #include "JuceHeader.h"
 #include "PluginProcessor.h"
-
+#include "HammerAitovGrid.h"
+#include "WarpVisualizer.h"
 
 //==============================================================================
-/**
-*/
-class Ambix_warpAudioProcessorEditor  : public AudioProcessorEditor
+class Ambix_warpAudioProcessorEditor  : public AudioProcessorEditor,
+                                         public Slider::Listener,
+                                         public Button::Listener,
+                                         public ChangeListener,
+                                         public Timer
 {
 public:
     Ambix_warpAudioProcessorEditor (Ambix_warpAudioProcessor* ownerFilter);
     ~Ambix_warpAudioProcessorEditor();
 
-    //==============================================================================
-    // This is just a standard Juce paint method...
     void paint (Graphics& g) override;
-};
+    void resized() override;
+    void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void buttonClicked (Button* buttonThatWasClicked) override;
+    void changeListenerCallback (ChangeBroadcaster* source) override;
+    void timerCallback() override;
 
+private:
+    LookAndFeel_V3 globalLaF;
+
+    HammerAitovGrid grid;
+    WarpVisualizer visualizer;
+
+    Slider sld_phi;
+    Slider sld_theta;
+    Slider sld_phi_curve;
+    Slider sld_theta_curve;
+    Slider sld_in_order;
+    Slider sld_out_order;
+    ToggleButton btn_preemp;
+
+    Label lbl_phi;
+    Label lbl_theta;
+    Label lbl_phi_curve;
+    Label lbl_theta_curve;
+    Label lbl_in_order;
+    Label lbl_out_order;
+    Label lbl_preemp;
+
+    TooltipWindow tooltipWindow;
+
+    bool _changed;
+
+    Ambix_warpAudioProcessor* getProcessor() const
+    {
+        return static_cast<Ambix_warpAudioProcessor*> (getAudioProcessor());
+    }
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_warpAudioProcessorEditor)
+};
 
 #endif  // PLUGINEDITOR_H_INCLUDED
