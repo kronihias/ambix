@@ -33,7 +33,8 @@
 //==============================================================================
 /**
 */
-class Ambix_wideningAudioProcessor  : public AudioProcessor
+class Ambix_wideningAudioProcessor  : public AudioProcessor,
+                                      public ChangeBroadcaster
 {
 public:
     //==============================================================================
