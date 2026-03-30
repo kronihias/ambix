@@ -105,6 +105,8 @@ void Ambix_wideningAudioProcessor::setParameter (int index, float newValue)
 		default:
             break;
 	}
+
+    sendChangeMessage();
 }
 
 const String Ambix_wideningAudioProcessor::getParameterName (int index)
@@ -656,13 +658,12 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
 //==============================================================================
 bool Ambix_wideningAudioProcessor::hasEditor() const
 {
-    return false; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 AudioProcessorEditor* Ambix_wideningAudioProcessor::createEditor()
 {
-    return nullptr;
-    //return new Ambix_wideningAudioProcessorEditor (this);
+    return new Ambix_wideningAudioProcessorEditor (this);
 }
 
 //==============================================================================
