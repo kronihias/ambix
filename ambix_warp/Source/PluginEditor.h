@@ -66,6 +66,7 @@ private:
     Label lbl_preemp;
 
     TooltipWindow tooltipWindow;
+    ComponentBoundsConstrainer constrainer;
 
     bool _changed;
 

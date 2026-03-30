@@ -141,6 +141,10 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
     getProcessor()->addChangeListener (this);
 
     // --- Window size ---
+    constrainer.setMinimumSize (400, 340);
+    constrainer.setFixedAspectRatio (600.0 / 470.0);
+    setConstrainer (&constrainer);
+    setResizable (true, true);
     setSize (600, 470);
 
     // --- Start timer for UI refresh ---
@@ -188,48 +192,61 @@ void Ambix_warpAudioProcessorEditor::paint (Graphics& g)
 
 void Ambix_warpAudioProcessorEditor::resized()
 {
-    int vizTop = 35;
-    int vizHeight = 310;
-    int vizMargin = 10;
-    int controlsTop = vizTop + vizHeight + 10;
+    const int w = getWidth();
+    const int h = getHeight();
+    const float scale = w / 600.0f;
 
-    // Visualization area
-    grid.setBounds (vizMargin, vizTop, getWidth() - 2 * vizMargin, vizHeight);
-    visualizer.setBounds (vizMargin, vizTop, getWidth() - 2 * vizMargin, vizHeight);
+    // Margins and spacing scaled proportionally
+    const int margin = juce::roundToInt (10 * scale);
+    const int titleH = juce::roundToInt (35 * scale);
+    const int rowH = juce::roundToInt (28 * scale);
+    const int gap = juce::roundToInt (5 * scale);
+    const int sectionGap = juce::roundToInt (10 * scale);
 
-    int lblW = 70;
-    int sldW = 200;
-    int curveSliderW = 50;
-    int curveLblW = 90;
-    int rowH = 28;
-    int x0 = 10;
+    // Controls area: 3 rows at bottom (2 warp rows + 1 order row + gaps)
+    const int controlsH = 3 * rowH + 2 * gap + sectionGap;
+    const int controlsTop = h - controlsH - margin;
+
+    // Visualization fills from title to controls
+    const int vizTop = titleH;
+    const int vizH = controlsTop - vizTop - gap;
+    grid.setBounds (margin, vizTop, w - 2 * margin, vizH);
+    visualizer.setBounds (margin, vizTop, w - 2 * margin, vizH);
+
+    // Control area layout
+    const int contentW = w - 2 * margin;
+    const int lblW = juce::roundToInt (contentW * 0.12f);
+    const int sldW = juce::roundToInt (contentW * 0.38f);
+    const int curveLblW = juce::roundToInt (contentW * 0.16f);
+    const int curveSliderW = contentW - lblW - sldW - curveLblW - 3 * gap;
+    const int x0 = margin;
 
     // Row 1: Az Warp
     int y = controlsTop;
     lbl_phi.setBounds (x0, y, lblW, rowH);
-    sld_phi.setBounds (x0 + lblW + 5, y, sldW, rowH);
-    lbl_phi_curve.setBounds (x0 + lblW + sldW + 10, y, curveLblW, rowH);
-    sld_phi_curve.setBounds (x0 + lblW + sldW + curveLblW + 15, y, curveSliderW, rowH);
+    sld_phi.setBounds (x0 + lblW + gap, y, sldW, rowH);
+    lbl_phi_curve.setBounds (x0 + lblW + sldW + 2 * gap, y, curveLblW, rowH);
+    sld_phi_curve.setBounds (x0 + lblW + sldW + curveLblW + 3 * gap, y, curveSliderW, rowH);
 
     // Row 2: El Warp
-    y += rowH + 5;
+    y += rowH + gap;
     lbl_theta.setBounds (x0, y, lblW, rowH);
-    sld_theta.setBounds (x0 + lblW + 5, y, sldW, rowH);
-    lbl_theta_curve.setBounds (x0 + lblW + sldW + 10, y, curveLblW, rowH);
-    sld_theta_curve.setBounds (x0 + lblW + sldW + curveLblW + 15, y, curveSliderW, rowH);
+    sld_theta.setBounds (x0 + lblW + gap, y, sldW, rowH);
+    lbl_theta_curve.setBounds (x0 + lblW + sldW + 2 * gap, y, curveLblW, rowH);
+    sld_theta_curve.setBounds (x0 + lblW + sldW + curveLblW + 3 * gap, y, curveSliderW, rowH);
 
     // Row 3: In Order, Out Order, Pre-Emp
-    y += rowH + 10;
-    int col3W = (getWidth() - 2 * x0) / 3;
+    y += rowH + sectionGap;
+    const int col3W = contentW / 3;
+    const int incDecW = juce::roundToInt (70 * scale);
 
-    int incDecW = 70;  // text box (30) + two small buttons
     lbl_in_order.setBounds (x0, y, lblW, rowH);
-    sld_in_order.setBounds (x0 + lblW + 5, y + 2, incDecW, rowH - 4);
+    sld_in_order.setBounds (x0 + lblW + gap, y + 2, incDecW, rowH - 4);
 
     lbl_out_order.setBounds (x0 + col3W, y, lblW, rowH);
-    sld_out_order.setBounds (x0 + col3W + lblW + 5, y + 2, incDecW, rowH - 4);
+    sld_out_order.setBounds (x0 + col3W + lblW + gap, y + 2, incDecW, rowH - 4);
 
-    btn_preemp.setBounds (x0 + col3W * 2 + 10, y, col3W - 15, rowH);
+    btn_preemp.setBounds (x0 + col3W * 2 + sectionGap, y, col3W - sectionGap - gap, rowH);
 }
 
 //==============================================================================
