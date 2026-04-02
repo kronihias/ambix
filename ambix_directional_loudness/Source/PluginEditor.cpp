@@ -81,6 +81,11 @@ Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioP
                                ImageCache::getFromMemory (solo_symbol_over_png, solo_symbol_over_pngSize), 1.000f, Colour (0x00000000),
                                ImageCache::getFromMemory (solo_symbol_act_png, solo_symbol_act_pngSize), 1.000f, Colour (0x00000000));
 
+    setWantsKeyboardFocus(true);
+
+    tabbedComponent.onTabChanged = [this]() { _lastTouchedIsRight = false; };
+    tabbedComponent2.onTabChanged = [this]() { _lastTouchedIsRight = true; };
+
     setSize (630, 400);
 
     ownerFilter->addChangeListener(this);
@@ -140,11 +145,13 @@ void Ambix_directional_loudnessAudioProcessorEditor::changeListenerCallback (Cha
             {
                 tabbedComponent.setCurrentTabIndex((int)(id/2));
                 ourProcessor->filter_sel_id_1 = (int)(id/2);
+                _lastTouchedIsRight = false;
             }
             else
             {
                 tabbedComponent2.setCurrentTabIndex((int)(id/2));
                 ourProcessor->filter_sel_id_2 = (int)(id/2);
+                _lastTouchedIsRight = true;
             }
 
 
@@ -203,6 +210,31 @@ void Ambix_directional_loudnessAudioProcessorEditor::buttonClicked (Button* butt
             setParameterNotifyingHost(ourProcessor, PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WindowParam, 0.f);
         }
     }
+}
+
+int Ambix_directional_loudnessAudioProcessorEditor::getLastTouchedFilterId() const
+{
+    if (_lastTouchedIsRight)
+        return tabbedComponent2.getCurrentTabIndex() * 2 + 1;
+    else
+        return tabbedComponent.getCurrentTabIndex() * 2;
+}
+
+bool Ambix_directional_loudnessAudioProcessorEditor::keyPressed (const KeyPress& key)
+{
+    if (key == KeyPress ('s') || key == KeyPress ('S'))
+    {
+        Ambix_directional_loudnessAudioProcessor* ourProcessor = getProcessor();
+        int filterId = getLastTouchedFilterId();
+        if (filterId >= 0 && filterId < NUM_FILTERS)
+        {
+            int paramIndex = PARAMS_PER_FILTER * filterId + Ambix_directional_loudnessAudioProcessor::WindowParam;
+            float current = ourProcessor->getParameter(paramIndex);
+            setParameterNotifyingHost(ourProcessor, paramIndex, current > 0.5f ? 0.f : 1.f);
+        }
+        return true;
+    }
+    return false;
 }
 
 void Ambix_directional_loudnessAudioProcessorEditor::selectFilterTab(int id)
