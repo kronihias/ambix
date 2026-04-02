@@ -135,6 +135,8 @@ private:
     float mWidth;
     float _mWidth;
 
+    float _dragStartDistToCenter;
+
     bool _first_run;
 };
 
