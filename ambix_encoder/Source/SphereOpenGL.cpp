@@ -186,11 +186,49 @@ void SphereOpenGL::setSource(float azimuth, float elevation, float width)
 
 void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
 {
+#if INPUT_CHANNELS > 1
+    if (e.mods.isAltDown())
+    {
+        // Compute center indicator screen position
+        float r_pixels = 105.f * cosf(mTheta);
+        float centerScreenX = (float)getWidth() / 2.f + r_pixels * sinf(mPhi);
+        float centerScreenY = (float)getHeight() / 2.f - r_pixels * cosf(mPhi);
+
+        float dx = (float)e.getPosition().x - centerScreenX;
+        float dy = (float)e.getPosition().y - centerScreenY;
+        _dragStartDistToCenter = sqrtf(dx * dx + dy * dy);
+        _mWidth = mWidth;
+        return;
+    }
+#endif
     mouseDrag(e);
 }
 
 void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
 {
+#if INPUT_CHANNELS > 1
+    if (e.mods.isAltDown())
+    {
+        // Compute center indicator screen position
+        float r_pixels = 105.f * cosf(mTheta);
+        float centerScreenX = (float)getWidth() / 2.f + r_pixels * sinf(mPhi);
+        float centerScreenY = (float)getHeight() / 2.f - r_pixels * cosf(mPhi);
+
+        float dx = (float)e.getPosition().x - centerScreenX;
+        float dy = (float)e.getPosition().y - centerScreenY;
+        float currentDist = sqrtf(dx * dx + dy * dy);
+
+        float deltaDist = currentDist - _dragStartDistToCenter;
+        mWidth = jlimit(0.f, (float)(2 * M_PI), _mWidth + deltaDist / 105.f * (float)M_PI);
+
+        if (processor)
+        {
+            setParameterNotifyingHost(processor, Ambix_encoderAudioProcessor::WidthParam,
+                                      mWidth / (2.f * (float)M_PI));
+        }
+        return;
+    }
+#endif
 
     if (e.mods.isRightButtonDown())
     {
@@ -251,4 +289,5 @@ void SphereOpenGL::mouseUp(const juce::MouseEvent &e)
 {
     _mTheta = mTheta;
     _mPhi = mPhi;
+    _mWidth = mWidth;
 }
