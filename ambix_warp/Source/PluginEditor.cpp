@@ -52,20 +52,12 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
     lbl_phi.setJustificationType (Justification::centredRight);
     lbl_phi.setColour (Label::textColourId, Colours::white);
 
-    // --- Az Curve slider (two-state: 0=toward poles, 1=toward equator) ---
-    addAndMakeVisible (sld_phi_curve);
-    sld_phi_curve.setRange (0.0, 1.0, 1.0);
-    sld_phi_curve.setSliderStyle (Slider::LinearHorizontal);
-    sld_phi_curve.setTextBoxStyle (Slider::NoTextBox, true, 0, 0);
-    sld_phi_curve.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_phi_curve.addListener (this);
-    sld_phi_curve.setTooltip ("azimuth warp curve type");
-
-    addAndMakeVisible (lbl_phi_curve);
-    lbl_phi_curve.setText ("-90 / 90 deg", dontSendNotification);
-    lbl_phi_curve.setFont (Font (12.0f, Font::plain));
-    lbl_phi_curve.setJustificationType (Justification::centredRight);
-    lbl_phi_curve.setColour (Label::textColourId, Colours::white);
+    // --- Az Curve toggle ---
+    addAndMakeVisible (btn_phi_curve);
+    btn_phi_curve.setButtonText ("-90 / 90 deg");
+    btn_phi_curve.setColour (ToggleButton::textColourId, Colours::white);
+    btn_phi_curve.addListener (this);
+    btn_phi_curve.setTooltip ("azimuth warp curve: off = -90/90 deg (toward poles), on = 180/0 deg (toward equator)");
 
     // --- El Warp slider ---
     addAndMakeVisible (sld_theta);
@@ -83,20 +75,12 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
     lbl_theta.setJustificationType (Justification::centredRight);
     lbl_theta.setColour (Label::textColourId, Colours::white);
 
-    // --- El Curve slider (two-state: 0=toward pole, 1=toward equator) ---
-    addAndMakeVisible (sld_theta_curve);
-    sld_theta_curve.setRange (0.0, 1.0, 1.0);
-    sld_theta_curve.setSliderStyle (Slider::LinearHorizontal);
-    sld_theta_curve.setTextBoxStyle (Slider::NoTextBox, true, 0, 0);
-    sld_theta_curve.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
-    sld_theta_curve.addListener (this);
-    sld_theta_curve.setTooltip ("elevation warp curve type");
-
-    addAndMakeVisible (lbl_theta_curve);
-    lbl_theta_curve.setText ("northpole", dontSendNotification);
-    lbl_theta_curve.setFont (Font (12.0f, Font::plain));
-    lbl_theta_curve.setJustificationType (Justification::centredRight);
-    lbl_theta_curve.setColour (Label::textColourId, Colours::white);
+    // --- El Curve toggle ---
+    addAndMakeVisible (btn_theta_curve);
+    btn_theta_curve.setButtonText ("northpole");
+    btn_theta_curve.setColour (ToggleButton::textColourId, Colours::white);
+    btn_theta_curve.addListener (this);
+    btn_theta_curve.setTooltip ("elevation warp curve: off = northpole, on = equator");
 
     // --- In Order (IncDecButtons) ---
     addAndMakeVisible (sld_in_order);
@@ -137,6 +121,28 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
     btn_preemp.addListener (this);
     btn_preemp.setTooltip ("pre-emphasis compensation");
 
+    // --- Undo / Redo buttons ---
+    addAndMakeVisible (btn_undo);
+    btn_undo.setButtonText ("Undo");
+    btn_undo.addListener (this);
+    btn_undo.setTooltip ("undo last parameter change");
+    btn_undo.setEnabled (false);
+
+    addAndMakeVisible (btn_redo);
+    btn_redo.setButtonText ("Redo");
+    btn_redo.addListener (this);
+    btn_redo.setTooltip ("redo last undone change");
+    btn_redo.setEnabled (false);
+
+    // --- Drag callback from visualizer ---
+    visualizer.onGestureEnded = [this] () { saveUndoState(); };
+    visualizer.onWarpDragged = [this] (float phiNorm, float thetaNorm)
+    {
+        auto* p = getProcessor();
+        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::PhiParam, phiNorm);
+        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::ThetaParam, thetaNorm);
+    };
+
     // --- Register for processor change notifications ---
     getProcessor()->addChangeListener (this);
 
@@ -150,8 +156,9 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
     // --- Start timer for UI refresh ---
     startTimer (40); // ~25 fps
 
-    // --- Load initial state ---
+    // --- Load initial state & save first undo snapshot ---
     timerCallback();
+    saveUndoState();
 }
 
 Ambix_warpAudioProcessorEditor::~Ambix_warpAudioProcessorEditor()
@@ -203,6 +210,12 @@ void Ambix_warpAudioProcessorEditor::resized()
     const int gap = juce::roundToInt (5 * scale);
     const int sectionGap = juce::roundToInt (10 * scale);
 
+    // Undo/Redo buttons in top-right
+    const int btnW = juce::roundToInt (45 * scale);
+    const int btnH = juce::roundToInt (20 * scale);
+    btn_undo.setBounds (w - 2 * btnW - gap - margin, juce::roundToInt (6 * scale), btnW, btnH);
+    btn_redo.setBounds (w - btnW - margin, juce::roundToInt (6 * scale), btnW, btnH);
+
     // Controls area: 3 rows at bottom (2 warp rows + 1 order row + gaps)
     const int controlsH = 3 * rowH + 2 * gap + sectionGap;
     const int controlsTop = h - controlsH - margin;
@@ -216,24 +229,21 @@ void Ambix_warpAudioProcessorEditor::resized()
     // Control area layout
     const int contentW = w - 2 * margin;
     const int lblW = juce::roundToInt (contentW * 0.12f);
-    const int sldW = juce::roundToInt (contentW * 0.38f);
-    const int curveLblW = juce::roundToInt (contentW * 0.16f);
-    const int curveSliderW = contentW - lblW - sldW - curveLblW - 3 * gap;
+    const int toggleW = juce::roundToInt (contentW * 0.22f);
+    const int sldW = contentW - lblW - toggleW - 2 * gap;
     const int x0 = margin;
 
     // Row 1: Az Warp
     int y = controlsTop;
     lbl_phi.setBounds (x0, y, lblW, rowH);
     sld_phi.setBounds (x0 + lblW + gap, y, sldW, rowH);
-    lbl_phi_curve.setBounds (x0 + lblW + sldW + 2 * gap, y, curveLblW, rowH);
-    sld_phi_curve.setBounds (x0 + lblW + sldW + curveLblW + 3 * gap, y, curveSliderW, rowH);
+    btn_phi_curve.setBounds (x0 + lblW + sldW + 2 * gap, y, toggleW, rowH);
 
     // Row 2: El Warp
     y += rowH + gap;
     lbl_theta.setBounds (x0, y, lblW, rowH);
     sld_theta.setBounds (x0 + lblW + gap, y, sldW, rowH);
-    lbl_theta_curve.setBounds (x0 + lblW + sldW + 2 * gap, y, curveLblW, rowH);
-    sld_theta_curve.setBounds (x0 + lblW + sldW + curveLblW + 3 * gap, y, curveSliderW, rowH);
+    btn_theta_curve.setBounds (x0 + lblW + sldW + 2 * gap, y, toggleW, rowH);
 
     // Row 3: In Order, Out Order, Pre-Emp
     y += rowH + sectionGap;
@@ -260,27 +270,70 @@ void Ambix_warpAudioProcessorEditor::sliderValueChanged (Slider* s)
     else if (s == &sld_theta)
         setParameterNotifyingHost (p, Ambix_warpAudioProcessor::ThetaParam,
                                    (float) (sld_theta.getValue() + 0.9) / 1.8f);
-    else if (s == &sld_phi_curve)
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::PhiCurveParam,
-                                   (float) sld_phi_curve.getValue());
-    else if (s == &sld_theta_curve)
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::ThetaCurveParam,
-                                   (float) sld_theta_curve.getValue());
     else if (s == &sld_in_order)
         setParameterNotifyingHost (p, Ambix_warpAudioProcessor::InOrderParam,
                                    (float) sld_in_order.getValue() / (float) AMBI_ORDER);
     else if (s == &sld_out_order)
         setParameterNotifyingHost (p, Ambix_warpAudioProcessor::OutOrderParam,
                                    (float) sld_out_order.getValue() / (float) AMBI_ORDER);
+
+}
+
+void Ambix_warpAudioProcessorEditor::sliderDragStarted (Slider*)
+{
+}
+
+void Ambix_warpAudioProcessorEditor::sliderDragEnded (Slider*)
+{
+    if (! undoInProgress)
+        saveUndoState();
 }
 
 void Ambix_warpAudioProcessorEditor::buttonClicked (Button* b)
 {
+    auto* p = getProcessor();
+
     if (b == &btn_preemp)
     {
-        auto* p = getProcessor();
         setParameterNotifyingHost (p, Ambix_warpAudioProcessor::PreEmpParam,
                                    btn_preemp.getToggleState() ? 1.0f : 0.0f);
+        if (! undoInProgress) saveUndoState();
+    }
+    else if (b == &btn_phi_curve)
+    {
+        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::PhiCurveParam,
+                                   btn_phi_curve.getToggleState() ? 1.0f : 0.0f);
+        if (! undoInProgress) saveUndoState();
+    }
+    else if (b == &btn_theta_curve)
+    {
+        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::ThetaCurveParam,
+                                   btn_theta_curve.getToggleState() ? 1.0f : 0.0f);
+        if (! undoInProgress) saveUndoState();
+    }
+    else if (b == &btn_undo)
+    {
+        if (undoIndex > 0)
+        {
+            undoInProgress = true;
+            --undoIndex;
+            auto& snap = undoHistory[(size_t) undoIndex];
+            for (int i = 0; i < Ambix_warpAudioProcessor::totalNumParams; ++i)
+                setParameterNotifyingHost (p, i, snap.params[i]);
+            undoInProgress = false;
+        }
+    }
+    else if (b == &btn_redo)
+    {
+        if (undoIndex < (int) undoHistory.size() - 1)
+        {
+            undoInProgress = true;
+            ++undoIndex;
+            auto& snap = undoHistory[(size_t) undoIndex];
+            for (int i = 0; i < Ambix_warpAudioProcessor::totalNumParams; ++i)
+                setParameterNotifyingHost (p, i, snap.params[i]);
+            undoInProgress = false;
+        }
     }
 }
 
@@ -304,16 +357,59 @@ void Ambix_warpAudioProcessorEditor::timerCallback()
     // Update sliders from processor state
     sld_phi.setValue (phi * 1.8 - 0.9, dontSendNotification);
     sld_theta.setValue (theta * 1.8 - 0.9, dontSendNotification);
-    sld_phi_curve.setValue (phiC > 0.5f ? 1.0 : 0.0, dontSendNotification);
-    sld_theta_curve.setValue (thetaC > 0.5f ? 1.0 : 0.0, dontSendNotification);
     sld_in_order.setValue (round (inOrd * AMBI_ORDER), dontSendNotification);
     sld_out_order.setValue (round (outOrd * AMBI_ORDER), dontSendNotification);
     btn_preemp.setToggleState (preEmp > 0.5f, dontSendNotification);
 
-    // Update curve labels to match VST parameter text
-    lbl_phi_curve.setText (phiC > 0.5f ? "180 / 0 deg" : "-90 / 90 deg", dontSendNotification);
-    lbl_theta_curve.setText (thetaC > 0.5f ? "equator" : "northpole", dontSendNotification);
+    // Update curve toggles and their labels
+    btn_phi_curve.setToggleState (phiC > 0.5f, dontSendNotification);
+    btn_phi_curve.setButtonText (phiC > 0.5f ? "180 / 0 deg" : "-90 / 90 deg");
+
+    btn_theta_curve.setToggleState (thetaC > 0.5f, dontSendNotification);
+    btn_theta_curve.setButtonText (thetaC > 0.5f ? "equator" : "northpole");
+
+    // Update undo/redo button states
+    btn_undo.setEnabled (undoIndex > 0);
+    btn_redo.setEnabled (undoIndex < (int) undoHistory.size() - 1);
 
     // Update visualization (internally checks if params actually changed)
     visualizer.setWarpParams (phi, phiC, theta, thetaC);
+}
+
+void Ambix_warpAudioProcessorEditor::saveUndoState()
+{
+    auto* p = getProcessor();
+    ParamSnapshot snap;
+    for (int i = 0; i < Ambix_warpAudioProcessor::totalNumParams; ++i)
+        snap.params[i] = p->getParameter (i);
+
+    // If we're not at the end of the history, truncate the redo tail
+    if (undoIndex >= 0 && undoIndex < (int) undoHistory.size() - 1)
+        undoHistory.resize ((size_t) undoIndex + 1);
+
+    // Skip if identical to current top
+    if (! undoHistory.empty())
+    {
+        auto& top = undoHistory.back();
+        bool same = true;
+        for (int i = 0; i < Ambix_warpAudioProcessor::totalNumParams; ++i)
+        {
+            if (std::abs (top.params[i] - snap.params[i]) > 1e-6f)
+            {
+                same = false;
+                break;
+            }
+        }
+        if (same) return;
+    }
+
+    undoHistory.push_back (snap);
+
+    // Cap history length
+    if (undoHistory.size() > 200)
+    {
+        undoHistory.erase (undoHistory.begin());
+    }
+
+    undoIndex = (int) undoHistory.size() - 1;
 }

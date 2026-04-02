@@ -30,10 +30,15 @@ class WarpVisualizer : public juce::Component
 public:
     WarpVisualizer()
     {
+        setMouseCursor (juce::MouseCursor::DraggingHandCursor);
         rebuildPaths();
     }
 
     ~WarpVisualizer() override = default;
+
+    // Callback: (phiNormalized, thetaNormalized) in 0..1 parameter range
+    std::function<void (float, float)> onWarpDragged;
+    std::function<void()> onGestureEnded;
 
     void setWarpParams (float phi, float phiCurve, float theta, float thetaCurve)
     {
@@ -47,6 +52,39 @@ public:
             rebuildPaths();
             repaint();
         }
+    }
+
+    void mouseDown (const juce::MouseEvent&) override
+    {
+        dragStartPhiParam = phi_param;
+        dragStartThetaParam = theta_param;
+    }
+
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        if (onGestureEnded) onGestureEnded();
+    }
+
+    void mouseDoubleClick (const juce::MouseEvent&) override
+    {
+        // Reset both warp factors to 0 (0.5 normalized = center of -0.9..0.9 range)
+        if (onWarpDragged)
+            onWarpDragged (0.5f, 0.5f);
+        if (onGestureEnded) onGestureEnded();
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        // Horizontal drag → az warp, vertical drag → el warp
+        // Scale: full width = full parameter range (0..1.8 mapped to -0.9..0.9)
+        float dx = (float) e.getDistanceFromDragStartX() / (float) getWidth();
+        float dy = (float) e.getDistanceFromDragStartY() / (float) getHeight();
+
+        float newPhi = juce::jlimit (0.0f, 1.0f, dragStartPhiParam + dx * 1.5f);
+        float newTheta = juce::jlimit (0.0f, 1.0f, dragStartThetaParam - dy * 1.5f);
+
+        if (onWarpDragged)
+            onWarpDragged (newPhi, newTheta);
     }
 
     void paint (juce::Graphics& g) override
@@ -85,6 +123,10 @@ private:
     float phi_curve_param = 0.0f;
     float theta_param = 0.5f;
     float theta_curve_param = 0.0f;
+
+    // Drag state
+    float dragStartPhiParam = 0.5f;
+    float dragStartThetaParam = 0.5f;
 
     juce::Path unwarpedCircles;
     juce::Path warpedCircles;
