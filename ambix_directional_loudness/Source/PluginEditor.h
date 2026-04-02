@@ -29,14 +29,16 @@
 
 
 
-//==============================================================================
-/**
-                                                                    //[Comments]
-    An auto-generated component, created by the Jucer.
+class TrackedTabbedComponent : public TabbedComponent {
+public:
+    using TabbedComponent::TabbedComponent;
+    std::function<void()> onTabChanged;
+    void currentTabChanged(int, const String&) override {
+        if (onTabChanged) onTabChanged();
+    }
+};
 
-    Describe your class and how it works here!
-                                                                    //[/Comments]
-*/
+//==============================================================================
 class Ambix_directional_loudnessAudioProcessorEditor  : public AudioProcessorEditor,
                                                         public ChangeListener,
                                                         public Button::Listener
@@ -57,6 +59,10 @@ public:
 
     void buttonClicked (Button* buttonThatWasClicked) override;
 
+    bool keyPressed (const KeyPress& key) override;
+
+    int getLastTouchedFilterId() const;
+
     void selectFilterTab(int id);
 
     // Binary resources:
@@ -74,8 +80,10 @@ private:
     Label lbl_gd;
     Component filtergraph;
 
-    TabbedComponent tabbedComponent;
-    TabbedComponent tabbedComponent2;
+    TrackedTabbedComponent tabbedComponent;
+    TrackedTabbedComponent tabbedComponent2;
+
+    bool _lastTouchedIsRight = false;
 
     OwnedArray<FilterTab> _filtertabs;
 
