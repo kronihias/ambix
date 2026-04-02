@@ -39,11 +39,15 @@ public:
     void paint (Graphics& g) override;
     void resized() override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void sliderDragStarted (Slider* slider) override;
+    void sliderDragEnded (Slider* slider) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
     void changeListenerCallback (ChangeBroadcaster* source) override;
     void timerCallback() override;
 
 private:
+    void saveUndoState();
+
     LookAndFeel_V3 globalLaF;
 
     HammerAitovGrid grid;
@@ -51,24 +55,33 @@ private:
 
     Slider sld_phi;
     Slider sld_theta;
-    Slider sld_phi_curve;
-    Slider sld_theta_curve;
     Slider sld_in_order;
     Slider sld_out_order;
+
+    ToggleButton btn_phi_curve;
+    ToggleButton btn_theta_curve;
     ToggleButton btn_preemp;
+    TextButton btn_undo;
+    TextButton btn_redo;
 
     Label lbl_phi;
     Label lbl_theta;
-    Label lbl_phi_curve;
-    Label lbl_theta_curve;
     Label lbl_in_order;
     Label lbl_out_order;
-    Label lbl_preemp;
 
     TooltipWindow tooltipWindow;
     ComponentBoundsConstrainer constrainer;
 
     bool _changed;
+
+    // Undo/redo state
+    struct ParamSnapshot
+    {
+        float params[Ambix_warpAudioProcessor::totalNumParams];
+    };
+    std::vector<ParamSnapshot> undoHistory;
+    int undoIndex = -1;
+    bool undoInProgress = false;
 
     Ambix_warpAudioProcessor* getProcessor() const
     {
