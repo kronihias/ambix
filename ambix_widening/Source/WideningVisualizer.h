@@ -10,7 +10,13 @@
 class WideningVisualizer : public juce::Component
 {
 public:
-    WideningVisualizer() {}
+    // Callback: normalized mod depth (0..1)
+    std::function<void (float)> onModDepthDragged;
+
+    WideningVisualizer()
+    {
+        setMouseCursor (juce::MouseCursor::LeftRightResizeCursor);
+    }
 
     void setParams (float modDepth, float modT, float rotOffset, bool singleSided)
     {
@@ -25,6 +31,35 @@ public:
 
         recompute();
         repaint();
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        // Record the center x of the plot area (azimuth 0°)
+        auto area = getLocalBounds().toFloat().reduced (2.0f);
+        float plotLeft = area.getX() + 40.0f;
+        float plotRight = area.getRight() - 15.0f;
+        float plotW = plotRight - plotLeft;
+        dragCenterX = plotLeft + 0.5f * plotW;
+        dragHalfWidth = plotW * 0.5f;
+        dragStartModDepth = lastModDepth;
+        dragStartX = (float) e.getPosition().x;
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (dragHalfWidth < 1.0f) return;
+
+        // Distance from center at drag start vs now
+        float startDist = std::abs (dragStartX - dragCenterX);
+        float curDist = std::abs ((float) e.getPosition().x - dragCenterX);
+
+        // Delta in normalized units (full half-width = 1.0 = 360°)
+        float delta = (curDist - startDist) / dragHalfWidth;
+        float newModDepth = juce::jlimit (0.0f, 1.0f, dragStartModDepth + delta);
+
+        if (onModDepthDragged)
+            onModDepthDragged (newModDepth);
     }
 
     void paint (juce::Graphics& g) override
@@ -147,6 +182,12 @@ private:
     float lastModT = -1.0f;
     float lastRotOffset = -1.0f;
     bool lastSingleSided = false;
+
+    // Drag state
+    float dragCenterX = 0.0f;
+    float dragHalfWidth = 1.0f;
+    float dragStartModDepth = 0.0f;
+    float dragStartX = 0.0f;
 
     void recompute()
     {

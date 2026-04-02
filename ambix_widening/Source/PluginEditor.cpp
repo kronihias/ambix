@@ -94,6 +94,13 @@ Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wi
     btn_single_sided.addListener (this);
     btn_single_sided.setTooltip ("single-sided mode (causal FIR, no latency)");
 
+    // --- Drag callback from visualizer ---
+    visualizer.onModDepthDragged = [this] (float normModDepth)
+    {
+        auto* p = getProcessor();
+        setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::ModDepthParam, normModDepth);
+    };
+
     // --- Register for processor change notifications ---
     getProcessor()->addChangeListener (this);
 
