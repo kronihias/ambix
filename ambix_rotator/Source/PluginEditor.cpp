@@ -74,7 +74,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible (label2);
     label2.setText("Yaw", dontSendNotification);
-    label2.setFont (Font (15.00f, Font::plain));
+    label2.setFont (Font (FontOptions {15.00f, Font::plain}));
     label2.setJustificationType (Justification::centredLeft);
     label2.setEditable (false, false, false);
     label2.setColour (Label::textColourId, Colours::white);
@@ -83,7 +83,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible (label3);
     label3.setText("Pitch", dontSendNotification);
-    label3.setFont (Font (15.00f, Font::plain));
+    label3.setFont (Font (FontOptions {15.00f, Font::plain}));
     label3.setJustificationType (Justification::centredLeft);
     label3.setEditable (false, false, false);
     label3.setColour (Label::textColourId, Colours::white);
@@ -101,7 +101,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible (label4);
     label4.setText("Roll", dontSendNotification);
-    label4.setFont (Font (15.00f, Font::plain));
+    label4.setFont (Font (FontOptions {15.00f, Font::plain}));
     label4.setJustificationType (Justification::centredLeft);
     label4.setEditable (false, false, false);
     label4.setColour (Label::textColourId, Colours::white);
@@ -118,7 +118,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible(label5);
     label5.setText("Euler rotation \norder:", dontSendNotification);
-    label5.setFont (Font (15.00f, Font::plain));
+    label5.setFont (Font (FontOptions {15.00f, Font::plain}));
     label5.setJustificationType (Justification::centredLeft);
     label5.setEditable (false, false, false);
     label5.setColour (Label::textColourId, Colours::white);
@@ -151,7 +151,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible(label7);
     label7.setText("Euler", dontSendNotification);
-    label7.setFont(Font(15.00f, Font::plain));
+    label7.setFont(Font(FontOptions{15.00f, Font::plain}));
     label7.setJustificationType(Justification::centredRight);
     label7.setEditable(false, false, false);
     label7.setColour(Label::textColourId, Colours::white);
@@ -160,7 +160,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible(label8);
     label8.setText("Quaternion", dontSendNotification);
-    label8.setFont(Font(15.00f, Font::plain));
+    label8.setFont(Font(FontOptions{15.00f, Font::plain}));
     label8.setJustificationType(Justification::centredRight);
     label8.setEditable(false, false, false);
     label8.setColour(Label::textColourId, Colours::white);
@@ -169,7 +169,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible(label6);
     label6.setText("q0", dontSendNotification);
-    label6.setFont(Font(15.00f, Font::plain));
+    label6.setFont(Font(FontOptions{15.00f, Font::plain}));
     label6.setJustificationType(Justification::centredRight);
     label6.setEditable(false, false, false);
     label6.setColour(Label::textColourId, Colours::white);
@@ -190,7 +190,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible(label9);
     label9.setText("q1", dontSendNotification);
-    label9.setFont(Font(15.00f, Font::plain));
+    label9.setFont(Font(FontOptions{15.00f, Font::plain}));
     label9.setJustificationType(Justification::centredRight);
     label9.setEditable(false, false, false);
     label9.setColour(Label::textColourId, Colours::white);
@@ -211,7 +211,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible(label10);
     label10.setText("q2", dontSendNotification);
-    label10.setFont(Font(15.00f, Font::plain));
+    label10.setFont(Font(FontOptions{15.00f, Font::plain}));
     label10.setJustificationType(Justification::centredRight);
     label10.setEditable(false, false, false);
     label10.setColour(Label::textColourId, Colours::white);
@@ -232,7 +232,7 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
     addAndMakeVisible(label11);
     label11.setText("q3", dontSendNotification);
-    label11.setFont(Font(15.00f, Font::plain));
+    label11.setFont(Font(FontOptions{15.00f, Font::plain}));
     label11.setJustificationType(Justification::centredRight);
     label11.setEditable(false, false, false);
     label11.setColour(Label::textColourId, Colours::white);
@@ -284,7 +284,7 @@ void Ambix_rotatorAudioProcessorEditor::paint (Graphics& g)
     g.drawRect(0, 0, 410, 350, 1);
 
     g.setColour(Colours::azure);
-    g.setFont(Font(17.20f, Font::bold));
+    g.setFont(Font(FontOptions{17.20f, Font::bold}));
     g.drawText(TRANS("AMBIX-ROTATOR"),
       10, 8, 380, 30,
       Justification::centred, true);
@@ -301,7 +301,7 @@ void Ambix_rotatorAudioProcessorEditor::paint (Graphics& g)
 
     /* Version text */
     g.setColour (Colours::white);
-    g.setFont (Font (10.00f, Font::plain));
+    g.setFont (Font (FontOptions {10.00f, Font::plain}));
     String version_string;
     version_string << "v" << QUOTE(VERSION);
     g.drawText (version_string,
@@ -380,16 +380,16 @@ void Ambix_rotatorAudioProcessorEditor::timerCallback()
         if (ourProcessor->isQuaternionActive())
         {
           label7.setColour(Label::textColourId, Colours::dimgrey);
-          label7.setFont(Font(15.00f, Font::plain));
+          label7.setFont(Font(FontOptions{15.00f, Font::plain}));
           label8.setColour(Label::textColourId, Colours::yellow);
-          label8.setFont(Font(20.00f, Font::plain));
+          label8.setFont(Font(FontOptions{20.00f, Font::plain}));
         }
         else
         {
           label7.setColour(Label::textColourId, Colours::yellow);
-          label7.setFont(Font(20.00f, Font::plain));
+          label7.setFont(Font(FontOptions{20.00f, Font::plain}));
           label8.setColour(Label::textColourId, Colours::dimgrey);
-          label8.setFont(Font(15.00f, Font::plain));
+          label8.setFont(Font(FontOptions{15.00f, Font::plain}));
         }
     }
 }

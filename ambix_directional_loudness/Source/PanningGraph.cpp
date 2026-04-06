@@ -61,7 +61,7 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
         lbl_drag.add(new Label(label));
         lbl_drag.getLast()->setText(label, dontSendNotification);
         lbl_drag.getLast()->setInterceptsMouseClicks(false, false);
-        lbl_drag.getLast()->setFont (Font (15.00f, Font::plain));
+        lbl_drag.getLast()->setFont (Font (FontOptions {15.00f, Font::plain}));
         lbl_drag.getLast()->setJustificationType (Justification::centred);
         lbl_drag.getLast()->setEditable (false, false, false);
         lbl_drag.getLast()->setColour (Label::textColourId, Colours::white);
@@ -116,7 +116,7 @@ void PanningGraph::paint (Graphics& g)
         // text
         String axislabel = String((int)deg_val);
         axislabel << "°";
-        g.setFont (Font ("Arial Rounded MT", 12.0f, Font::plain));
+        g.setFont (Font (FontOptions {"Arial Rounded MT", 12.0f, Font::plain}));
         g.drawText (axislabel, 0, ypos-6, 34, 12, Justification::centred, false);
         // g.drawText (String ("-") + axisLabel, 6, (int) (numHorizontalLines * (height - 5) / (numHorizontalLines + 1) + 3.5f), 45, 12, Justification::left, false);
     }
@@ -132,7 +132,7 @@ void PanningGraph::paint (Graphics& g)
         // text
         String axislabel = String((int)deg_val);
         axislabel << "°";
-        g.setFont (Font ("Arial Rounded MT", 12.0f, Font::plain));
+        g.setFont (Font (FontOptions {"Arial Rounded MT", 12.0f, Font::plain}));
         g.drawText (axislabel, xpos-22, getHeight()-bymargin, 44, 12, Justification::centred, false);
     }
 

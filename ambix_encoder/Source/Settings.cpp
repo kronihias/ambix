@@ -78,7 +78,7 @@ Settings::Settings (Ambix_encoderAudioProcessor& Processor)
 
     addAndMakeVisible (lbl_id);
     lbl_id.setText("ID: 1", dontSendNotification);
-    lbl_id.setFont (Font (15.00f, Font::plain));
+    lbl_id.setFont (Font (FontOptions {15.00f, Font::plain}));
     lbl_id.setJustificationType (Justification::centredRight);
     lbl_id.setEditable (false, false, false);
     lbl_id.setColour (Label::textColourId, Colour (0xff888888));
@@ -134,25 +134,25 @@ void Settings::paint (Graphics& g)
     g.fillRoundedRectangle (19.0f, 45.0f, 163.0f, 90.0f, 4.000f);
 
     g.setColour (Colours::black);
-    g.setFont (Font (14.20f, Font::bold));
+    g.setFont (Font (FontOptions {14.20f, Font::bold}));
     g.drawText (TRANS("OSC send"),
                 101, 46, 80, 26,
                 Justification::centredLeft, true);
 
     g.setColour (Colours::white);
-    g.setFont (Font (17.20f, Font::bold));
+    g.setFont (Font (FontOptions {17.20f, Font::bold}));
     g.drawText (TRANS("ambix_encoder settings"),
                 -2, 2, 208, 30,
                 Justification::centred, true);
 
     g.setColour (Colours::black);
-    g.setFont (Font (14.20f, Font::plain));
+    g.setFont (Font (FontOptions {14.20f, Font::plain}));
     g.drawText (TRANS("ip"),
                 24, 78, 25, 26,
                 Justification::centredRight, true);
 
     g.setColour (Colours::black);
-    g.setFont (Font (14.20f, Font::plain));
+    g.setFont (Font (FontOptions {14.20f, Font::plain}));
     g.drawText (TRANS("port"),
                 24, 101, 25, 26,
                 Justification::centredRight, true);
@@ -161,13 +161,13 @@ void Settings::paint (Graphics& g)
     g.fillRoundedRectangle (19.0f, 149.0f, 163.0f, 58.0f, 4.000f);
 
     g.setColour (Colours::black);
-    g.setFont (Font (14.20f, Font::bold));
+    g.setFont (Font (FontOptions {14.20f, Font::bold}));
     g.drawText (TRANS("OSC rcv"),
                 101, 150, 80, 26,
                 Justification::centredLeft, true);
 
     g.setColour (Colours::black);
-    g.setFont (Font (14.20f, Font::plain));
+    g.setFont (Font (FontOptions {14.20f, Font::plain}));
     g.drawText (TRANS("port"),
                 24, 175, 25, 26,
                 Justification::centredRight, true);
@@ -176,7 +176,7 @@ void Settings::paint (Graphics& g)
     g.fillRoundedRectangle (19.0f, 220.0f, 163.0f, 52.0f, 4.000f);
 
     g.setColour (Colours::black);
-    g.setFont (Font (14.20f, Font::bold));
+    g.setFont (Font (FontOptions {14.20f, Font::bold}));
     g.drawText (TRANS("OSC send interval"),
                 43, 220, 133, 26,
                 Justification::centredLeft, true);

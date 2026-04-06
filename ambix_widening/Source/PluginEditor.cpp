@@ -49,7 +49,7 @@ Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wi
 
     addAndMakeVisible (lbl_mod_depth);
     lbl_mod_depth.setText ("Mod Depth", dontSendNotification);
-    lbl_mod_depth.setFont (Font (14.0f, Font::plain));
+    lbl_mod_depth.setFont (Font (FontOptions {14.0f, Font::plain}));
     lbl_mod_depth.setJustificationType (Justification::centredRight);
     lbl_mod_depth.setColour (Label::textColourId, Colours::white);
 
@@ -66,7 +66,7 @@ Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wi
 
     addAndMakeVisible (lbl_rot_offset);
     lbl_rot_offset.setText ("Rot Offset", dontSendNotification);
-    lbl_rot_offset.setFont (Font (14.0f, Font::plain));
+    lbl_rot_offset.setFont (Font (FontOptions {14.0f, Font::plain}));
     lbl_rot_offset.setJustificationType (Justification::centredRight);
     lbl_rot_offset.setColour (Label::textColourId, Colours::white);
 
@@ -83,7 +83,7 @@ Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wi
 
     addAndMakeVisible (lbl_mod_t);
     lbl_mod_t.setText ("Mod T", dontSendNotification);
-    lbl_mod_t.setFont (Font (14.0f, Font::plain));
+    lbl_mod_t.setFont (Font (FontOptions {14.0f, Font::plain}));
     lbl_mod_t.setJustificationType (Justification::centredRight);
     lbl_mod_t.setColour (Label::textColourId, Colours::white);
 
@@ -142,11 +142,11 @@ void Ambix_wideningAudioProcessorEditor::paint (Graphics& g)
 
     // Title
     g.setColour (Colours::white);
-    g.setFont (Font (17.2f, Font::bold));
+    g.setFont (Font (FontOptions {17.2f, Font::bold}));
     g.drawText ("AMBIX-WIDENING", 0, 4, getWidth(), 30, Justification::centred, true);
 
     // Version string (bottom-right)
-    g.setFont (Font (10.0f, Font::plain));
+    g.setFont (Font (FontOptions {10.0f, Font::plain}));
     String version_string;
     version_string << "v" << QUOTE(VERSION);
     g.drawText (version_string, getWidth() - 51, getHeight() - 11, 50, 10, Justification::bottomRight, true);

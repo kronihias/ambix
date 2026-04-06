@@ -50,7 +50,7 @@ Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_
 
     addAndMakeVisible (label);
     label.setText ("Channel sequence", dontSendNotification);
-    label.setFont (Font (15.0000f, Font::plain));
+    label.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label.setJustificationType (Justification::centredRight);
     label.setEditable (false, false, false);
     label.setColour (Label::textColourId, Colours::azure);
@@ -59,7 +59,7 @@ Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_
 
     addAndMakeVisible (label2);
     label2.setText ("Input", dontSendNotification);
-    label2.setFont (Font (15.0000f, Font::bold));
+    label2.setFont (Font (FontOptions {15.0000f, Font::bold}));
     label2.setJustificationType (Justification::centred);
     label2.setEditable (false, false, false);
     label2.setColour (Label::textColourId, Colours::black);
@@ -68,7 +68,7 @@ Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_
 
     addAndMakeVisible (label3);
     label3.setText ("Normalization", dontSendNotification);
-    label3.setFont (Font (15.0000f, Font::plain));
+    label3.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label3.setJustificationType (Justification::centredRight);
     label3.setEditable (false, false, false);
     label3.setColour (Label::textColourId, Colours::azure);
@@ -88,7 +88,7 @@ Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_
 
     addAndMakeVisible (label4);
     label4.setText ("Output", dontSendNotification);
-    label4.setFont (Font (15.0000f, Font::bold));
+    label4.setFont (Font (FontOptions {15.0000f, Font::bold}));
     label4.setJustificationType (Justification::centred);
     label4.setEditable (false, false, false);
     label4.setColour (Label::textColourId, Colours::black);
@@ -143,7 +143,7 @@ Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_
 
     addAndMakeVisible (label6);
     label6.setText ("Mirror", dontSendNotification);
-    label6.setFont (Font (15.0000f, Font::bold));
+    label6.setFont (Font (FontOptions {15.0000f, Font::bold}));
     label6.setJustificationType (Justification::centredLeft);
     label6.setEditable (false, false, false);
     label6.setColour (Label::textColourId, Colours::azure);
@@ -189,7 +189,7 @@ Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_
 
     addAndMakeVisible (label5);
     label5.setText ("Presets", dontSendNotification);
-    label5.setFont (Font (15.0000f, Font::plain));
+    label5.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label5.setJustificationType (Justification::centredRight);
     label5.setEditable (false, false, false);
     label5.setColour (Label::textColourId, Colours::azure);
@@ -254,13 +254,13 @@ void Ambix_converterAudioProcessorEditor::paint (Graphics& g)
     g.fillRoundedRectangle (128.0f, 110.0f, 133.0f, 106.0f, 10.0000f);
 
     g.setColour (Colours::azure);
-    g.setFont (Font (17.2000f, Font::bold));
+    g.setFont (Font (FontOptions {17.2000f, Font::bold}));
     g.drawText ("AMBIX-CONVERTER",
                 11, 6, 380, 30,
                 Justification::centred, true);
 
     g.setColour (Colours::azure);
-    g.setFont (Font (12.4000f, Font::plain));
+    g.setFont (Font (FontOptions {12.4000f, Font::plain}));
     g.drawText ("convert between Ambisonics formats",
                 8, 28, 380, 30,
                 Justification::centred, true);
@@ -274,7 +274,7 @@ void Ambix_converterAudioProcessorEditor::paint (Graphics& g)
 
     /* Version text */
     g.setColour (Colours::white);
-    g.setFont (Font (10.00f, Font::plain));
+    g.setFont (Font (FontOptions {10.00f, Font::plain}));
     String version_string;
     version_string << "v" << QUOTE(VERSION);
     g.drawText (version_string,
