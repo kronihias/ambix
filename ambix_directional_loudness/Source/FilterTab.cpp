@@ -119,37 +119,37 @@ void FilterTab::paint(juce::Graphics &g)
     g.fillRoundedRectangle (0.0f, 0.0f, 234.0f, 110.0f, 10.000f);
 
     g.setColour (Colours::aqua);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText ("elevation",
                 21, 67, 82, 23,
                 Justification::centred, true);
 
     g.setColour (Colours::aqua);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText ("azimuth",
                 24, 25, 82, 23,
                 Justification::centred, true);
 
     g.setColour (Colours::yellow);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText ("width",
                 106, 62, 36, 23,
                 Justification::centredRight, true);
 
     g.setColour (Colours::yellow);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText ("height",
                 99, 87, 44, 23,
                 Justification::centredRight, true);
 
     g.setColour (Colours::white);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText ("gain",
                 60, 5, 30, 23,
                 Justification::centredLeft, true);
 
     g.setColour (Colours::yellow);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     String label("filter ");
     label << _id+1;
 

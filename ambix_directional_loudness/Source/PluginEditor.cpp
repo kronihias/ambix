@@ -37,7 +37,7 @@ Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioP
 
     addAndMakeVisible (lbl_gd);
     lbl_gd.setText("ambix_directional_loudness", dontSendNotification);
-    lbl_gd.setFont (Font (15.00f, Font::plain));
+    lbl_gd.setFont (Font (FontOptions {15.00f, Font::plain}));
     lbl_gd.setJustificationType (Justification::centredLeft);
     lbl_gd.setEditable (false, false, false);
     lbl_gd.setColour (Label::textColourId, Colours::aquamarine);
@@ -112,7 +112,7 @@ void Ambix_directional_loudnessAudioProcessorEditor::paint (Graphics& g)
 
     /* Version text */
     g.setColour (Colours::white);
-    g.setFont (Font (10.00f, Font::plain));
+    g.setFont (Font (FontOptions {10.00f, Font::plain}));
     String version_string;
     version_string << "v" << QUOTE(VERSION);
     g.drawText (version_string,

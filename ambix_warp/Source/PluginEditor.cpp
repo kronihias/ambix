@@ -48,7 +48,7 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
 
     addAndMakeVisible (lbl_phi);
     lbl_phi.setText ("Az Warp", dontSendNotification);
-    lbl_phi.setFont (Font (15.0f, Font::plain));
+    lbl_phi.setFont (Font (FontOptions {15.0f, Font::plain}));
     lbl_phi.setJustificationType (Justification::centredRight);
     lbl_phi.setColour (Label::textColourId, Colours::white);
 
@@ -71,7 +71,7 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
 
     addAndMakeVisible (lbl_theta);
     lbl_theta.setText ("El Warp", dontSendNotification);
-    lbl_theta.setFont (Font (15.0f, Font::plain));
+    lbl_theta.setFont (Font (FontOptions {15.0f, Font::plain}));
     lbl_theta.setJustificationType (Justification::centredRight);
     lbl_theta.setColour (Label::textColourId, Colours::white);
 
@@ -94,7 +94,7 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
 
     addAndMakeVisible (lbl_in_order);
     lbl_in_order.setText ("In Order", dontSendNotification);
-    lbl_in_order.setFont (Font (15.0f, Font::plain));
+    lbl_in_order.setFont (Font (FontOptions {15.0f, Font::plain}));
     lbl_in_order.setJustificationType (Justification::centredRight);
     lbl_in_order.setColour (Label::textColourId, Colours::white);
 
@@ -110,7 +110,7 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
 
     addAndMakeVisible (lbl_out_order);
     lbl_out_order.setText ("Out Order", dontSendNotification);
-    lbl_out_order.setFont (Font (15.0f, Font::plain));
+    lbl_out_order.setFont (Font (FontOptions {15.0f, Font::plain}));
     lbl_out_order.setJustificationType (Justification::centredRight);
     lbl_out_order.setColour (Label::textColourId, Colours::white);
 
@@ -187,11 +187,11 @@ void Ambix_warpAudioProcessorEditor::paint (Graphics& g)
 
     // Title
     g.setColour (Colours::white);
-    g.setFont (Font (17.2f, Font::bold));
+    g.setFont (Font (FontOptions {17.2f, Font::bold}));
     g.drawText ("AMBIX-WARP", 0, 4, getWidth(), 30, Justification::centred, true);
 
     // Version string (bottom-right)
-    g.setFont (Font (10.0f, Font::plain));
+    g.setFont (Font (FontOptions {10.0f, Font::plain}));
     String version_string;
     version_string << "v" << QUOTE(VERSION);
     g.drawText (version_string, getWidth() - 51, getHeight() - 11, 50, 10, Justification::bottomRight, true);

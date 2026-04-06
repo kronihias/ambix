@@ -55,7 +55,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label5);
     label5.setText("Presets", dontSendNotification);
-    label5.setFont (Font (15.0000f, Font::plain));
+    label5.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label5.setJustificationType (Justification::centredRight);
     label5.setEditable (false, false, false);
     label5.setColour (Label::textColourId, Colours::azure);
@@ -72,7 +72,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label);
     label.setText("x axis symmetries", dontSendNotification);
-    label.setFont (Font (15.0000f, Font::italic));
+    label.setFont (Font (FontOptions {15.0000f, Font::italic}));
     label.setJustificationType (Justification::centred);
     label.setEditable (false, false, false);
     label.setColour (Label::textColourId, Colour (0x66ffffff));
@@ -81,7 +81,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label2);
     label2.setText("X even", dontSendNotification);
-    label2.setFont (Font (15.0000f, Font::plain));
+    label2.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label2.setJustificationType (Justification::centredLeft);
     label2.setEditable (false, false, false);
     label2.setColour (Label::textColourId, Colours::white);
@@ -103,7 +103,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label3);
     label3.setText( "X odd", dontSendNotification);
-    label3.setFont (Font (15.0000f, Font::plain));
+    label3.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label3.setJustificationType (Justification::centredLeft);
     label3.setEditable (false, false, false);
     label3.setColour (Label::textColourId, Colours::white);
@@ -125,7 +125,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label6);
     label6.setText("Y even", dontSendNotification);
-    label6.setFont (Font (15.0000f, Font::plain));
+    label6.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label6.setJustificationType (Justification::centredLeft);
     label6.setEditable (false, false, false);
     label6.setColour (Label::textColourId, Colours::white);
@@ -147,7 +147,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label7);
     label7.setText("Y odd", dontSendNotification);
-    label7.setFont (Font (15.0000f, Font::plain));
+    label7.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label7.setJustificationType (Justification::centredLeft);
     label7.setEditable (false, false, false);
     label7.setColour (Label::textColourId, Colours::white);
@@ -169,7 +169,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label9);
     label9.setText("Z even", dontSendNotification);
-    label9.setFont (Font (15.0000f, Font::plain));
+    label9.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label9.setJustificationType (Justification::centredLeft);
     label9.setEditable (false, false, false);
     label9.setColour (Label::textColourId, Colours::white);
@@ -191,7 +191,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label10);
     label10.setText("Z odd", dontSendNotification);
-    label10.setFont (Font (15.0000f, Font::plain));
+    label10.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label10.setJustificationType (Justification::centredLeft);
     label10.setEditable (false, false, false);
     label10.setColour (Label::textColourId, Colours::white);
@@ -205,7 +205,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (lbl_x_even);
     lbl_x_even.setText("-99 dB", dontSendNotification);
-    lbl_x_even.setFont (Font (15.0000f, Font::plain));
+    lbl_x_even.setFont (Font (FontOptions {15.0000f, Font::plain}));
     lbl_x_even.setJustificationType (Justification::centredRight);
     lbl_x_even.setEditable (false, false, false);
     lbl_x_even.setColour (Label::textColourId, Colours::yellow);
@@ -214,7 +214,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (lbl_x_odd);
     lbl_x_odd.setText("-99 dB", dontSendNotification);
-    lbl_x_odd.setFont (Font (15.0000f, Font::plain));
+    lbl_x_odd.setFont (Font (FontOptions {15.0000f, Font::plain}));
     lbl_x_odd.setJustificationType (Justification::centredRight);
     lbl_x_odd.setEditable (false, false, false);
     lbl_x_odd.setColour (Label::textColourId, Colours::yellow);
@@ -223,7 +223,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (lbl_y_even);
     lbl_y_even.setText("-99 dB", dontSendNotification);
-    lbl_y_even.setFont (Font (15.0000f, Font::plain));
+    lbl_y_even.setFont (Font (FontOptions {15.0000f, Font::plain}));
     lbl_y_even.setJustificationType (Justification::centredRight);
     lbl_y_even.setEditable (false, false, false);
     lbl_y_even.setColour (Label::textColourId, Colours::yellow);
@@ -232,7 +232,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (lbl_y_odd);
     lbl_y_odd.setText("-99 dB", dontSendNotification);
-    lbl_y_odd.setFont (Font (15.0000f, Font::plain));
+    lbl_y_odd.setFont (Font (FontOptions {15.0000f, Font::plain}));
     lbl_y_odd.setJustificationType (Justification::centredRight);
     lbl_y_odd.setEditable (false, false, false);
     lbl_y_odd.setColour (Label::textColourId, Colours::yellow);
@@ -241,7 +241,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (lbl_z_even);
     lbl_z_even.setText("-99 dB", dontSendNotification);
-    lbl_z_even.setFont (Font (15.0000f, Font::plain));
+    lbl_z_even.setFont (Font (FontOptions {15.0000f, Font::plain}));
     lbl_z_even.setJustificationType (Justification::centredRight);
     lbl_z_even.setEditable (false, false, false);
     lbl_z_even.setColour (Label::textColourId, Colours::yellow);
@@ -250,7 +250,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (lbl_z_odd);
     lbl_z_odd.setText("-99 dB", dontSendNotification);
-    lbl_z_odd.setFont (Font (15.0000f, Font::plain));
+    lbl_z_odd.setFont (Font (FontOptions {15.0000f, Font::plain}));
     lbl_z_odd.setJustificationType (Justification::centredRight);
     lbl_z_odd.setEditable (false, false, false);
     lbl_z_odd.setColour (Label::textColourId, Colours::yellow);
@@ -259,7 +259,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label4);
     label4.setText("y axis symmetries", dontSendNotification);
-    label4.setFont (Font (15.0000f, Font::italic));
+    label4.setFont (Font (FontOptions {15.0000f, Font::italic}));
     label4.setJustificationType (Justification::centred);
     label4.setEditable (false, false, false);
     label4.setColour (Label::textColourId, Colour (0x66ffffff));
@@ -268,7 +268,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label8);
     label8.setText("z axis symmetries", dontSendNotification);
-    label8.setFont (Font (15.0000f, Font::italic));
+    label8.setFont (Font (FontOptions {15.0000f, Font::italic}));
     label8.setJustificationType (Justification::centred);
     label8.setEditable (false, false, false);
     label8.setColour (Label::textColourId, Colour (0x66ffffff));
@@ -285,7 +285,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (label11);
     label11.setText("Circular", dontSendNotification);
-    label11.setFont (Font (15.0000f, Font::plain));
+    label11.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label11.setJustificationType (Justification::centredLeft);
     label11.setEditable (false, false, false);
     label11.setColour (Label::textColourId, Colours::white);
@@ -299,7 +299,7 @@ Ambix_mirrorAudioProcessorEditor::Ambix_mirrorAudioProcessorEditor (Ambix_mirror
 
     addAndMakeVisible (lbl_circular);
     lbl_circular.setText("-99 dB", dontSendNotification);
-    lbl_circular.setFont (Font (15.0000f, Font::plain));
+    lbl_circular.setFont (Font (FontOptions {15.0000f, Font::plain}));
     lbl_circular.setJustificationType (Justification::centredRight);
     lbl_circular.setEditable (false, false, false);
     lbl_circular.setColour (Label::textColourId, Colours::yellow);
@@ -348,13 +348,13 @@ void Ambix_mirrorAudioProcessorEditor::paint (Graphics& g)
     g.fillRoundedRectangle (8.0f, 100.0f, 392.0f, 76.0f, 10.0000f);
 
     g.setColour (Colours::azure);
-    g.setFont (Font (17.2000f, Font::bold));
+    g.setFont (Font (FontOptions {17.2000f, Font::bold}));
     g.drawText ("AMBIX-MIRROR",
                 18, 2, 380, 30,
                 Justification::centred, true);
 
     g.setColour (Colours::azure);
-    g.setFont (Font (12.4000f, Font::plain));
+    g.setFont (Font (FontOptions {12.4000f, Font::plain}));
     g.drawText ("adjusts symmetric components in Ambisonics streams",
                 -27, 25, 380, 30,
                 Justification::centred, true);
@@ -377,7 +377,7 @@ void Ambix_mirrorAudioProcessorEditor::paint (Graphics& g)
 
     /* Version text */
     g.setColour (Colours::white);
-    g.setFont (Font (10.00f, Font::plain));
+    g.setFont (Font (FontOptions {10.00f, Font::plain}));
     String version_string;
     version_string << "v" << QUOTE(VERSION);
     g.drawText (version_string,

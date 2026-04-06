@@ -34,7 +34,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     addAndMakeVisible (label);
     label.setText("Ambisonics input channels: ", dontSendNotification);
-    label.setFont (Font (15.0000f, Font::plain));
+    label.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label.setJustificationType (Justification::centredRight);
     label.setEditable (false, false, false);
     label.setColour (Label::textColourId, Colours::white);
@@ -48,7 +48,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     addAndMakeVisible (label5);
     label5.setText("Preset", dontSendNotification);
-    label5.setFont (Font (15.0000f, Font::plain));
+    label5.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label5.setJustificationType (Justification::centredRight);
     label5.setEditable (false, false, false);
     label5.setColour (Label::textColourId, Colours::white);
@@ -63,7 +63,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     txt_debug.setCaretVisible (false);
     txt_debug.setPopupMenuEnabled (true);
     txt_debug.setText ("debug window");
-    txt_debug.setFont(Font(10,1));
+    txt_debug.setFont(Font(FontOptions{10,1}));
 
     addAndMakeVisible (btn_open);
     btn_open.setTooltip ("browse presets or open from file");
@@ -74,7 +74,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     addAndMakeVisible (label2);
     label2.setText("Virtual loudspeakers: ", dontSendNotification);
-    label2.setFont (Font (15.0000f, Font::plain));
+    label2.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label2.setJustificationType (Justification::centredRight);
     label2.setEditable (false, false, false);
     label2.setColour (Label::textColourId, Colours::white);
@@ -83,7 +83,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     addAndMakeVisible (label3);
     label3.setText("Impulse responses: ", dontSendNotification);
-    label3.setFont (Font (15.0000f, Font::plain));
+    label3.setFont (Font (FontOptions {15.0000f, Font::plain}));
     label3.setJustificationType (Justification::centredRight);
     label3.setEditable (false, false, false);
     label3.setColour (Label::textColourId, Colours::white);
@@ -98,7 +98,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     addAndMakeVisible (label4);
     label4.setText("debug window", dontSendNotification);
-    label4.setFont (Font (10.0000f, Font::plain));
+    label4.setFont (Font (FontOptions {10.0000f, Font::plain}));
     label4.setJustificationType (Justification::centredLeft);
     label4.setEditable (false, false, false);
     label4.setColour (Label::textColourId, Colours::white);
@@ -107,7 +107,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     addAndMakeVisible (num_ch);
     num_ch.setText("0", dontSendNotification);
-    num_ch.setFont (Font (15.0000f, Font::plain));
+    num_ch.setFont (Font (FontOptions {15.0000f, Font::plain}));
     num_ch.setJustificationType (Justification::centredRight);
     num_ch.setEditable (false, false, false);
     num_ch.setColour (Label::textColourId, Colours::white);
@@ -116,7 +116,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     addAndMakeVisible (num_spk);
     num_spk.setText("0", dontSendNotification);
-    num_spk.setFont (Font (15.0000f, Font::plain));
+    num_spk.setFont (Font (FontOptions {15.0000f, Font::plain}));
     num_spk.setJustificationType (Justification::centredRight);
     num_spk.setEditable (false, false, false);
     num_spk.setColour (Label::textColourId, Colours::white);
@@ -125,7 +125,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     addAndMakeVisible (num_hrtf);
     num_hrtf.setText("", dontSendNotification);
-    num_hrtf.setFont (Font (15.0000f, Font::plain));
+    num_hrtf.setFont (Font (FontOptions {15.0000f, Font::plain}));
     num_hrtf.setJustificationType (Justification::centredRight);
     num_hrtf.setEditable (false, false, false);
     num_hrtf.setColour (Label::textColourId, Colours::white);
@@ -225,18 +225,18 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
 
     g.setColour (Colours::white);
 
-    g.setFont (Font (12.40f, Font::plain));
+    g.setFont (Font (FontOptions {12.40f, Font::plain}));
     g.drawText (TRANS("Volume [dB]"),
                 353, 282, 65, 23,
                 Justification::centred, true);
 
-    g.setFont (Font (17.2000f, Font::bold));
+    g.setFont (Font (FontOptions {17.2000f, Font::bold}));
 #if BINAURAL_DECODER
     g.drawText ("AMBIX-BINAURAL-DECODER",
                 1, 4, 343, 30,
                 Justification::centred, true);
 
-  g.setFont (Font (12.4000f, Font::plain));
+  g.setFont (Font (FontOptions {12.4000f, Font::plain}));
   g.drawText ("listening to Ambisonics with headphones",
               1, 28, 343, 30,
               Justification::centred, true);
@@ -245,7 +245,7 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
   g.drawText ("AMBIX-DECODER",
               1, 4, 343, 30,
               Justification::centred, true);
-  g.setFont (Font (12.4000f, Font::plain));
+  g.setFont (Font (FontOptions {12.4000f, Font::plain}));
   g.drawText ("playback Ambisonics with loudspeakers",
               1, 28, 343, 30,
               Justification::centred, true);
@@ -254,7 +254,7 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
 
     /* Version text */
     g.setColour (Colours::white);
-    g.setFont (Font (10.00f, Font::plain));
+    g.setFont (Font (FontOptions {10.00f, Font::plain}));
     String version_string;
     version_string << "v" << QUOTE(VERSION);
     g.drawText (version_string,
@@ -579,7 +579,7 @@ void Ambix_binauralAudioProcessorEditor::DrawMeters()
                 _labels.add(LABEL);
                 addChildComponent(_labels.getUnchecked(i));
                 _labels.getUnchecked(i)->setVisible(true);
-                _labels.getUnchecked(i)->setFont (Font (11.0000f, Font::plain));
+                _labels.getUnchecked(i)->setFont (Font (FontOptions {11.0000f, Font::plain}));
                 _labels.getUnchecked(i)->setColour (Label::textColourId, Colours::white);
                 _labels.getUnchecked(i)->setJustificationType (Justification::centred);
                 _labels.getUnchecked(i)->setBounds(xoffset+385 + 15*i, 222, 25, 14);

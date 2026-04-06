@@ -109,37 +109,37 @@ void FilterTab::paint(juce::Graphics &g)
     g.fillRoundedRectangle (0.0f, 0.0f, 234.0f, 110.0f, 10.000f);
 
     g.setColour (Colours::aqua);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText (TRANS("elevation"),
                 21, 67, 82, 23,
                 Justification::centred, true);
 
     g.setColour (Colours::aqua);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText (TRANS("azimuth"),
                 24, 25, 82, 23,
                 Justification::centred, true);
 
     g.setColour (Colours::yellow);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText (TRANS("width"),
                 106, 62, 36, 23,
                 Justification::centredRight, true);
 
     g.setColour (Colours::yellow);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText (TRANS("height"),
                 99, 87, 44, 23,
                 Justification::centredRight, true);
 
     g.setColour (Colours::white);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     g.drawText (TRANS("gain"),
                 60, 5, 30, 23,
                 Justification::centredLeft, true);
 
     g.setColour (Colours::yellow);
-    g.setFont (Font (15.00f, Font::plain));
+    g.setFont (Font (FontOptions {15.00f, Font::plain}));
     String label("filter ");
     label << _id+1;
 
