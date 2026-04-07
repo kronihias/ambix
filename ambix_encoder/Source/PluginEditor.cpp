@@ -262,9 +262,13 @@ void Ambix_encoderAudioProcessorEditor::paint (Graphics& g)
 
     g.setColour (Colours::white);
     g.setFont (Font (FontOptions {17.2000f, Font::bold}));
-    g.drawText ("AMBIX-ENCODER",
-                -6, 2, 343, 30,
-                Justification::centred, true);
+    {
+        int order = ambiOrderFromChannels (getProcessor()->getTotalNumOutputChannels());
+        String title = "AMBIX-ENCODER";
+        if (order > 0)
+            title << " O" << order;
+        g.drawText (title, -6, 2, 343, 30, Justification::centred, true);
+    }
 
     g.setColour (Colours::white);
     g.setFont (Font (FontOptions {10.0000f, Font::plain}));

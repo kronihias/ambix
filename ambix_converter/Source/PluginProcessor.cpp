@@ -28,8 +28,8 @@
 //==============================================================================
 Ambix_converterAudioProcessor::Ambix_converterAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     active_preset(0),
     output_buffer(16, 256),
@@ -495,8 +495,19 @@ void Ambix_converterAudioProcessor::releaseResources()
 
 bool Ambix_converterAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+#endif
+}
+
+void Ambix_converterAudioProcessor::numChannelsChanged()
+{
+#ifdef UNIVERSAL_AMBISONIC
+    sendChangeMessage();
+#endif
 }
 
 void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

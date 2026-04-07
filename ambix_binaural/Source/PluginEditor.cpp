@@ -232,9 +232,13 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
 
     g.setFont (Font (FontOptions {17.2000f, Font::bold}));
 #if BINAURAL_DECODER
-    g.drawText ("AMBIX-BINAURAL-DECODER",
-                1, 4, 343, 30,
-                Justification::centred, true);
+    {
+        int order = ambiOrderFromChannels (getProcessor()->getTotalNumInputChannels());
+        String title = "AMBIX-BINAURAL-DECODER";
+        if (order > 0)
+            title << " O" << order;
+        g.drawText (title, 1, 4, 343, 30, Justification::centred, true);
+    }
 
   g.setFont (Font (FontOptions {12.4000f, Font::plain}));
   g.drawText ("listening to Ambisonics with headphones",
@@ -242,9 +246,13 @@ void Ambix_binauralAudioProcessorEditor::paint (Graphics& g)
               Justification::centred, true);
 
 #else
-  g.drawText ("AMBIX-DECODER",
-              1, 4, 343, 30,
-              Justification::centred, true);
+  {
+      int order = ambiOrderFromChannels (getProcessor()->getTotalNumInputChannels());
+      String title = "AMBIX-DECODER";
+      if (order > 0)
+          title << " O" << order;
+      g.drawText (title, 1, 4, 343, 30, Justification::centred, true);
+  }
   g.setFont (Font (FontOptions {12.4000f, Font::plain}));
   g.drawText ("playback Ambisonics with loudspeakers",
               1, 28, 343, 30,

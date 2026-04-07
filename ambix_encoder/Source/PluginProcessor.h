@@ -48,6 +48,7 @@ public:
     void releaseResources() override;
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    void numChannelsChanged() override;
 
     void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;
 

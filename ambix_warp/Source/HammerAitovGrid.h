@@ -106,7 +106,7 @@ public:
         g.strokePath (path, juce::PathStrokeType (0.2f));
 
         // text
-        g.setFont (getLookAndFeel().getTypefaceForFont (juce::Font (juce::FontOptions {12.0f, 1})));
+        g.setFont (juce::Font (juce::FontOptions (12.0f)));
         g.setFont (12.0f);
         juce::Point<float> textPos;
 
@@ -138,7 +138,7 @@ public:
         textPos.applyTransform (toArea);
         g.drawText ("BOTTOM", textPos.x - 25, textPos.y, 50, 12, juce::Justification::centred);
 
-        g.setFont (getLookAndFeel().getTypefaceForFont (juce::Font (juce::FontOptions {12.0f, 2})));
+        g.setFont (juce::Font (juce::FontOptions (12.0f)));
         g.setFont (12.0f);
 
         // azimuth labels

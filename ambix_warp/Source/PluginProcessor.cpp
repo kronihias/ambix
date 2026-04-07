@@ -31,8 +31,8 @@ inline double round( double d )
 //==============================================================================
 Ambix_warpAudioProcessor::Ambix_warpAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     phi_param(0.5f),
     _phi_param(-10.f),
@@ -288,6 +288,15 @@ void Ambix_warpAudioProcessor::releaseResources()
 
 void Ambix_warpAudioProcessor::calcParams()
 {
+#ifdef UNIVERSAL_AMBISONIC
+    // Cap order to active channel count from host
+    int activeOrder = ambiOrderFromChannels (getTotalNumInputChannels());
+    if (activeOrder > 0) {
+        in_order = juce::jmin (in_order, activeOrder);
+        out_order = juce::jmin (out_order, activeOrder);
+    }
+#endif
+
     if (!_initialized)
     {
 
@@ -554,8 +563,20 @@ void Ambix_warpAudioProcessor::calcParams()
 
 bool Ambix_warpAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+#endif
+}
+
+void Ambix_warpAudioProcessor::numChannelsChanged()
+{
+#ifdef UNIVERSAL_AMBISONIC
+    _initialized = false;
+    sendChangeMessage();
+#endif
 }
 
 void Ambix_warpAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

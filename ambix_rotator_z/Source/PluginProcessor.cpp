@@ -88,8 +88,8 @@ void Ambix_rotator_zAudioProcessor::oscMessageReceived (const OSCMessage& messag
 //==============================================================================
 Ambix_rotator_zAudioProcessor::Ambix_rotator_zAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     rot_z_param(0.5f),
     output_buffer(16, 256)
@@ -301,7 +301,12 @@ void Ambix_rotator_zAudioProcessor::calcParams()
     sin_z.set(1, sinf(-(rot_z_param - 0.5f) * (float)_2PI)); // -> map it to -pi...+pi ( -180....+180deg )
 
     // chebyshev recursion
-    for (int i = 2; i <= AMBI_ORDER; i++) {
+    int maxOrder = AMBI_ORDER;
+#ifdef UNIVERSAL_AMBISONIC
+    maxOrder = ambiOrderFromChannels (getTotalNumInputChannels());
+    if (maxOrder < 1) maxOrder = AMBI_ORDER;
+#endif
+    for (int i = 2; i <= maxOrder; i++) {
 
         cos_z.set(i, 2 * cos_z[1] * cos_z[i-1] - cos_z[i-2]);
 
@@ -312,8 +317,16 @@ void Ambix_rotator_zAudioProcessor::calcParams()
 
 bool Ambix_rotator_zAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+#endif
+}
+
+void Ambix_rotator_zAudioProcessor::numChannelsChanged()
+{
 }
 
 void Ambix_rotator_zAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

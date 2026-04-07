@@ -19,9 +19,12 @@ SET(NUM_OUTPUTS_DECODER 64 CACHE STRING "output channels for decoder")
 SET(NUM_FILTERS 8 CACHE STRING "number of directional filters that can be controlled for directional_loudness")
 SET(NUM_FILTERS_VMIC 8 CACHE STRING "number of directional filters (==outputs) for vmic")
 
-SET(BUILD_VST TRUE CACHE BOOL "build VST plugins")
+SET(BUILD_VST TRUE CACHE BOOL "build VST2 plugins (fixed order, _oX naming)")
+SET(BUILD_VST3 TRUE CACHE BOOL "build VST3 plugins (universal order, no _oX suffix)")
+SET(BUILD_AU FALSE CACHE BOOL "build AudioUnit plugins (macOS only, universal order)")
 SET(BUILD_STANDALONE FALSE CACHE BOOL "build standalone application (for those with editor)")
 SET(BUILD_LV2 FALSE CACHE BOOL "build LV2 plugins")
+SET(MAX_AMBI_ORDER 7 CACHE STRING "Maximum ambisonic order for universal (VST3/AU) builds")
 
 
 IF(UNIX AND NOT APPLE AND NOT ANDROID)
@@ -60,7 +63,8 @@ ADD_DEFINITIONS(-DNUM_OUTPUTS=${NUM_OUTPUTS_DECODER})
 ADD_DEFINITIONS(-DNUM_FILTERS=${NUM_FILTERS})
 ADD_DEFINITIONS(-DNUM_FILTERS_VMIC=${NUM_FILTERS_VMIC})
 
-ADD_DEFINITIONS(-DAMBI_ORDER=${AMBI_ORDER})
+# AMBI_ORDER is set per-target in Subproject.cmake (fixed for VST2, MAX for universal)
+ADD_DEFINITIONS(-DMAX_AMBI_ORDER=${MAX_AMBI_ORDER})
 
 # formats
 set (AMBIX_FORMATS "")
@@ -84,10 +88,23 @@ if (BUILD_LV2)
     list (APPEND AMBIX_FORMATS LV2)
 endif(BUILD_LV2)
 
+# Universal formats (VST3, AU, Standalone) - built separately via UNIVERSAL_BUILD in Subproject.cmake
+set (AMBIX_UNIVERSAL_FORMATS "")
+
+if (BUILD_VST3)
+    message ("-- Building VST3 versions (universal order up to ${MAX_AMBI_ORDER})")
+    list (APPEND AMBIX_UNIVERSAL_FORMATS VST3)
+endif(BUILD_VST3)
+
 if (BUILD_STANDALONE)
-    message ("-- Building Standalone versions")
-    list (APPEND AMBIX_FORMATS Standalone)
+    message ("-- Building Standalone versions (universal order up to ${MAX_AMBI_ORDER})")
+    list (APPEND AMBIX_UNIVERSAL_FORMATS Standalone)
 endif(BUILD_STANDALONE)
+
+if (BUILD_AU AND APPLE)
+    message ("-- Building AudioUnit versions (universal order up to ${MAX_AMBI_ORDER})")
+    list (APPEND AMBIX_UNIVERSAL_FORMATS AU)
+endif()
 
 
 #save path for later
@@ -99,6 +116,10 @@ SET (BIN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set_directory_properties (PROPERTIES JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 set_directory_properties (PROPERTIES JUCE_VST_COPY_DIR "${BIN_DIR}/vst_o${AMBI_ORDER}")
 set_directory_properties (PROPERTIES JUCE_LV2_COPY_DIR "${BIN_DIR}/lv2_o${AMBI_ORDER}")
+set_directory_properties (PROPERTIES JUCE_VST3_COPY_DIR "${BIN_DIR}/vst3")
+IF (APPLE)
+    set_directory_properties (PROPERTIES JUCE_AU_COPY_DIR "${BIN_DIR}/au")
+ENDIF(APPLE)
 
 IF (APPLE)
     SET (CMAKE_BUILD_TYPE MinSizeRel)

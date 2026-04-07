@@ -28,8 +28,8 @@
 //==============================================================================
 Ambix_wideningAudioProcessor::Ambix_wideningAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     mod_depth_param(0.0f),
     mod_t_param(0.02f),
@@ -299,7 +299,12 @@ void Ambix_wideningAudioProcessor::calcParams()
 
         // std::cout << "MATRIX:" << std::endl;
 
-        for (int m=1; m <= AMBI_ORDER; m++) {
+        int maxOrder = AMBI_ORDER;
+#ifdef UNIVERSAL_AMBISONIC
+        maxOrder = ambiOrderFromChannels (getTotalNumInputChannels());
+        if (maxOrder < 1) maxOrder = AMBI_ORDER;
+#endif
+        for (int m=1; m <= maxOrder; m++) {
 
             // String output_cos = "cos: ";
             // String output_sin = "sin: ";
@@ -343,8 +348,19 @@ void Ambix_wideningAudioProcessor::calcParams()
 
 bool Ambix_wideningAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+#endif
+}
+
+void Ambix_wideningAudioProcessor::numChannelsChanged()
+{
+#ifdef UNIVERSAL_AMBISONIC
+    sendChangeMessage();
+#endif
 }
 
 void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

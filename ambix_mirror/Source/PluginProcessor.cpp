@@ -26,8 +26,8 @@
 //==============================================================================
 Ambix_mirrorAudioProcessor::Ambix_mirrorAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     x_even_param(0.75f),
     x_even_inv_param(0.f),
@@ -439,7 +439,8 @@ void Ambix_mirrorAudioProcessor::calcParams()
         gain_factors.set(i, 1.f);
     }
 
-    for (int acn = 0; acn < AMBI_CHANNELS; acn++)
+    int numCh = juce::jmin ((int) AMBI_CHANNELS, getTotalNumInputChannels());
+    for (int acn = 0; acn < numCh; acn++)
     {
 
         float* g = &gain_factors.getReference(acn);
@@ -542,8 +543,19 @@ void Ambix_mirrorAudioProcessor::calcParams()
 
 bool Ambix_mirrorAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+#endif
+}
+
+void Ambix_mirrorAudioProcessor::numChannelsChanged()
+{
+#ifdef UNIVERSAL_AMBISONIC
+    sendChangeMessage();
+#endif
 }
 
 void Ambix_mirrorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

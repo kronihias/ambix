@@ -24,7 +24,7 @@
 
 #define NUM_PRESETS 8
 
-#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
+#include "AmbisonicConfig.h"
 
 #define _2PI 6.2831853071795
 
@@ -88,6 +88,7 @@ public:
     void releaseResources() override;
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    void numChannelsChanged() override;
 
     void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;
 

@@ -188,7 +188,13 @@ void Ambix_warpAudioProcessorEditor::paint (Graphics& g)
     // Title
     g.setColour (Colours::white);
     g.setFont (Font (FontOptions {17.2f, Font::bold}));
-    g.drawText ("AMBIX-WARP", 0, 4, getWidth(), 30, Justification::centred, true);
+    {
+        int order = ambiOrderFromChannels (getProcessor()->getTotalNumInputChannels());
+        String title = "AMBIX-WARP";
+        if (order > 0)
+            title << " O" << order;
+        g.drawText (title, 0, 4, getWidth(), 30, Justification::centred, true);
+    }
 
     // Version string (bottom-right)
     g.setFont (Font (FontOptions {10.0f, Font::plain}));
@@ -272,10 +278,10 @@ void Ambix_warpAudioProcessorEditor::sliderValueChanged (Slider* s)
                                    (float) (sld_theta.getValue() + 0.9) / 1.8f);
     else if (s == &sld_in_order)
         setParameterNotifyingHost (p, Ambix_warpAudioProcessor::InOrderParam,
-                                   (float) sld_in_order.getValue() / (float) AMBI_ORDER);
+                                   (float) sld_in_order.getValue() / (float) sld_in_order.getMaximum());
     else if (s == &sld_out_order)
         setParameterNotifyingHost (p, Ambix_warpAudioProcessor::OutOrderParam,
-                                   (float) sld_out_order.getValue() / (float) AMBI_ORDER);
+                                   (float) sld_out_order.getValue() / (float) sld_out_order.getMaximum());
 
 }
 
@@ -354,11 +360,23 @@ void Ambix_warpAudioProcessorEditor::timerCallback()
     float outOrd = p->getParameter (Ambix_warpAudioProcessor::OutOrderParam);
     float preEmp = p->getParameter (Ambix_warpAudioProcessor::PreEmpParam);
 
+    // Update order slider range based on active channel count
+    int maxOrder = AMBI_ORDER;
+#ifdef UNIVERSAL_AMBISONIC
+    {
+        int activeOrder = ambiOrderFromChannels (p->getTotalNumInputChannels());
+        if (activeOrder > 0)
+            maxOrder = activeOrder;
+    }
+#endif
+    sld_in_order.setRange (0, maxOrder, 1);
+    sld_out_order.setRange (0, maxOrder, 1);
+
     // Update sliders from processor state
     sld_phi.setValue (phi * 1.8 - 0.9, dontSendNotification);
     sld_theta.setValue (theta * 1.8 - 0.9, dontSendNotification);
-    sld_in_order.setValue (round (inOrd * AMBI_ORDER), dontSendNotification);
-    sld_out_order.setValue (round (outOrd * AMBI_ORDER), dontSendNotification);
+    sld_in_order.setValue (round (inOrd * maxOrder), dontSendNotification);
+    sld_out_order.setValue (round (outOrd * maxOrder), dontSendNotification);
     btn_preemp.setToggleState (preEmp > 0.5f, dontSendNotification);
 
     // Update curve toggles and their labels

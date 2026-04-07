@@ -5,6 +5,16 @@ SET( WITH_SphFilter TRUE )
 
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_directional_loudness )
 
-SET( PLUGIN_CODE ADl${AMBI_ORDER})
+# VST2 fixed-order
+IF(BUILD_VST)
+	SET(UNIVERSAL_BUILD FALSE)
+	SET( PLUGIN_CODE ADl${AMBI_ORDER})
+	INCLUDE(${SRC_DIR}/Subproject.cmake)
+ENDIF()
 
-INCLUDE(${SRC_DIR}/Subproject.cmake)
+# VST3/AU universal
+IF(BUILD_VST3 OR BUILD_AU)
+	SET(UNIVERSAL_BUILD TRUE)
+	SET( PLUGIN_CODE ADlU)
+	INCLUDE(${SRC_DIR}/Subproject.cmake)
+ENDIF()

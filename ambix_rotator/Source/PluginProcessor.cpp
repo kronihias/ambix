@@ -129,8 +129,8 @@ void Ambix_rotatorAudioProcessor::oscMessageReceived (const OSCMessage& message)
 //==============================================================================
 Ambix_rotatorAudioProcessor::Ambix_rotatorAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     yaw_param(0.5f),
     pitch_param(0.5f),
@@ -745,7 +745,12 @@ void Ambix_rotatorAudioProcessor::calcParams()
   Eigen::MatrixXd R_lm1 = R_1;
 
   // recursivly generate higher orders
-  for (int l=2; l<=AMBI_ORDER; l++)
+  int maxOrder = AMBI_ORDER;
+#ifdef UNIVERSAL_AMBISONIC
+  maxOrder = ambiOrderFromChannels (getTotalNumInputChannels());
+  if (maxOrder < 1) maxOrder = AMBI_ORDER;
+#endif
+  for (int l=2; l<=maxOrder; l++)
   {
     Eigen::MatrixXd R_l = Eigen::MatrixXd::Zero(2*l+1, 2*l+1);
     for (int m=-l;m <= l; m++)
@@ -792,8 +797,20 @@ void Ambix_rotatorAudioProcessor::calcParams()
 
 bool Ambix_rotatorAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+#endif
+}
+
+void Ambix_rotatorAudioProcessor::numChannelsChanged()
+{
+#ifdef UNIVERSAL_AMBISONIC
+    _initialized = false;
+    sendChangeMessage();
+#endif
 }
 
 void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

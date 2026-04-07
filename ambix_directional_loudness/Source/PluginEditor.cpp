@@ -110,6 +110,14 @@ void Ambix_directional_loudnessAudioProcessorEditor::paint (Graphics& g)
 
     g.fillAll (Colour (0xff1a1a1a));
 
+    {
+        int order = ambiOrderFromChannels (getProcessor()->getTotalNumInputChannels());
+        String title = "AMBIX-DIRECTIONAL-LOUDNESS";
+        if (order > 0)
+            title << " O" << order;
+        lbl_gd.setText (title, dontSendNotification);
+    }
+
     /* Version text */
     g.setColour (Colours::white);
     g.setFont (Font (FontOptions {10.00f, Font::plain}));

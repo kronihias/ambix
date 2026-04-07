@@ -23,7 +23,7 @@
 #include "JuceHeader.h"
 #include "AmbiSpeaker.h"
 
-#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
+#include "AmbisonicConfig.h"
 
 #if BINAURAL_DECODER
     #if WITH_ZITA_CONVOLVER
@@ -118,6 +118,7 @@ public:
     void releaseResources() override;
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    void numChannelsChanged() override;
 
     void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;
 

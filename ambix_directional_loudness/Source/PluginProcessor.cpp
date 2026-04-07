@@ -22,13 +22,12 @@
 
 #include "t_design.h"
 
-#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
 
 //==============================================================================
 Ambix_directional_loudnessAudioProcessor::Ambix_directional_loudnessAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     filter_sel_id_1(0),
     filter_sel_id_2(0),
@@ -560,8 +559,20 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
 
 bool Ambix_directional_loudnessAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+#endif
+}
+
+void Ambix_directional_loudnessAudioProcessor::numChannelsChanged()
+{
+#ifdef UNIVERSAL_AMBISONIC
+    _initialized = false;
+    sendChangeMessage();
+#endif
 }
 
 void Ambix_directional_loudnessAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

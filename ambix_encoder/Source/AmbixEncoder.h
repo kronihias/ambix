@@ -27,7 +27,7 @@
 
 #include <Eigen/Eigen>
 
-#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
+#include "AmbisonicConfig.h"
 
 class AmbixEncoder {
 

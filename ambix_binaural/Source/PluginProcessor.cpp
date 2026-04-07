@@ -48,9 +48,9 @@ enum coeff_seq_enum
 //==============================================================================
 Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
 #if BINAURAL_DECODER
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(2), true)
+        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
 #else
         .withOutput ("Output", juce::AudioChannelSet::discreteChannels(NUM_OUTPUTS), true)
 #endif
@@ -315,11 +315,26 @@ void Ambix_binauralAudioProcessor::releaseResources()
 bool Ambix_binauralAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
 #if BINAURAL_DECODER
+  #ifdef UNIVERSAL_AMBISONIC
+    return true;
+  #else
     return ((layouts.getMainOutputChannelSet().size() == 2) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+  #endif
 #else
+  #ifdef UNIVERSAL_AMBISONIC
+    return true;
+  #else
     return ((layouts.getMainOutputChannelSet().size() == NUM_OUTPUTS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+  #endif
+#endif
+}
+
+void Ambix_binauralAudioProcessor::numChannelsChanged()
+{
+#ifdef UNIVERSAL_AMBISONIC
+    sendChangeMessage();
 #endif
 }
 
