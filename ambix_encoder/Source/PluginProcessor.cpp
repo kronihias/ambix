@@ -26,10 +26,20 @@
 int Ambix_encoderAudioProcessor::s_ID = 0; // for counting id!
 
 Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
+#ifdef UNIVERSAL_AMBISONIC
+    // Both buses default to the same ambisonic layout so that the host
+    // negotiates them together based on track channel count.
+    // processBlock only reads INPUT_CHANNELS from the input buffer.
+    AudioProcessor (BusesProperties()
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
+    ),
+#else
     AudioProcessor (BusesProperties()
         .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(INPUT_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
+#endif
     myProperties(),
     azimuth_param(0.5f),
     elevation_param(0.5f),
@@ -423,8 +433,19 @@ void Ambix_encoderAudioProcessor::releaseResources()
 
 bool Ambix_encoderAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == INPUT_CHANNELS));
+#endif
+}
+
+void Ambix_encoderAudioProcessor::numChannelsChanged()
+{
+#ifdef UNIVERSAL_AMBISONIC
+    sendChangeMessage();
+#endif
 }
 
 void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

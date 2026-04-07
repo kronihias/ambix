@@ -101,6 +101,15 @@ Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wi
         setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::ModDepthParam, normModDepth);
     };
 
+    // --- Scroll wheel callback from visualizer (adjusts Mod T) ---
+    visualizer.onModTScrolled = [this] (float delta)
+    {
+        auto* p = getProcessor();
+        float currentNorm = p->getParameter (Ambix_wideningAudioProcessor::ModTParam);
+        float newNorm = juce::jlimit (0.0f, 1.0f, currentNorm + delta);
+        setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::ModTParam, newNorm);
+    };
+
     // --- Register for processor change notifications ---
     getProcessor()->addChangeListener (this);
 
@@ -143,7 +152,13 @@ void Ambix_wideningAudioProcessorEditor::paint (Graphics& g)
     // Title
     g.setColour (Colours::white);
     g.setFont (Font (FontOptions {17.2f, Font::bold}));
-    g.drawText ("AMBIX-WIDENING", 0, 4, getWidth(), 30, Justification::centred, true);
+    {
+        int order = ambiOrderFromChannels (getProcessor()->getTotalNumInputChannels());
+        String title = "AMBIX-WIDENING";
+        if (order > 0)
+            title << " O" << order;
+        g.drawText (title, 0, 4, getWidth(), 30, Justification::centred, true);
+    }
 
     // Version string (bottom-right)
     g.setFont (Font (FontOptions {10.0f, Font::plain}));

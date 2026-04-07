@@ -285,9 +285,13 @@ void Ambix_rotatorAudioProcessorEditor::paint (Graphics& g)
 
     g.setColour(Colours::azure);
     g.setFont(Font(FontOptions{17.20f, Font::bold}));
-    g.drawText(TRANS("AMBIX-ROTATOR"),
-      10, 8, 380, 30,
-      Justification::centred, true);
+    {
+        int order = ambiOrderFromChannels (getProcessor()->getTotalNumInputChannels());
+        String title = "AMBIX-ROTATOR";
+        if (order > 0)
+            title << " O" << order;
+        g.drawText (title, 10, 8, 380, 30, Justification::centred, true);
+    }
 
     g.setColour(Colour(0x932b1d69));
     g.fillRoundedRectangle(9.0f, 48.0f, 383.0f, 179.0f, 10.000f);

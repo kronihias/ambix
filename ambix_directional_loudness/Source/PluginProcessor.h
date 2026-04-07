@@ -26,7 +26,7 @@
 
 #include <Eigen/Eigen>
 
-#define AMBI_CHANNELS (AMBI_ORDER + 1) * (AMBI_ORDER + 1) // (N+1)^2 for 3D!
+#include "AmbisonicConfig.h"
 
 #ifndef NUM_FILTERS
     #define NUM_FILTERS 8 // number of directional filters that can be controlled
@@ -137,6 +137,7 @@ public:
     void releaseResources() override;
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+    void numChannelsChanged() override;
 
     void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;
 

@@ -12,6 +12,8 @@ class WideningVisualizer : public juce::Component
 public:
     // Callback: normalized mod depth (0..1)
     std::function<void (float)> onModDepthDragged;
+    // Callback: normalized mod T delta from scroll wheel
+    std::function<void (float)> onModTScrolled;
 
     WideningVisualizer()
     {
@@ -60,6 +62,16 @@ public:
 
         if (onModDepthDragged)
             onModDepthDragged (newModDepth);
+    }
+
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override
+    {
+        if (onModTScrolled)
+        {
+            // Scroll up = increase Mod T, scroll down = decrease
+            float delta = wheel.deltaY * 0.05f;
+            onModTScrolled (delta);
+        }
     }
 
     void paint (juce::Graphics& g) override

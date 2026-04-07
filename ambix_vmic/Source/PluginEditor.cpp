@@ -99,6 +99,13 @@ void Ambix_vmicAudioProcessorEditor::paint (Graphics& g)
 
     g.fillAll (Colour (0xff1a1a1a));
 
+    {
+        int order = ambiOrderFromChannels (getProcessor()->getTotalNumInputChannels());
+        String title = "AMBIX-VMIC";
+        if (order > 0)
+            title << " O" << order;
+        lbl_gd.setText (title, dontSendNotification);
+    }
 
     /* Version text */
     g.setColour (Colours::white);

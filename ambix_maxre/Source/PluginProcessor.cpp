@@ -27,8 +27,8 @@
 //==============================================================================
 Ambix_maxreAudioProcessor::Ambix_maxreAudioProcessor() :
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
-        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(AMBI_CHANNELS), true)
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     apply_param(0.5f),
     _apply_param(0.5f),
@@ -268,8 +268,16 @@ void Ambix_maxreAudioProcessor::CalcParams()
 
 bool Ambix_maxreAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
+#ifdef UNIVERSAL_AMBISONIC
+    return true;
+#else
     return ((layouts.getMainOutputChannelSet().size() == AMBI_CHANNELS) &&
             (layouts.getMainInputChannelSet().size() == AMBI_CHANNELS));
+#endif
+}
+
+void Ambix_maxreAudioProcessor::numChannelsChanged()
+{
 }
 
 void Ambix_maxreAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)

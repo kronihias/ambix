@@ -255,9 +255,13 @@ void Ambix_converterAudioProcessorEditor::paint (Graphics& g)
 
     g.setColour (Colours::azure);
     g.setFont (Font (FontOptions {17.2000f, Font::bold}));
-    g.drawText ("AMBIX-CONVERTER",
-                11, 6, 380, 30,
-                Justification::centred, true);
+    {
+        int order = ambiOrderFromChannels (getProcessor()->getTotalNumInputChannels());
+        String title = "AMBIX-CONVERTER";
+        if (order > 0)
+            title << " O" << order;
+        g.drawText (title, 11, 6, 380, 30, Justification::centred, true);
+    }
 
     g.setColour (Colours::azure);
     g.setFont (Font (FontOptions {12.4000f, Font::plain}));

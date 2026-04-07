@@ -1,12 +1,27 @@
 GET_FILENAME_COMPONENT(SUBDIRNAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
-IF( DEFINED SPECIFIC_PROJECTNAME )
-	# this is for ambix_decoder (which shares the code of ambix_binaural)
-	SET (SUBPROJECT_NAME ${SPECIFIC_PROJECTNAME}_o${AMBI_ORDER})
-ELSE( DEFINED SPECIFIC_PROJECTNAME )
-	# this is the normal way...
-	SET (SUBPROJECT_NAME ${SUBDIRNAME}_o${AMBI_ORDER})
-ENDIF(DEFINED SPECIFIC_PROJECTNAME )
+IF (UNIVERSAL_BUILD)
+	# Universal build: no _oX suffix, uses MAX_AMBI_ORDER
+	IF( DEFINED SPECIFIC_PROJECTNAME )
+		SET (SUBPROJECT_NAME ${SPECIFIC_PROJECTNAME})
+	ELSE( DEFINED SPECIFIC_PROJECTNAME )
+		SET (SUBPROJECT_NAME ${SUBDIRNAME})
+	ENDIF(DEFINED SPECIFIC_PROJECTNAME )
+	SET (_FORMATS ${AMBIX_UNIVERSAL_FORMATS})
+ELSE ()
+	# Fixed-order build: _oX suffix, uses AMBI_ORDER
+	IF( DEFINED SPECIFIC_PROJECTNAME )
+		SET (SUBPROJECT_NAME ${SPECIFIC_PROJECTNAME}_o${AMBI_ORDER})
+	ELSE( DEFINED SPECIFIC_PROJECTNAME )
+		SET (SUBPROJECT_NAME ${SUBDIRNAME}_o${AMBI_ORDER})
+	ENDIF(DEFINED SPECIFIC_PROJECTNAME )
+	SET (_FORMATS ${AMBIX_FORMATS})
+ENDIF ()
+
+# Skip if no formats to build
+IF (NOT _FORMATS)
+	return()
+ENDIF()
 
 # add the folder with Juce includes
 INCLUDE_DIRECTORIES ( JuceLibraryCode )
@@ -99,7 +114,7 @@ juce_add_plugin (${SUBPROJECT_NAME}
     PLUGIN_CODE ${PLUGIN_CODE}
     COMPANY_NAME "kronlachner"
     PRODUCT_NAME ${SUBPROJECT_NAME}
-    FORMATS ${AMBIX_FORMATS}
+    FORMATS ${_FORMATS}
     VERSION ${VERSION}
     LV2URI http://www.matthiaskronlachner.com/${SUBPROJECT_NAME})
 
@@ -121,6 +136,15 @@ target_compile_definitions (${SUBPROJECT_NAME} PRIVATE
     JUCE_USE_WINDOWS_MEDIA_FORMAT=0
     JUCE_VST3_CAN_REPLACE_VST2=0)
 
+IF (UNIVERSAL_BUILD)
+    target_compile_definitions (${SUBPROJECT_NAME} PRIVATE
+        UNIVERSAL_AMBISONIC=1
+        AMBI_ORDER=${MAX_AMBI_ORDER})
+ELSE()
+    target_compile_definitions (${SUBPROJECT_NAME} PRIVATE
+        AMBI_ORDER=${AMBI_ORDER})
+ENDIF()
+
 target_link_libraries (${SUBPROJECT_NAME} PRIVATE
     juce::juce_audio_utils
     juce::juce_audio_plugin_client
@@ -138,3 +162,23 @@ IF(WITH_FFTW3)
 		${FFTW3F_THREADS_LIBRARY}
 	)
 ENDIF(WITH_FFTW3)
+
+# Copy Standalone app to standalone output directory
+IF(BUILD_STANDALONE)
+	list (FIND _FORMATS "Standalone" _has_standalone)
+	IF(NOT _has_standalone EQUAL -1)
+		IF (APPLE)
+			add_custom_command (TARGET ${SUBPROJECT_NAME}_Standalone POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_directory
+					"${CMAKE_CURRENT_BINARY_DIR}/${SUBPROJECT_NAME}_artefacts/$<CONFIG>/Standalone/${SUBPROJECT_NAME}.app"
+					"${BIN_DIR}/standalone/${SUBPROJECT_NAME}.app"
+				COMMENT "Copying ${SUBPROJECT_NAME} Standalone to ${BIN_DIR}/standalone/")
+		ELSE()
+			add_custom_command (TARGET ${SUBPROJECT_NAME}_Standalone POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy
+					"${CMAKE_CURRENT_BINARY_DIR}/${SUBPROJECT_NAME}_artefacts/$<CONFIG>/Standalone/${SUBPROJECT_NAME}"
+					"${BIN_DIR}/standalone/${SUBPROJECT_NAME}"
+				COMMENT "Copying ${SUBPROJECT_NAME} Standalone to ${BIN_DIR}/standalone/")
+		ENDIF()
+	ENDIF()
+ENDIF()

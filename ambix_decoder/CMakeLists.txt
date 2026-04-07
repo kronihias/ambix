@@ -12,6 +12,16 @@ SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_binaural )
 SET ( IGNORE_SRC_FILES MtxConv.cpp
     ConvolverData.cpp)
 
-SET( PLUGIN_CODE ADe${AMBI_ORDER})
+# VST2 fixed-order
+IF(BUILD_VST)
+	SET(UNIVERSAL_BUILD FALSE)
+	SET( PLUGIN_CODE ADe${AMBI_ORDER})
+	INCLUDE(${SRC_DIR}/Subproject.cmake)
+ENDIF()
 
-INCLUDE(${SRC_DIR}/Subproject.cmake)
+# VST3/AU universal
+IF(BUILD_VST3 OR BUILD_AU)
+	SET(UNIVERSAL_BUILD TRUE)
+	SET( PLUGIN_CODE ADeU)
+	INCLUDE(${SRC_DIR}/Subproject.cmake)
+ENDIF()
