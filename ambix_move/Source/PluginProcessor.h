@@ -33,24 +33,39 @@
 /**
  ambix_move
 
- Translates the listener point of view through the soundfield in x, y, z metres
- (range -5..+5 m) on a virtual sampling sphere of configurable reference radius
- (1..5 m). Re-encoding is performed as a single matrix operation in the same way
- as ambix_warp:
+ Translates *and rotates* the listener point of view through the soundfield.
+
+ Translation range is ±5 m in x, y, z on a virtual sampling sphere of
+ configurable reference radius (1..5 m). Rotation uses the same Yaw / Pitch /
+ Roll + Quaternion convention as ambix_rotator / IEM SceneRotator.
+
+ Re-encoding is performed as a single matrix operation in the same way as
+ ambix_warp:
 
    1) Decode the input ambisonic signal at a fixed t-design sampling grid (the
       pseudo-inverse of the SH basis at those points).
    2) For each sampling point on the reference sphere, compute the new arrival
-      direction *and* distance as seen from the translated listener.
+      direction *and* distance as seen from the translated listener, then apply
+      the head rotation to that direction.
    3) Re-encode each sample using a SH basis evaluated at the new direction,
       scaled by R_ref / new_distance (1/r gain compensation).
-   4) Multiply the two matrices to get the final transformation matrix.
+   4) Multiply the two matrices to get the final transformation matrix — so at
+      runtime the whole 6DoF operation is a single matrix multiply on the
+      ambisonic signal.
+
+ OSC control is available on a configurable UDP port (default 7130) using the
+ same message patterns as ambix_rotator, plus new /xyz and /6dof messages for
+ positional control.
 
  No delay compensation is applied (only gain compensation). The speed of sound
  c = 343 m/s is documented in the source as a constant for future use.
 */
 class Ambix_moveAudioProcessor  : public AudioProcessor,
-                                       public ChangeBroadcaster
+#ifdef WITH_OSC
+                                   private OSCReceiver,
+                                   private OSCReceiver::Listener<OSCReceiver::RealtimeCallback>,
+#endif
+                                   public ChangeBroadcaster
 {
 public:
     //==============================================================================
@@ -97,6 +112,18 @@ public:
         YParam,         // 0..1, mapped to -5..+5 m
         ZParam,         // 0..1, mapped to -5..+5 m
         RadiusParam,    // 0..1, mapped to  1..5  m
+
+        YawParam,       // 0..1, mapped to -180..+180 deg (yaw around Z)
+        PitchParam,     // 0..1, mapped to -180..+180 deg (pitch around Y)
+        RollParam,      // 0..1, mapped to -180..+180 deg (roll around X)
+        RotOrderParam,  // <0.5 = ypr, >=0.5 = rpy
+
+        Q0Param,        // 0..1 mapped to -1..+1 (quaternion w)
+        Q1Param,        // 0..1 mapped to -1..+1 (quaternion x)
+        Q2Param,        // 0..1 mapped to -1..+1 (quaternion y)
+        Q3Param,        // 0..1 mapped to -1..+1 (quaternion z)
+        QinvertParam,   // <0.5 = forward, >=0.5 = inverse
+
         InOrderParam,   // 0..1, mapped to 0..AMBI_ORDER (active order)
         OutOrderParam,
         totalNumParams
@@ -107,6 +134,31 @@ public:
     static float xParamFromMeters   (float m) { return juce::jlimit (0.f, 1.f, (m + 5.f) * 0.1f); }
     static float radiusMetersFromParam (float p) { return 1.f + 4.f * p; }
     static float radiusParamFromMeters (float m) { return juce::jlimit (0.f, 1.f, (m - 1.f) * 0.25f); }
+
+    // Rotation helpers: parameter is 0..1, displayed as -180..+180 deg.
+    static float degFromParam   (float p) { return p * 360.f - 180.f; }
+    static float paramFromDeg   (float d) { return juce::jlimit (0.f, 1.f, (d + 180.f) / 360.f); }
+
+#ifdef WITH_OSC
+    String osc_in_port;
+    bool   osc_enabled;
+    void oscMessageReceived (const OSCMessage& message) override;
+
+    // Called from the editor when the user types a new port number.
+    // Returns true if the new port could be opened.
+    bool setOscPort (const String& newPort);
+
+    // Enable / disable the OSC receiver. Returns true if the request
+    // succeeded (i.e. the listener is in the requested state afterwards).
+    bool setOscEnabled (bool shouldBeEnabled);
+#endif
+
+    bool isQuaternionActive(); // true if quaternions drive the rotation, false for Euler angles
+
+    // World-frame unit forward vector implied by the current rotation
+    // parameters (ambix convention: x = front, y = left, z = up).
+    // Used by the GUI to draw a "look direction" indicator on the listener dot.
+    void getLookForward (float out[3]);
 
     //==============================================================================
     int getNumPrograms() override;
@@ -130,6 +182,19 @@ private:
 
     // Reference radius (normalized 0..1, default 0 = 1 m)
     float radius_param, _radius_param;
+
+    // Rotation parameters (normalized 0..1, default 0.5 = 0 deg / 0 quat)
+    float yaw_param,   _yaw_param;
+    float pitch_param, _pitch_param;
+    float roll_param,  _roll_param;
+    float rot_order_param, _rot_order_param;
+    float q0_param, _q0_param;
+    float q1_param, _q1_param;
+    float q2_param, _q2_param;
+    float q3_param, _q3_param;
+    float qinvert_param, _qinvert_param;
+
+    bool _q_changed; // true when quaternions were touched last (→ use them)
 
     // Ambisonic order parameters
     float in_order_param;
