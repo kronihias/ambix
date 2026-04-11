@@ -81,6 +81,14 @@ public:
         repaint();
     }
 
+    void setLookForward (float fx, float fy, float fz)
+    {
+        if (lookFwd.x == fx && lookFwd.y == fy && lookFwd.z == fz)
+            return;
+        lookFwd = { fx, fy, fz };
+        repaint();
+    }
+
     //========================================================================
     // Editor callbacks
     std::function<void (float xMeters, float yMeters)> onListenerXYDragged;
@@ -170,6 +178,7 @@ private:
     enum class DragKind { None, Top, Front };
 
     juce::Vector3D<float> listener { 0.f, 0.f, 0.f };
+    juce::Vector3D<float> lookFwd  { 1.f, 0.f, 0.f };
     float refRadius = 1.f;
 
     std::array<juce::Vector3D<float>, 32> displayPoints;
@@ -335,6 +344,51 @@ private:
 
             g.setColour (juce::Colour (0xFFCCCCCC));
             g.fillEllipse (sampleScreen.x - 2.0f, sampleScreen.y - 2.0f, 4.0f, 4.0f);
+        }
+
+        // Listener "nose" — projected look-forward vector. Drawn before the
+        // head dot so the dot overlays the base of the nose cleanly.
+        {
+            const float noseLenPx = 22.f;
+            const float noseLenM  = noseLenPx / metresToPixels (pane);
+
+            const juce::Vector3D<float> noseTip {
+                listener.x + lookFwd.x * noseLenM,
+                listener.y + lookFwd.y * noseLenM,
+                listener.z + lookFwd.z * noseLenM };
+
+            const auto noseScreen = worldToScreen (pane, kind, noseTip);
+
+            // Length of the projection into *this* pane's plane. If the
+            // listener is looking straight along the view axis, the nose
+            // collapses to the centre — skip drawing it then.
+            const float dxPx = noseScreen.x - listenerScreen.x;
+            const float dyPx = noseScreen.y - listenerScreen.y;
+            const float projLen = std::sqrt (dxPx * dxPx + dyPx * dyPx);
+
+            if (projLen > 2.5f)
+            {
+                g.setColour (juce::Colour (0xFFFFC060));
+                g.drawLine (listenerScreen.x, listenerScreen.y,
+                            noseScreen.x,     noseScreen.y, 2.4f);
+
+                // Arrow-head: small filled triangle at the nose tip
+                const float ux = dxPx / projLen;
+                const float uy = dyPx / projLen;
+                const float nx = -uy;
+                const float ny =  ux;
+                const float tipLen = 6.0f;
+                const float tipHalf = 3.0f;
+
+                juce::Path tri;
+                tri.startNewSubPath (noseScreen.x, noseScreen.y);
+                tri.lineTo (noseScreen.x - ux * tipLen + nx * tipHalf,
+                            noseScreen.y - uy * tipLen + ny * tipHalf);
+                tri.lineTo (noseScreen.x - ux * tipLen - nx * tipHalf,
+                            noseScreen.y - uy * tipLen - ny * tipHalf);
+                tri.closeSubPath();
+                g.fillPath (tri);
+            }
         }
 
         // Listener dot
