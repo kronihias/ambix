@@ -655,7 +655,16 @@ void Ambix_rotatorAudioProcessor::calcParams()
     // normalize the quaternion just in case it isn't
     // ||q|| = 1, sqrt(q0^2+q1^2+q2^2+q3^2)
     float absq = sqrtf(q0*q0 + q1*q1 + q2*q2 + q3*q3);
-    if ((absq != 0.f) && absq != 1.0)
+    if (absq == 0.f)
+    {
+      // degenerate input (q0_param = q1_param = q2_param = q3_param = 0.5,
+      // the plugin's construction default, maps to q = (0,0,0,0)). Fall back
+      // to the identity quaternion so the SH rotation matrix stays identity
+      // instead of collapsing to all-zeros.
+      q0 = 1.f;
+      q1 = q2 = q3 = 0.f;
+    }
+    else if (absq != 1.0f)
     {
       q0 = q0 / absq;
       q1 = q1 / absq;
