@@ -47,10 +47,12 @@ void ShChebyshev::Calc(int n_max, double phi)
         // start values
         sinus(0) = 0.f;
         cosinus(0) = 1.f;
-        
-        sinus(1) = -sin(phi); // for mtx_sph_h compatibility use -sin
-        cosinus(1) = cos(phi);
-        
+
+        if (n_max > 0) {
+            sinus(1) = -sin(phi); // for mtx_sph_h compatibility use -sin
+            cosinus(1) = cos(phi);
+        }
+
         // chebyshev recursion for multiples of argument
         for (int i = 2; i <= n_max; i++) {
             

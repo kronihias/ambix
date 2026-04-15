@@ -58,25 +58,28 @@ void SphericalHarmonic::Init(int order, bool n3d, bool elevation_conv)
 
 void SphericalHarmonic::Calc(double phi, double theta)
 {
-    if (_phi != phi && _theta != theta)
+    if (_phi != phi || _theta != theta)
     {
         Eigen::VectorXd Nmn, Chb, Pmn;
-        
+
         // sin -> ambix convention -> elevation
         // cos -> mtx_spherical_harmonics -> zenith
-        
+
         if (!_elevation_conv)
             Legendre.Calc(_order, sin(theta), cos(theta));
         else
             Legendre.Calc(_order, cos(theta), sin(theta));
-        
+
         Chebyshev.Calc(_order, phi);
-        
+
         Norm.Get(Nmn);
         Legendre.Get(Pmn);
         Chebyshev.Get(Chb);
-        
+
         Ymn = Nmn.cwiseProduct(Pmn).cwiseProduct(Chb);
+
+        _phi = phi;
+        _theta = theta;
     }
     
 }
