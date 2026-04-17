@@ -383,9 +383,18 @@ void Ambix_moveAudioProcessor::getLookForward (float out[3])
     }
     else
     {
-        const double yaw   = -((double) yaw_param   * 2.0 * M_PI - M_PI);
+        // Yaw and roll are inverted relative to the raw Euler-to-rotation
+        // math used in ambix_rotator. In ambix_move the rotation is applied
+        // to the listener-to-source vector (`d * Rot` ≡ rotating `d` by
+        // Rot^T, i.e. we view the world from the listener's head frame),
+        // so the sign of the yaw (Z) and roll (X) angles has to flip to
+        // give the same perceptual direction of motion as ambix_rotator,
+        // which rotates the sound field in the opposite sense. Pitch (Y)
+        // does not need the flip because the ambix convention already
+        // uses a left-handed pitch axis (see ambix_rotator's RotY).
+        const double yaw   =  ((double) yaw_param   * 2.0 * M_PI - M_PI);
         const double pitch =  ((double) pitch_param * 2.0 * M_PI - M_PI);
-        const double roll  =  ((double) roll_param  * 2.0 * M_PI - M_PI);
+        const double roll  = -((double) roll_param  * 2.0 * M_PI - M_PI);
 
         Eigen::Matrix3d RotX = Eigen::Matrix3d::Zero();
         Eigen::Matrix3d RotY = Eigen::Matrix3d::Zero();
@@ -603,9 +612,10 @@ void Ambix_moveAudioProcessor::calcParams()
                 q0 /= absq; q1 /= absq; q2 /= absq; q3 /= absq;
             }
 
-            if (qinvert_param > 0.5f)
+            if (qinvert_param < 0.5f)
             {
-                // inverse rotation
+                // apply conjugate (inverse) by default so that the quaternion
+                // convention matches the Euler path and external trackers
                 q1 = -q1; q2 = -q2; q3 = -q3;
             }
 
