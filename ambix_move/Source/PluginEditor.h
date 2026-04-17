@@ -54,14 +54,16 @@ private:
     Slider sld_x, sld_y, sld_z, sld_radius;
     Slider sld_in_order, sld_out_order;
 
-    Label  lbl_trans_title;
+    Label        lbl_trans_title;
+    ToggleButton tgl_transl_enabled;
     Label  lbl_x, lbl_y, lbl_z, lbl_radius;
     Label  lbl_in_order, lbl_out_order;
 
     // Rotation
     Slider sld_yaw, sld_pitch, sld_roll;
     Label  lbl_yaw, lbl_pitch, lbl_roll;
-    Label  lbl_rot_title, lbl_euler_title, lbl_quat_title;
+    Label        lbl_rot_title, lbl_euler_title, lbl_quat_title;
+    ToggleButton tgl_rot_enabled;
 
     ToggleButton tgl_ypr;
     ToggleButton tgl_rpy;

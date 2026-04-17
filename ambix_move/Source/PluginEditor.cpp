@@ -157,6 +157,13 @@ Ambix_moveAudioProcessorEditor::Ambix_moveAudioProcessorEditor (Ambix_moveAudioP
     lbl_trans_title.setFont (Font (FontOptions { 15.0f, Font::bold }));
     lbl_trans_title.setJustificationType (Justification::centredLeft);
 
+    addAndMakeVisible (tgl_transl_enabled);
+    tgl_transl_enabled.setButtonText ("enabled");
+    tgl_transl_enabled.setTooltip ("enable / bypass listener translation");
+    tgl_transl_enabled.setToggleState (true, dontSendNotification);
+    tgl_transl_enabled.addListener (this);
+    tgl_transl_enabled.setColour (ToggleButton::textColourId, Colours::white);
+
     // --- Rotation section -------------------------------------------------
     addAndMakeVisible (configureRotSlider (sld_yaw,   this, "yaw (left-right), degrees"));
     addAndMakeVisible (configureRotSlider (sld_pitch, this, "pitch (up-down), degrees"));
@@ -169,6 +176,13 @@ Ambix_moveAudioProcessorEditor::Ambix_moveAudioProcessorEditor (Ambix_moveAudioP
     addAndMakeVisible (configureTitleLabel (lbl_rot_title,   "Rotation"));
     lbl_rot_title.setFont (Font (FontOptions { 15.0f, Font::bold }));
     lbl_rot_title.setJustificationType (Justification::centredLeft);
+
+    addAndMakeVisible (tgl_rot_enabled);
+    tgl_rot_enabled.setButtonText ("enabled");
+    tgl_rot_enabled.setTooltip ("enable / bypass listener rotation");
+    tgl_rot_enabled.setToggleState (true, dontSendNotification);
+    tgl_rot_enabled.addListener (this);
+    tgl_rot_enabled.setColour (ToggleButton::textColourId, Colours::white);
 
     addAndMakeVisible (configureTitleLabel (lbl_euler_title, "Euler"));
     lbl_euler_title.setJustificationType (Justification::centredLeft);
@@ -453,8 +467,12 @@ void Ambix_moveAudioProcessorEditor::resized()
 
     int y = controlsTop;
 
-    // Row 1 : title
-    lbl_trans_title.setBounds (x0, y, halfW, rowH);
+    // Row 1 : title + bypass toggle
+    const int transTitleW  = juce::roundToInt (90 * scale);
+    const int bypassGap    = juce::roundToInt (16 * scale);
+    const int bypassToggleW = juce::roundToInt (80 * scale);
+    lbl_trans_title.setBounds (x0, y, transTitleW, rowH);
+    tgl_transl_enabled.setBounds (x0 + transTitleW + bypassGap, y, bypassToggleW, rowH);
     y += rowH + gap;
 
     auto rowSlider = [&] (Label& lbl, Slider& sld)
@@ -484,8 +502,10 @@ void Ambix_moveAudioProcessorEditor::resized()
     const int rotSldW = halfW - rotLblW - gap;
     int yR = controlsTop;
 
-    // Row 1 : title
-    lbl_rot_title.setBounds (xRot, yR, halfW, rowH);
+    // Row 1 : title + bypass toggle
+    const int rotTitleW = juce::roundToInt (80 * scale);
+    lbl_rot_title.setBounds (xRot, yR, rotTitleW, rowH);
+    tgl_rot_enabled.setBounds (xRot + rotTitleW + bypassGap, yR, bypassToggleW, rowH);
     yR += rowH + gap;
 
     // Rows 2..4 : yaw / pitch / roll sliders
@@ -623,6 +643,14 @@ void Ambix_moveAudioProcessorEditor::buttonClicked (Button* b)
     {
         setParameterNotifyingHost (p, P::QinvertParam, (float) tgl_qinvert.getToggleState());
     }
+    else if (b == &tgl_transl_enabled)
+    {
+        setParameterNotifyingHost (p, P::TranslEnabledParam, tgl_transl_enabled.getToggleState() ? 1.f : 0.f);
+    }
+    else if (b == &tgl_rot_enabled)
+    {
+        setParameterNotifyingHost (p, P::RotEnabledParam, tgl_rot_enabled.getToggleState() ? 1.f : 0.f);
+    }
 #ifdef WITH_OSC
     else if (b == &tgl_osc_enable)
     {
@@ -752,6 +780,8 @@ void Ambix_moveAudioProcessorEditor::timerCallback()
         txt_q3.setText (String (p->getParameter (P::Q3Param) * 2. - 1., 4), dontSendNotification);
 
     tgl_qinvert.setToggleState (p->getParameter (P::QinvertParam) > 0.5f, dontSendNotification);
+    tgl_transl_enabled.setToggleState (p->getParameter (P::TranslEnabledParam) > 0.5f, dontSendNotification);
+    tgl_rot_enabled.setToggleState    (p->getParameter (P::RotEnabledParam)    > 0.5f, dontSendNotification);
 
     // Visually indicate which rotation input is driving the matrix
     if (p->isQuaternionActive())
