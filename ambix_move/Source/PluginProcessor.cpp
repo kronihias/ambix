@@ -126,6 +126,8 @@ Ambix_moveAudioProcessor::Ambix_moveAudioProcessor() :
     q3_param (0.5f),      _q3_param (-10.f),
     qinvert_param (0.f),  _qinvert_param (-10.f),
     _q_changed (false),
+    transl_enabled_param (1.f), _transl_enabled_param (-10.f),
+    rot_enabled_param    (1.f), _rot_enabled_param    (-10.f),
     in_order_param (1.f),
     out_order_param (1.f),
     in_order (AMBI_ORDER),
@@ -241,9 +243,11 @@ float Ambix_moveAudioProcessor::getParameter (int index)
         case Q3Param:       return q3_param;
         case QinvertParam:  return qinvert_param;
 
-        case InOrderParam:  return in_order_param;
-        case OutOrderParam: return out_order_param;
-        default:            return 0.0f;
+        case InOrderParam:       return in_order_param;
+        case OutOrderParam:      return out_order_param;
+        case TranslEnabledParam: return transl_enabled_param;
+        case RotEnabledParam:    return rot_enabled_param;
+        default:                 return 0.0f;
     }
 }
 
@@ -280,6 +284,9 @@ void Ambix_moveAudioProcessor::setParameter (int index, float newValue)
             out_order = (int) round (out_order_param * AMBI_ORDER);
             break;
 
+        case TranslEnabledParam: transl_enabled_param = newValue; break;
+        case RotEnabledParam:    rot_enabled_param    = newValue; break;
+
         default:
             break;
     }
@@ -303,8 +310,10 @@ const String Ambix_moveAudioProcessor::getParameterName (int index)
         case Q2Param:       return "Quaternion q2";
         case Q3Param:       return "Quaternion q3";
         case QinvertParam:  return "Inverse Quaternion Rotation";
-        case InOrderParam:  return "Ambi In order";
-        case OutOrderParam: return "Ambi Out order";
+        case InOrderParam:       return "Ambi In order";
+        case OutOrderParam:      return "Ambi Out order";
+        case TranslEnabledParam: return "Translation enabled";
+        case RotEnabledParam:    return "Rotation enabled";
         default:            break;
     }
     return String();
@@ -331,8 +340,10 @@ const String Ambix_moveAudioProcessor::getParameterText (int index)
         case Q3Param:       text = String (q3_param * 2. - 1., 4); break;
         case QinvertParam:  text = (qinvert_param < 0.5f) ? "" : "inverse"; break;
 
-        case InOrderParam:  text = String (in_order); break;
-        case OutOrderParam: text = String (out_order); break;
+        case InOrderParam:       text = String (in_order); break;
+        case OutOrderParam:      text = String (out_order); break;
+        case TranslEnabledParam: text = (transl_enabled_param > 0.5f) ? "on" : "bypass"; break;
+        case RotEnabledParam:    text = (rot_enabled_param    > 0.5f) ? "on" : "bypass"; break;
         default: break;
     }
     return text;
@@ -557,21 +568,23 @@ void Ambix_moveAudioProcessor::calcParams()
 
     // Recompute the transformation matrix only if any relevant parameter changed
     const bool anyChanged =
-        (x_param          != _x_param)          ||
-        (y_param          != _y_param)          ||
-        (z_param          != _z_param)          ||
-        (radius_param     != _radius_param)     ||
-        (yaw_param        != _yaw_param)        ||
-        (pitch_param      != _pitch_param)      ||
-        (roll_param       != _roll_param)       ||
-        (rot_order_param  != _rot_order_param)  ||
-        (q0_param         != _q0_param)         ||
-        (q1_param         != _q1_param)         ||
-        (q2_param         != _q2_param)         ||
-        (q3_param         != _q3_param)         ||
-        (qinvert_param    != _qinvert_param)    ||
-        (in_order         != _in_order)         ||
-        (out_order        != _out_order);
+        (x_param              != _x_param)              ||
+        (y_param              != _y_param)              ||
+        (z_param              != _z_param)              ||
+        (radius_param         != _radius_param)         ||
+        (yaw_param            != _yaw_param)            ||
+        (pitch_param          != _pitch_param)          ||
+        (roll_param           != _roll_param)           ||
+        (rot_order_param      != _rot_order_param)      ||
+        (q0_param             != _q0_param)             ||
+        (q1_param             != _q1_param)             ||
+        (q2_param             != _q2_param)             ||
+        (q3_param             != _q3_param)             ||
+        (qinvert_param        != _qinvert_param)        ||
+        (transl_enabled_param != _transl_enabled_param) ||
+        (rot_enabled_param    != _rot_enabled_param)    ||
+        (in_order             != _in_order)             ||
+        (out_order            != _out_order);
 
     if (anyChanged)
     {
@@ -582,7 +595,9 @@ void Ambix_moveAudioProcessor::calcParams()
         const int out_ambi_channels = (out_order + 1) * (out_order + 1);
 
         const double R  = radiusMetersFromParam (radius_param);
-        const double lx = xMetersFromParam (x_param);
+        // When translation is bypassed the listener stays at the origin.
+        const bool translActive = (transl_enabled_param > 0.5f);
+        const double lx = translActive ? xMetersFromParam (x_param) : 0.0;
         // Y is negated so that moving the listener "right" (as per the GUI
         // and DAW convention) actually translates toward ambix -Y. The SH
         // library used by the suite has Y_1,-1 = -sin(az)*cos(el) (i.e. the
@@ -590,8 +605,8 @@ void Ambix_moveAudioProcessor::calcParams()
         // correct left/right translation read inverted in downstream tools.
         // Flipping the parameter here keeps the rest of the chain consistent
         // without touching the GUI labels or the shared SH code.
-        const double ly = -xMetersFromParam (y_param);
-        const double lz = xMetersFromParam (z_param);
+        const double ly = translActive ? -xMetersFromParam (y_param) : 0.0;
+        const double lz = translActive ? xMetersFromParam (z_param) : 0.0;
 
         // --------------------------------------------------------------
         // Build the 3x3 head-rotation matrix (same math as ambix_rotator
@@ -599,7 +614,7 @@ void Ambix_moveAudioProcessor::calcParams()
         // --------------------------------------------------------------
         Eigen::Matrix3d Rot = Eigen::Matrix3d::Identity();
 
-        if (_q_changed)
+        if (rot_enabled_param > 0.5f && _q_changed)
         {
             float q0 = q0_param * 2.f - 1.f;
             float q1 = q1_param * 2.f - 1.f;
@@ -632,7 +647,7 @@ void Ambix_moveAudioProcessor::calcParams()
             Rot(2, 1) = 2 * q2 * q3 - 2 * q0 * q1;
             Rot(2, 2) = q0q0 - q1q1 - q2q2 + q3q3;
         }
-        else
+        else if (rot_enabled_param > 0.5f)
         {
             // Euler angles. Yaw is mathematically negated (matches ambix_rotator)
             // so that a positive yaw slider rotates the scene in the same
@@ -730,21 +745,23 @@ void Ambix_moveAudioProcessor::calcParams()
                 Sh_transf (i) = 0.0;
         }
 
-        _x_param         = x_param;
-        _y_param         = y_param;
-        _z_param         = z_param;
-        _radius_param    = radius_param;
-        _yaw_param       = yaw_param;
-        _pitch_param     = pitch_param;
-        _roll_param      = roll_param;
-        _rot_order_param = rot_order_param;
-        _q0_param        = q0_param;
-        _q1_param        = q1_param;
-        _q2_param        = q2_param;
-        _q3_param        = q3_param;
-        _qinvert_param   = qinvert_param;
-        _in_order        = in_order;
-        _out_order       = out_order;
+        _x_param              = x_param;
+        _y_param              = y_param;
+        _z_param              = z_param;
+        _radius_param         = radius_param;
+        _yaw_param            = yaw_param;
+        _pitch_param          = pitch_param;
+        _roll_param           = roll_param;
+        _rot_order_param      = rot_order_param;
+        _q0_param             = q0_param;
+        _q1_param             = q1_param;
+        _q2_param             = q2_param;
+        _q3_param             = q3_param;
+        _qinvert_param        = qinvert_param;
+        _transl_enabled_param = transl_enabled_param;
+        _rot_enabled_param    = rot_enabled_param;
+        _in_order             = in_order;
+        _out_order            = out_order;
     }
 }
 

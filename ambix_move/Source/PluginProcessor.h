@@ -126,6 +126,10 @@ public:
 
         InOrderParam,   // 0..1, mapped to 0..AMBI_ORDER (active order)
         OutOrderParam,
+
+        TranslEnabledParam, // 1 = translation active, 0 = bypass (listener at origin)
+        RotEnabledParam,    // 1 = rotation active,    0 = bypass (identity rotation)
+
         totalNumParams
     };
 
@@ -194,7 +198,10 @@ private:
     float q3_param, _q3_param;
     float qinvert_param, _qinvert_param;
 
-    bool _q_changed; // true when quaternions were touched last (→ use them)
+    bool _q_changed;
+
+    float transl_enabled_param, _transl_enabled_param;
+    float rot_enabled_param,    _rot_enabled_param; // true when quaternions were touched last (→ use them)
 
     // Ambisonic order parameters
     float in_order_param;
