@@ -275,9 +275,9 @@ void Ambix_warpAudioProcessor::changeProgramName (int index, const String& newNa
 //==============================================================================
 void Ambix_warpAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    // calcParams();
+    output_buffer.setSize (getTotalNumOutputChannels(), samplesPerBlock, false, false, false);
+    _initialized = false;
+    calcParams();
 }
 
 void Ambix_warpAudioProcessor::releaseResources()
@@ -587,7 +587,6 @@ void Ambix_warpAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
 
     int NumSamples = buffer.getNumSamples();
 
-    output_buffer.setSize(buffer.getNumChannels(), NumSamples);
     output_buffer.clear();
 
 
@@ -609,7 +608,8 @@ void Ambix_warpAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
     }
 
 
-    buffer = output_buffer;
+    for (int ch = 0; ch < std::min(AMBI_CHANNELS, getTotalNumOutputChannels()); ++ch)
+        buffer.copyFrom(ch, 0, output_buffer, ch, 0, NumSamples);
 
 }
 

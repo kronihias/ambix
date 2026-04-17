@@ -368,8 +368,9 @@ void Ambix_directional_loudnessAudioProcessor::changeProgramName (int index, con
 //==============================================================================
 void Ambix_directional_loudnessAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    output_buffer.setSize (getTotalNumOutputChannels(), samplesPerBlock, false, false, false);
+    _initialized = false;
+    calcParams();
 }
 
 void Ambix_directional_loudnessAudioProcessor::releaseResources()
@@ -583,7 +584,6 @@ void Ambix_directional_loudnessAudioProcessor::processBlock (AudioSampleBuffer& 
 
     int NumSamples = buffer.getNumSamples();
 
-    output_buffer.setSize(buffer.getNumChannels(), NumSamples);
     output_buffer.clear();
 
 
@@ -605,7 +605,8 @@ void Ambix_directional_loudnessAudioProcessor::processBlock (AudioSampleBuffer& 
     }
 
 
-    buffer = output_buffer;
+    for (int ch = 0; ch < std::min(AMBI_CHANNELS, getTotalNumOutputChannels()); ++ch)
+        buffer.copyFrom(ch, 0, output_buffer, ch, 0, NumSamples);
 }
 
 //==============================================================================

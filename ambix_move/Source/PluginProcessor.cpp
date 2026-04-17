@@ -458,8 +458,11 @@ const String Ambix_moveAudioProcessor::getProgramName (int)       { return Strin
 void Ambix_moveAudioProcessor::changeProgramName (int, const String&) {}
 
 //==============================================================================
-void Ambix_moveAudioProcessor::prepareToPlay (double, int)
+void Ambix_moveAudioProcessor::prepareToPlay (double, int samplesPerBlock)
 {
+    output_buffer.setSize (getTotalNumOutputChannels(), samplesPerBlock, false, false, false);
+    _initialized = false; // force SH basis rebuild before audio starts
+    calcParams();
 }
 
 void Ambix_moveAudioProcessor::releaseResources()
@@ -761,7 +764,6 @@ void Ambix_moveAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
 
     const int NumSamples = buffer.getNumSamples();
 
-    output_buffer.setSize (buffer.getNumChannels(), NumSamples);
     output_buffer.clear();
 
     for (int out = 0; out < std::min (AMBI_CHANNELS, getTotalNumOutputChannels()); ++out)
@@ -785,7 +787,8 @@ void Ambix_moveAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
         }
     }
 
-    buffer = output_buffer;
+    for (int ch = 0; ch < std::min (AMBI_CHANNELS, getTotalNumOutputChannels()); ++ch)
+        buffer.copyFrom (ch, 0, output_buffer, ch, 0, NumSamples);
 }
 
 //==============================================================================
