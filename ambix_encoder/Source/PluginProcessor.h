@@ -80,6 +80,10 @@ public:
 
     void calcAzimuth();
 
+    void updateTrackProperties (const TrackProperties& properties) override;
+
+    String getTrackName() const;  // thread-safe accessor used by sendOSC()
+
 #if WITH_ADVANCED_CONTROL
     void calcNewParameters(double SampleRate, int BufferLength);
 #endif
@@ -142,6 +146,9 @@ public:
     ApplicationProperties myProperties;
 
 private:
+    CriticalSection track_name_lock;
+    String          track_name;   // updated by the host via updateTrackProperties()
+
     OwnedArray<AmbixEncoder> AmbiEnc;
 
     double SampleRate;

@@ -161,7 +161,7 @@ void Ambix_encoderAudioProcessor::sendOSC() // send osc data
     {
         OSCMessage mymsg = OSCMessage("/ambi_enc");
         mymsg.addInt32(m_id); // source id
-        mymsg.addString("test"); // name... currently unused
+        mymsg.addString(getTrackName());
         mymsg.addFloat32(2.0f); // distance... currently unused
         mymsg.addFloat32(360.f*(azimuth_param-0.5f)); // azimuth -180....180°
         mymsg.addFloat32(360.f*(elevation_param-0.5f)); // elevation -180....180°
@@ -571,6 +571,22 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
         }
 
     }
+}
+
+//==============================================================================
+void Ambix_encoderAudioProcessor::updateTrackProperties (const TrackProperties& properties)
+{
+    if (properties.name.has_value())
+    {
+        const ScopedLock sl (track_name_lock);
+        track_name = *properties.name;
+    }
+}
+
+String Ambix_encoderAudioProcessor::getTrackName() const
+{
+    const ScopedLock sl (track_name_lock);
+    return track_name;
 }
 
 //==============================================================================
