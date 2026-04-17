@@ -356,8 +356,9 @@ void Ambix_vmicAudioProcessor::changeProgramName (int index, const String& newNa
 //==============================================================================
 void Ambix_vmicAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    output_buffer.setSize (getTotalNumOutputChannels(), samplesPerBlock, false, false, false);
+    _initialized = false;
+    calcParams();
 }
 
 void Ambix_vmicAudioProcessor::releaseResources()
@@ -553,7 +554,6 @@ void Ambix_vmicAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
 
     int NumSamples = buffer.getNumSamples();
 
-    output_buffer.setSize(buffer.getNumChannels(), NumSamples);
     output_buffer.clear();
 
 
@@ -574,14 +574,8 @@ void Ambix_vmicAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuff
         }
     }
 
-    // clear unused channels
-    for (int out = std::min(NUM_FILTERS_VMIC,getTotalNumOutputChannels()); out < output_buffer.getNumChannels(); out++)
-    {
-        output_buffer.clear(out, 0, NumSamples);
-    }
-
-
-    buffer = output_buffer;
+    for (int ch = 0; ch < getTotalNumOutputChannels(); ++ch)
+        buffer.copyFrom(ch, 0, output_buffer, ch, 0, NumSamples);
 }
 
 //==============================================================================
