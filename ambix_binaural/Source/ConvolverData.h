@@ -59,6 +59,7 @@ public:
 
     // set the target samplerate -> ir gets resampled if added with different samplingrate
     void setSampleRate(double samplerate);
+    double getSampleRate() const { return SampleRate; }
 private:
 
     int NumInCh; // number of input channels (max(InCh))
