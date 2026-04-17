@@ -43,12 +43,14 @@
     #endif
 #endif
 
+#define GARDNER_SCHEME 1
+
 
 // Aligned Memory Allocation and Deallocation
 
 inline void* aligned_malloc(size_t size, size_t align) {
     void *result;
-#ifdef _MSC_VER
+#if defined(_MSC_VER) or defined(_WIN32)
     result = _aligned_malloc(size, align);
 #else
     if(posix_memalign(&result, align, size)) result = 0;
@@ -57,7 +59,7 @@ inline void* aligned_malloc(size_t size, size_t align) {
 }
 
 inline void aligned_free(void *ptr) {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) or defined(_WIN32)
     _aligned_free(ptr);
 #else
     free(ptr);
@@ -130,69 +132,9 @@ class OutNode
 {
 public:
 
-    OutNode(int out, int partitionsize, int numpartitions) // resize buffer
-    {
-        numpartitions_ = numpartitions;
+    OutNode(int out, int partitionsize, int numpartitions);
 
-        out_ = out;
-        outbuf_.setSize(1, partitionsize);
-        outbuf_.clear();
-
-        // allocate complex output for each partition stage
-#if SPLIT_COMPLEX
-        c_re_ = new float* [numpartitions_];
-        c_im_ = new float* [numpartitions_];
-#else
-        c_c_ = new fftwf_complex* [numpartitions_];
-#endif
-
-        for (int i=0; i<numpartitions_; i++)
-        {
-            // allocate memory in constructor
-#if SPLIT_COMPLEX
-            // vdsp framework needs N split complex samples
-            c_re_[i] = reinterpret_cast<float*>( aligned_malloc( (partitionsize+1)*sizeof(float), 16 ) );
-            c_im_[i] = reinterpret_cast<float*>( aligned_malloc( (partitionsize+1)*sizeof(float), 16 ) );
-
-
-            FloatVectorOperations::clear(c_re_[i], partitionsize+1);
-            FloatVectorOperations::clear(c_im_[i], partitionsize+1);
-
-#else
-            // fftw needs N+1 complex samples
-            c_c_[i] = reinterpret_cast<fftwf_complex*>( aligned_malloc( (partitionsize+1)*sizeof(fftwf_complex), 16 ) );
-
-            FloatVectorOperations::clear((float*)c_c_[i], 2*(partitionsize+1));
-#endif
-        }
-
-    };
-
-    ~OutNode()
-    {
-        filternodes_.clear();
-
-        // free memory in destructor
-        for (int i=0; i<numpartitions_; i++)
-        {
-#if SPLIT_COMPLEX
-            if (c_re_[i])
-                aligned_free(c_re_[i]);
-            if (c_im_[i])
-                aligned_free(c_im_[i]);
-#else
-            if (c_c_[i])
-                aligned_free(c_c_[i]);
-#endif
-        }
-
-#if SPLIT_COMPLEX
-        delete[] c_re_;
-        delete[] c_im_;
-#else
-        delete[] c_c_;
-#endif
-    };
+    ~OutNode();
 
 private:
 
@@ -331,6 +273,11 @@ private:
     OwnedArray<OutNode> outnodes_;          // holds output nodes
 
 	std::unique_ptr<FileOutputStream>	debug_out_; // Debug output Text File
+
+#if GARDNER_SCHEME
+    WaitableEvent       inter_sync;
+    int                 inter_offset;
+#endif
 };
 
 

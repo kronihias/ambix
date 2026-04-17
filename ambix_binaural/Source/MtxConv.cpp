@@ -220,11 +220,14 @@ bool MtxConvMaster::Configure(int numins, int numouts, int blocksize, int maxsiz
 
     while (maxsize > 0) {
 
+#if GARDNER_SCHEME
+        int numpartitions = 2;
+#else
         int numpartitions = 4;
+#endif
 
         numpartitions_++;
         partitions_.add(new MtxConvSlave());
-
 
         if (partsize >= maxpart_)
         {
@@ -365,7 +368,10 @@ void MtxConvMaster::DebugInfo()
 //////////////////////////////////////
 // SLAVE METHODS
 //////////////////////////////////////
-MtxConvSlave::MtxConvSlave() : Thread("mtx_convolver_slave")
+MtxConvSlave::MtxConvSlave() :  Thread("mtx_convolver_slave_")
+#if GARDNER_SCHEME
+                            ,   inter_sync(false)
+#endif
 {
 }
 
@@ -392,6 +398,10 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
     outnodeoffset_ = 0;
 
     part_idx_ = 0;
+
+#if GARDNER_SCHEME
+    inter_offset = 0;
+#endif
 
 #if SPLIT_COMPLEX
     fft_norm_ = 0.25f / ( 2.f*(float)partitionsize_ ); // vDSP has a different scaling factors for fft/ifft than fftw
@@ -427,8 +437,11 @@ bool MtxConvSlave::Configure(int partitionsize, int numpartitions, int offset, i
 
 #endif
 
-    waitnewdata_.reset();
     waitprocessing_.signal();
+
+#if GARDNER_SCHEME
+    inter_sync.reset();
+#endif
 
 #ifdef DEBUG_COUT
 	// open debug txt
@@ -469,8 +482,23 @@ void MtxConvSlave::SetBufsize(int inbufsize, int outbufsize, int blocksize)
 
 void MtxConvSlave::StartProc()
 {
+    // map partition priority to JUCE Thread::Priority
+    // priority_ is 0 for first partition, decreasing for later ones
+    // all partitions stay high — this is real-time audio, just differentiate
+    // between the most urgent (first) and later partitions
+    Thread::Priority threadPriority;
+    if (priority_ >= 0)
+        threadPriority = Thread::Priority::highest;
+    else
+        threadPriority = Thread::Priority::high;
+
     // start a thread for each partitionsize
-    startThread(Thread::Priority::highest);
+#if GARDNER_SCHEME
+    if (offset_ >= partitionsize_ )
+        startThread(threadPriority);
+#else
+    startThread(threadPriority);
+#endif
 }
 
 
@@ -480,9 +508,13 @@ void MtxConvSlave::StopProc()
 
     waitnewdata_.signal();
 
-    stopThread(50);
+    stopThread(2000);
 
-    // waitForThreadToExit(20);
+    // host block elaboration thread unlock
+#if GARDNER_SCHEME
+    inter_sync.signal();
+#endif
+    waitprocessing_.signal();
 }
 
 
@@ -640,14 +672,17 @@ bool MtxConvSlave::AddFilter(int in, int out, const juce::AudioSampleBuffer &dat
 // thread function - do the background tasks
 void MtxConvSlave::run()
 {
+    // name thread with related partition size
+    String threadName = getThreadName();
+    setCurrentThreadName(threadName << partitionsize_);
+
 	// thread function for highest priority
 	// does only process the later partitions - first partition has to be computed immediateley
-	if (priority_ == 0)
+	if (priority_ == 0 || offset_ <= partitionsize_)
 	{
 		while (true)
 		{
 			waitnewdata_.wait();
-			waitnewdata_.reset();
 
 			if ( threadShouldExit() )
 				return;
@@ -665,7 +700,6 @@ void MtxConvSlave::run()
 		while(true)
 		{
 			waitnewdata_.wait();
-			waitnewdata_.reset();
 
 			if ( threadShouldExit() )
 				return;
@@ -687,6 +721,10 @@ void MtxConvSlave::run()
 
 			TransformOutput(false);
 			WriteToOutbuf(partitionsize_, false);
+
+#if GARDNER_SCHEME
+            inter_sync.signal();
+#endif
 
 			for (int i = 1; i < numpartitions_; i++)
 			{
@@ -1086,13 +1124,28 @@ bool MtxConvSlave::ReadOutput(int numsamples, bool forcesync)
 
     numnewinsamples_ += numsamples;
 
+    //extra thread sync for Gardner scheme
+#if GARDNER_SCHEME
+    if (offset_ > partitionsize_)
+    {
+        inter_offset += numsamples;
+
+        if (inter_offset >= offset_)
+        {
+            inter_offset -= partitionsize_;
+            if (!threadShouldExit())
+                inter_sync.wait();
+        }
+    }
+#endif
+
     // do processing if enough samples arrived
     if (numnewinsamples_ >= partitionsize_)
     {
-        if (forcesync)
-            waitprocessing_.wait(1000); // maximum wait for 1 seconds if force sync... this is a long time anyway...
-        //else
-        //    waitprocessing_.wait(1); // should we try to wait in realtime mode as well?
+        if (forcesync && !threadShouldExit())
+            waitprocessing_.wait(); // wait until processing is done if force sync
+        else
+            waitprocessing_.reset();
 
         if (finished_part_.get() < numpartitions_)
         {
@@ -1103,7 +1156,7 @@ bool MtxConvSlave::ReadOutput(int numsamples, bool forcesync)
         }
         else
         {
-            if (priority_ == 0) // highest priority has to deliver immediateley
+            if (priority_ == 0 || offset_ <= partitionsize_) // highest priority has to deliver immediateley
             {
 
                 // first check wheter we have to skip a cycle
@@ -1123,17 +1176,33 @@ bool MtxConvSlave::ReadOutput(int numsamples, bool forcesync)
                 Process(0);
 
                 // signal thread to do the other partitions
-                waitprocessing_.reset();
+#if GARDNER_SCHEME
+                if (offset_ == partitionsize_)
+                {
+                    waitnewdata_.signal();
+                }
+#else
                 waitnewdata_.signal();
+#endif
 
                 TransformOutput(false);
 
                 WriteToOutbuf(partitionsize_, false); // should i do something different here if skipped??!!
+
+#if GARDNER_SCHEME
+                if (priority_ == 0)
+                {
+                    Process(1);
+                    waitprocessing_.signal();
+                }
+#endif
             }
             else // lower priority has some time for computations...
             {
                 // signal thread to do the work...
-                waitprocessing_.reset();
+#if GARDNER_SCHEME
+                inter_sync.reset();
+#endif
                 waitnewdata_.signal();
             }
         }
@@ -1327,6 +1396,73 @@ InNode::~InNode()
     delete[] a_im_;
 #else
     delete[] a_c_;
+#endif
+}
+
+/////////////////////////////////
+// OutNode
+
+OutNode::OutNode(int out, int partitionsize, int numpartitions)
+{
+    numpartitions_ = numpartitions;
+
+    out_ = out;
+    outbuf_.setSize(1, partitionsize);
+    outbuf_.clear();
+
+    // allocate complex output for each partition stage
+#if SPLIT_COMPLEX
+    c_re_ = new float* [numpartitions_];
+    c_im_ = new float* [numpartitions_];
+#else
+    c_c_ = new fftwf_complex* [numpartitions_];
+#endif
+
+    for (int i=0; i<numpartitions_; i++)
+    {
+        // allocate memory in constructor
+#if SPLIT_COMPLEX
+        // vdsp framework needs N split complex samples
+        c_re_[i] = reinterpret_cast<float*>( aligned_malloc( (partitionsize+1)*sizeof(float), 16 ) );
+        c_im_[i] = reinterpret_cast<float*>( aligned_malloc( (partitionsize+1)*sizeof(float), 16 ) );
+
+
+        FloatVectorOperations::clear(c_re_[i], partitionsize+1);
+        FloatVectorOperations::clear(c_im_[i], partitionsize+1);
+
+#else
+        // fftw needs N+1 complex samples
+        c_c_[i] = reinterpret_cast<fftwf_complex*>( aligned_malloc( (partitionsize+1)*sizeof(fftwf_complex), 16 ) );
+
+        FloatVectorOperations::clear((float*)c_c_[i], 2*(partitionsize+1));
+#endif
+    }
+
+}
+
+OutNode::~OutNode()
+{
+    filternodes_.clear();
+
+    // free memory in destructor
+    for (int i=0; i<numpartitions_; i++)
+    {
+#if SPLIT_COMPLEX
+        if (c_re_[i])
+            aligned_free(c_re_[i]);
+        if (c_im_[i])
+            aligned_free(c_im_[i]);
+#else
+        if (c_c_[i])
+            aligned_free(c_c_[i]);
+#endif
+    }
+
+#if SPLIT_COMPLEX
+    delete[] c_re_;
+    delete[] c_im_;
+#else
+    delete[] c_c_;
 #endif
 }
 
