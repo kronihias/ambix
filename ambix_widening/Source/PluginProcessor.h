@@ -21,6 +21,7 @@
 #define PLUGINPROCESSOR_H_INCLUDED
 
 #include "JuceHeader.h"
+#include "ambix_buses.h"
 
 // approximation order
 #define BESSEL_APPR 8
@@ -46,6 +47,10 @@ public:
     void releaseResources() override;
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+
+   #ifdef UNIVERSAL_AMBISONIC
+    AMBIX_APPLY_BUS_LAYOUTS_OVERRIDE
+   #endif
     void numChannelsChanged() override;
 
     void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;

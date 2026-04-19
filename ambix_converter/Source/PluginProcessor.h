@@ -21,6 +21,7 @@
 #define __PLUGINPROCESSOR_H_9173E00A__
 
 #include "JuceHeader.h"
+#include "ambix_buses.h"
 
 #include "AmbisonicConfig.h"
 
@@ -40,6 +41,10 @@ public:
     void releaseResources() override;
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+
+   #ifdef UNIVERSAL_AMBISONIC
+    AMBIX_APPLY_BUS_LAYOUTS_OVERRIDE
+   #endif
     void numChannelsChanged() override;
 
     void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;

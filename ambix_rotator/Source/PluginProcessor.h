@@ -24,6 +24,7 @@
 #include <cmath>
 
 #include "JuceHeader.h"
+#include "ambix_buses.h"
 #include "SphericalHarmonic/SphericalHarmonic.h"
 #include <Eigen/Eigen>
 
@@ -49,6 +50,10 @@ public:
     void releaseResources() override;
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
+
+   #ifdef UNIVERSAL_AMBISONIC
+    AMBIX_APPLY_BUS_LAYOUTS_OVERRIDE
+   #endif
     void numChannelsChanged() override;
 
     void processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages) override;
