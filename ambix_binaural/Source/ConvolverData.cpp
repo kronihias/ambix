@@ -103,7 +103,7 @@ void ConvolverData::addIR(int in_ch, int out_ch, int offset, int delay, int leng
         resamplingSource.getNextAudioBlock (info);
 
         // scale to maintain filter gain
-        resampledBuffer.applyGain(src_samplerate / SampleRate);
+        resampledBuffer.applyGain(static_cast<float>(src_samplerate / SampleRate));
 
         (*IRBuf) = resampledBuffer;
 #if 0
