@@ -26,6 +26,12 @@
 
 #include "MyMeterDsp/MyMeterDsp.h"
 
+#if WITH_OSC
+ #include "NetworkAdvertiser.h"
+#endif
+
+#include "ReaperVST3Integration.h"
+
 #define _2PI 6.2831853071795
 
 //==============================================================================
@@ -35,6 +41,7 @@ class Ambix_encoderAudioProcessor  : public AudioProcessor,
 #if WITH_OSC
                                     public Timer,
                                     private OSCReceiver::ListenerWithOSCAddress<OSCReceiver::RealtimeCallback>,
+                                    private juce::ChangeListener,
 #endif
                                     public ChangeBroadcaster
 {
@@ -84,6 +91,13 @@ public:
 
     String getTrackName() const;  // thread-safe accessor used by sendOSC()
 
+    // Expose the VST3 extensions object so the JUCE VST3 wrapper can pass
+    // host-side interfaces (e.g. REAPER's IReaperHostApplication) to it.
+    juce::VST3ClientExtensions* getVST3ClientExtensions() override
+    {
+        return &reaperIntegration;
+    }
+
 #if WITH_ADVANCED_CONTROL
     void calcNewParameters(double SampleRate, int BufferLength);
 #endif
@@ -129,8 +143,16 @@ public:
 
     void sendOSC(); // send osc data
 
-    void oscOut(bool arg); // activate osc out
-    void oscIn(bool arg); // activate osc in
+    // UI toggles. Semantics (decoupled now):
+    //   osc_out       — enable sending to the manual ip:port list.
+    //   osc_in        — honour /ambi_enc_set for remote parameter control.
+    //   discoverable  — advertise on the LAN + accept /ambi_enc_subscribe and
+    //                   stream /ambi_enc to every subscriber, regardless of
+    //                   osc_out. Subscriber traffic is independent of the
+    //                   manual send/receive toggles.
+    void oscOut(bool arg);
+    void oscIn (bool arg);
+    void setDiscoverable (bool arg);
 
     void changeTimer(int time);
 
@@ -141,13 +163,60 @@ public:
 
 	String osc_in_port, osc_out_ip, osc_out_port;
 
+    // zeroconf discovery
+    bool discoverable;
+    std::unique_ptr<NetworkAdvertiser> networkAdvertiser;
+    void refreshAdvertiser();
+    void rebuildOscSenders(); // combines manual + subscribers
+
+    // Decides whether the UDP receive socket should be bound, and whether the
+    // send timer should be running, based on the current flags + subscriber
+    // count. Called from every setter that affects those conditions.
+    void refreshOscReceiverBinding();
+    void refreshOscOutput();
+
+    void dispatchSubscribe   (const juce::OSCMessage& m);
+    void dispatchUnsubscribe (const juce::OSCMessage& m);
+
+    // Rebuilds sender list when NSD expires subscribers.
+    void changeListenerCallback (juce::ChangeBroadcaster* source) override;
+
 #endif
 
-    ApplicationProperties myProperties;
+    // Fully constructed by the member-initializer list so the VST3 wrapper
+    // can call setIHostApplication on it even before our ctor body runs.
+    ReaperVST3Integration reaperIntegration;
+
+    // Stable per-plugin-load identifier broadcast in the NSD description as
+    // `euid=...`. The visualizer keys its subscription list on this — it is
+    // invariant across Advertiser rebuilds, unlike juce's `Service::instanceID`
+    // which mints a fresh random value every time the Advertiser is recreated
+    // (e.g. when the description changes after a project-name poll).
+    const juce::String instanceUuid { juce::Uuid().toDashedString() };
 
 private:
+    // Lightweight timer that polls REAPER's project name for this plugin
+    // instance. Runs regardless of whether the OSC-send timer is active —
+    // without it, the project name would only resolve AFTER the first
+    // subscriber arrived, which triggered a description change and (before we
+    // added the stable `euid`) would have invalidated that very subscription.
+    // Decoupling project-poll from OSC-send keeps the first-ever broadcast
+    // carrying the right `proj=` value.
+    struct ReaperPollTimer : public juce::Timer
+    {
+        explicit ReaperPollTimer (Ambix_encoderAudioProcessor& p) : owner (p) {}
+        void timerCallback() override { owner.pollReaperProject(); }
+        Ambix_encoderAudioProcessor& owner;
+    };
+    ReaperPollTimer reaperPollTimer { *this };
+    void pollReaperProject();
+
     CriticalSection track_name_lock;
     String          track_name;   // updated by the host via updateTrackProperties()
+
+    // Cached "last seen" REAPER project name; compared each poll tick so we
+    // only rebuild the NSD advertiser when the project is saved/renamed/changed.
+    String          currentReaperProject;
 
     OwnedArray<AmbixEncoder> AmbiEnc;
 
@@ -181,7 +250,13 @@ private:
 
 #if WITH_OSC
     OSCReceiver oscReceiver;
+    bool receiverBound { false }; // tracks whether oscReceiver is connected so
+                                  // refreshOscReceiverBinding() can idempotently
+                                  // bind/unbind.
 
+    CriticalSection oscSenders_lock; // protects oscSenders against concurrent
+                                     // access from Timer thread (sendOSC) and
+                                     // OSC receiver / NSD threads.
     OwnedArray<OSCSender> oscSenders;
 
 #endif

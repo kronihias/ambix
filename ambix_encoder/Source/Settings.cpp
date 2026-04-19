@@ -97,7 +97,26 @@ Settings::Settings (Ambix_encoderAudioProcessor& Processor)
     slider.setSkewFactor (0.6);
     slider.setDoubleClickReturnValue(true, 50.f);
 
-    setSize (203, 290);
+    // --- Discovery section ----------------------------------------------------
+    addAndMakeVisible (tgl_discoverable);
+    tgl_discoverable.setButtonText (TRANS ("enabled"));
+    tgl_discoverable.setTooltip (TRANS ("announce this plugin on the local network "
+                                        "so visualizers can find and subscribe to it."));
+    tgl_discoverable.addListener (this);
+    tgl_discoverable.setToggleState (_processor.discoverable, dontSendNotification);
+    tgl_discoverable.setColour (ToggleButton::textColourId, Colours::black);
+
+    addAndMakeVisible (lbl_subscribers);
+    lbl_subscribers.setFont (Font (FontOptions { 11.0f, Font::plain }));
+    lbl_subscribers.setJustificationType (Justification::topLeft);
+    lbl_subscribers.setColour (Label::textColourId, Colours::black);
+    lbl_subscribers.setMinimumHorizontalScale (0.7f);
+    refreshSubscribersLabel();
+
+    if (_processor.networkAdvertiser != nullptr)
+        _processor.networkAdvertiser->addChangeListener (this);
+
+    setSize (240, 400);
 
     updateSettings();
 
@@ -108,8 +127,41 @@ Settings::Settings (Ambix_encoderAudioProcessor& Processor)
 
 Settings::~Settings()
 {
-    _processor.myProperties.saveIfNeeded();
+    if (_processor.networkAdvertiser != nullptr)
+        _processor.networkAdvertiser->removeChangeListener (this);
+    // Nothing to persist here — all encoder settings live in the plugin's
+    // state (getStateInformation) now, and the host saves that with the
+    // project.
+}
 
+void Settings::changeListenerCallback (ChangeBroadcaster*)
+{
+    refreshSubscribersLabel();
+}
+
+void Settings::refreshSubscribersLabel()
+{
+    String text;
+    if (_processor.networkAdvertiser != nullptr)
+    {
+        const auto subs = _processor.networkAdvertiser->getSubscribers();
+        if (subs.empty())
+        {
+            text = "(no subscribers)";
+        }
+        else
+        {
+            for (const auto& s : subs)
+            {
+                if (text.isNotEmpty()) text << "\n";
+                const juce::String ipText = s.ip.isEmpty() ? juce::String ("pending") : s.ip;
+                text << (s.friendlyName.isEmpty() ? ipText : s.friendlyName)
+                     << "  " << ipText << ":" << s.port
+                     << (s.stillAdvertising ? "" : "  (stale)");
+            }
+        }
+    }
+    lbl_subscribers.setText (text, dontSendNotification);
 }
 
 //==============================================================================
@@ -118,31 +170,42 @@ void Settings::paint (Graphics& g)
     //[UserPrePaint] Add your own custom painting code here..
     //[/UserPrePaint]
 
-    g.fillAll (Colours::white);
+    // Background fills the entire component — host windows can be a few pixels
+    // larger than our preferred size, so never leave gaps. Gradient + border
+    // follow the actual size rather than the original hardcoded 220x400.
+    const int W = getWidth();
+    const int H = getHeight();
+
+    g.fillAll (Colours::black);
 
     g.setGradientFill (ColourGradient (Colour (0xff4e4e4e),
                                        static_cast<float> (proportionOfWidth (0.6314f)), static_cast<float> (proportionOfHeight (0.5842f)),
                                        Colours::black,
                                        static_cast<float> (proportionOfWidth (0.1143f)), static_cast<float> (proportionOfHeight (0.0800f)),
                                        true));
-    g.fillRect (0, 0, 220, 360);
+    g.fillRect (0, 0, W, H);
 
     g.setColour (Colours::black);
-    g.drawRect (0, 0, 220, 360, 1);
+    g.drawRect (0, 0, W, H, 1);
+
+    // Geometry for the four rounded group boxes — shared constants so the
+    // backgrounds line up with the widgets placed in resized().
+    constexpr float kBoxX = 19.0f;
+    const     float kBoxW = static_cast<float> (W) - 2.0f * kBoxX;
 
     g.setColour (Colour (0xff8ea4aa));
-    g.fillRoundedRectangle (19.0f, 45.0f, 163.0f, 90.0f, 4.000f);
+    g.fillRoundedRectangle (kBoxX, 45.0f, kBoxW, 90.0f, 4.000f);
 
     g.setColour (Colours::black);
     g.setFont (Font (FontOptions {14.20f, Font::bold}));
     g.drawText (TRANS("OSC send"),
-                101, 46, 80, 26,
+                static_cast<int> (kBoxX + kBoxW - 88), 46, 80, 26,
                 Justification::centredLeft, true);
 
     g.setColour (Colours::white);
     g.setFont (Font (FontOptions {17.20f, Font::bold}));
     g.drawText (TRANS("ambix_encoder settings"),
-                -2, 2, 208, 30,
+                0, 2, W, 30,
                 Justification::centred, true);
 
     g.setColour (Colours::black);
@@ -158,12 +221,12 @@ void Settings::paint (Graphics& g)
                 Justification::centredRight, true);
 
     g.setColour (Colour (0xff8ea4aa));
-    g.fillRoundedRectangle (19.0f, 149.0f, 163.0f, 58.0f, 4.000f);
+    g.fillRoundedRectangle (kBoxX, 149.0f, kBoxW, 58.0f, 4.000f);
 
     g.setColour (Colours::black);
     g.setFont (Font (FontOptions {14.20f, Font::bold}));
     g.drawText (TRANS("OSC rcv"),
-                101, 150, 80, 26,
+                static_cast<int> (kBoxX + kBoxW - 88), 150, 80, 26,
                 Justification::centredLeft, true);
 
     g.setColour (Colours::black);
@@ -173,13 +236,23 @@ void Settings::paint (Graphics& g)
                 Justification::centredRight, true);
 
     g.setColour (Colour (0xff8ea4aa));
-    g.fillRoundedRectangle (19.0f, 220.0f, 163.0f, 52.0f, 4.000f);
+    g.fillRoundedRectangle (kBoxX, 220.0f, kBoxW, 52.0f, 4.000f);
 
     g.setColour (Colours::black);
     g.setFont (Font (FontOptions {14.20f, Font::bold}));
     g.drawText (TRANS("OSC send interval"),
-                43, 220, 133, 26,
-                Justification::centredLeft, true);
+                static_cast<int> (kBoxX), 220, static_cast<int> (kBoxW), 26,
+                Justification::centred, true);
+
+    // Discovery section
+    g.setColour (Colour (0xff8ea4aa));
+    g.fillRoundedRectangle (kBoxX, 284.0f, kBoxW, 108.0f, 4.000f);
+
+    g.setColour (Colours::black);
+    g.setFont (Font (FontOptions {14.20f, Font::bold}));
+    g.drawText (TRANS("Discovery"),
+                static_cast<int> (kBoxX), 285, static_cast<int> (kBoxW), 22,
+                Justification::centred, true);
 
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
@@ -187,13 +260,24 @@ void Settings::paint (Graphics& g)
 
 void Settings::resized()
 {
-    txt_snd_ip.setBounds (56, 80, 120, 20);
-    txt_snd_port.setBounds (56, 106, 120, 20);
+    // Inputs fill the width of each rounded group box (x=19, w=W-38).
+    const int W          = getWidth();
+    const int kEditorX   = 56;
+    const int kEditorW   = W - kEditorX - 24; // same right margin as the group box
+
+    txt_snd_ip.setBounds   (kEditorX, 80,  kEditorW, 20);
+    txt_snd_port.setBounds (kEditorX, 106, kEditorW, 20);
     tgl_snd_active.setBounds (24, 48, 80, 24);
-    txt_rcv_port.setBounds (56, 178, 120, 20);
+    txt_rcv_port.setBounds   (kEditorX, 178, kEditorW, 20);
     tgl_rcv_active.setBounds (24, 152, 80, 24);
-    lbl_id.setBounds (144, 24, 57, 24);
-    slider.setBounds (57, 244, 96, 24);
+    lbl_id.setBounds         (W - 59, 24, 57, 24);
+
+    // OSC send interval slider — centred inside its group box.
+    constexpr int kSliderW = 96;
+    slider.setBounds ((W - kSliderW) / 2, 244, kSliderW, 24);
+
+    tgl_discoverable.setBounds (24, 310, 140, 22);
+    lbl_subscribers.setBounds  (24, 336, W - 48, 54);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -218,14 +302,15 @@ void Settings::buttonClicked (Button* buttonThatWasClicked)
     if (buttonThatWasClicked == &tgl_snd_active)
     {
         _processor.oscOut(tgl_snd_active.getToggleState());
-
-        _processor.myProperties.getUserSettings()->setValue("osc_out", tgl_snd_active.getToggleState());
-
     }
     else if (buttonThatWasClicked == &tgl_rcv_active)
     {
         _processor.oscIn(tgl_rcv_active.getToggleState());
-        _processor.myProperties.getUserSettings()->setValue("osc_in", tgl_rcv_active.getToggleState());
+    }
+    else if (buttonThatWasClicked == &tgl_discoverable)
+    {
+        _processor.setDiscoverable (tgl_discoverable.getToggleState());
+        refreshSubscribersLabel();
     }
 }
 
@@ -233,8 +318,8 @@ void Settings::sliderValueChanged (Slider* sliderThatWasMoved)
 {
     if (sliderThatWasMoved == &slider)
     {
-        _processor.myProperties.getUserSettings()->setValue("osc_out_interval", (int)slider.getValue());
-        _processor.changeTimer((int)slider.getValue());
+        _processor.osc_interval = (int) slider.getValue();
+        _processor.changeTimer ((int) slider.getValue());
     }
 
 }
@@ -251,20 +336,21 @@ void Settings::textEditorReturnKeyPressed (TextEditor& ed)
 
 void Settings::updateOscSend()
 {
-    _processor.myProperties.getUserSettings()->setValue("osc_out_ip", txt_snd_ip.getText());
-    _processor.myProperties.getUserSettings()->setValue("osc_out_port", txt_snd_port.getText());
+    // Always mirror the text boxes into the processor so plugin state captures
+    // edits even if osc_out is currently off. Only restart the senders when
+    // the destination actually changed AND we're currently sending.
+    const bool changed = ! _processor.osc_out_ip.equalsIgnoreCase (txt_snd_ip.getText())
+                      || ! _processor.osc_out_port.equalsIgnoreCase (txt_snd_port.getText());
 
+    _processor.osc_out_ip   = txt_snd_ip.getText();
+    _processor.osc_out_port = txt_snd_port.getText();
 
-    if (  _processor.osc_out && ( !_processor.osc_out_ip.equalsIgnoreCase(txt_snd_ip.getText()) || !_processor.osc_out_port.equalsIgnoreCase(txt_snd_port.getText()) )  ) {
-
-        _processor.osc_out_ip = txt_snd_ip.getText();
-        _processor.osc_out_port = txt_snd_port.getText();
-
-        _processor.oscOut(false);
-        _processor.oscOut(true);
+    if (changed && _processor.osc_out)
+    {
+        // osc_out is already true so oscOut(true) would be a no-op — just
+        // rebuild the sender list against the new ip/port.
+        _processor.refreshOscOutput();
     }
-
-
 }
 
 

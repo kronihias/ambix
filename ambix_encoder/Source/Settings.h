@@ -38,12 +38,15 @@
 class Settings  : public Component,
                   public Button::Listener,
                   public Slider::Listener,
-                  public TextEditor::Listener
+                  public TextEditor::Listener,
+                  public ChangeListener
 {
 public:
     //==============================================================================
     Settings (Ambix_encoderAudioProcessor& Processor);
     ~Settings();
+
+    void changeListenerCallback (ChangeBroadcaster*) override;
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
@@ -73,6 +76,11 @@ private:
     ToggleButton tgl_rcv_active;
     Label lbl_id;
     Slider slider;
+
+    // Zeroconf / Discovery section
+    ToggleButton tgl_discoverable;
+    Label        lbl_subscribers;
+    void refreshSubscribersLabel();
 
 
     //==============================================================================

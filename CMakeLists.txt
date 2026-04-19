@@ -24,6 +24,7 @@ SET(BUILD_VST3 TRUE CACHE BOOL "build VST3 plugins (universal order, no _oX suff
 SET(BUILD_AU FALSE CACHE BOOL "build AudioUnit plugins (macOS only, universal order)")
 SET(BUILD_STANDALONE FALSE CACHE BOOL "build standalone application (for those with editor)")
 SET(BUILD_LV2 FALSE CACHE BOOL "build LV2 plugins")
+SET(BUILD_VISUALIZER TRUE CACHE BOOL "build the cross-platform ambix_visualizer GUI app (companion to ambix_encoder)")
 SET(MAX_AMBI_ORDER 7 CACHE STRING "Maximum ambisonic order for universal (VST3/AU) builds")
 
 
@@ -184,4 +185,9 @@ ADD_SUBDIRECTORY ( ambix_rotator_z )
 ADD_SUBDIRECTORY ( ambix_vmic )
 ADD_SUBDIRECTORY ( ambix_warp )
 ADD_SUBDIRECTORY ( ambix_widening )
+
+IF (BUILD_VISUALIZER)
+	message ("-- Building ambix_visualizer (standalone GUI app)")
+	ADD_SUBDIRECTORY ( ambix_visualizer )
+ENDIF()
 
