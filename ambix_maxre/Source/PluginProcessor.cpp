@@ -238,7 +238,7 @@ void Ambix_maxreAudioProcessor::CalcParams()
         if (apply_param < 0.33f) // apply reciprokal
         {
             for (int i=0; i < Pn.size(); i++) {
-                weights.set(i, (float)1./Pn(i));
+                weights.set(i, (float)(1./Pn(i)));
             }
         } else {
             for (int i=0; i < Pn.size(); i++) {
@@ -246,7 +246,7 @@ void Ambix_maxreAudioProcessor::CalcParams()
             }
         }
 
-        for (int i=Pn.size(); i < weights.size(); i++)
+        for (int i=(int)Pn.size(); i < weights.size(); i++)
         {
             weights.set(i, 0.f);
         }

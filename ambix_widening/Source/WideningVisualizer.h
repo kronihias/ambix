@@ -1,6 +1,9 @@
 #pragma once
 #include "JuceHeader.h"
 #include <cmath>
+#ifdef _MSC_VER
+#define jn _jn
+#endif
 #include <vector>
 
 #ifndef BESSEL_APPR

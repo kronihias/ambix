@@ -22,6 +22,9 @@
 #include "tools.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
+#ifdef _MSC_VER
+#define jn _jn
+#endif
 
 
 
@@ -715,7 +718,7 @@ void Ambix_wideningAudioProcessor::setStateInformation (const void* data, int si
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
             for (int i=0; i < getNumParameters(); i++) {
-                setParameter(i, xmlState->getDoubleAttribute(String(i)));
+                setParameter(i, (float)xmlState->getDoubleAttribute(String(i)));
             }
         }
 

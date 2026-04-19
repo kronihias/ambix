@@ -622,7 +622,7 @@ void Ambix_mirrorAudioProcessor::setStateInformation (const void* data, int size
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
             for (int i=0; i < getNumParameters(); i++) {
-                setParameter(i, xmlState->getDoubleAttribute(String(i)));
+                setParameter(i, (float)xmlState->getDoubleAttribute(String(i)));
             }
         }
 
