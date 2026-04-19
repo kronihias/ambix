@@ -1,214 +1,364 @@
-ambiX Ambisonic plug-in suite
-==========
+# ambiX — Ambisonic Plug-in Suite
 
-> cross-platform Ambisonic VST, LV2 plug-ins with variable order for use in Digital Audio Workstations like Reaper or Ardour or as Jack standalone applications.
-> The plug-in suite use the ambiX *(1)* convention (ACN channel order, SN3D normalization, full periphony (3D)) except the sqrt(1/4pi) factor in equation 3.
-> these plug-ins use a recursive implementation of the spherical harmonics, therefore the maximum Ambisonic order is defined at compile time. the practical maximum order is rather defined by the hosts maximum channel count (N+1)^2 or your CPU power
+Cross-platform Ambisonic VST/VST3/LV2 plug-ins and standalone applications for macOS, Windows, and Linux.
 
-*(1) http://iem.kug.ac.at/fileadmin/media/iem/projects/2011/ambisonics11_nachbar_zotter_sontacchi_deleflie.pdf*
+- VST3 plug-ins automatically adjust to the track channel count and switch Ambisonic order (VST2 are pre-built for a fixed order/channel count).
+- Uses the **ambiX convention**: ACN channel order, SN3D normalization, full periphony (3D), excluding the √(1/4π) factor
+- Spherical harmonics are computed recursively; the maximum order is defined at compile time — in practice limited by the host's channel count (N+1)² or CPU
+- Built on the [JUCE](https://www.juce.com) framework (GPLv3)
+- Designed to complement the [mcfx multichannel plug-in suite](http://www.matthiaskronlachner.com/?p=1910)
 
+**Convention reference:** [Nachbar et al., Ambisonics Symposium 2011](http://iem.kug.ac.at/fileadmin/media/iem/projects/2011/ambisonics11_nachbar_zotter_sontacchi_deleflie.pdf)
 
-> This software uses the JUCE C++ framework, which is under GPL license.
-More information: http://www.juce.com
+---
 
-> other libraries being used:
-> Eigen (MPL2, http://eigen.tuxfamily.org),
-> fftw under Linux and Windows (GPL, http://www.fftw.org)
-> libzita-convolver3 optional for Linux (GPL v3)
+## Table of Contents
 
-this software package goes well together with the mcfx - multichannel cross plattform audio plug-in suite: http://www.matthiaskronlachner.com/?p=1910
+- [ambiX — Ambisonic Plug-in Suite](#ambix--ambisonic-plug-in-suite)
+	- [Table of Contents](#table-of-contents)
+	- [Plug-ins](#plug-ins)
+		- [ambix\_binaural](#ambix_binaural)
+		- [ambix\_decoder](#ambix_decoder)
+		- [ambix\_converter](#ambix_converter)
+		- [ambix\_directional\_loudness](#ambix_directional_loudness)
+		- [ambix\_encoder](#ambix_encoder)
+		- [ambix\_move](#ambix_move)
+		- [ambix\_maxre](#ambix_maxre)
+		- [ambix\_mirror](#ambix_mirror)
+		- [ambix\_rotator](#ambix_rotator)
+		- [ambix\_rotator\_z](#ambix_rotator_z)
+		- [ambix\_vmic](#ambix_vmic)
+		- [ambix\_warp](#ambix_warp)
+		- [ambix\_widening](#ambix_widening)
+	- [Standalone Applications](#standalone-applications)
+		- [ambix\_visualizer](#ambix_visualizer)
+	- [Prerequisites for Building](#prerequisites-for-building)
+	- [How to Build](#how-to-build)
+	- [LV2 Plug-ins](#lv2-plug-ins)
+	- [Known Problems](#known-problems)
+	- [Changelog](#changelog)
 
+---
 
-plug-in reference:
-----------
-> some information about the software can be found here: http://lac.linuxaudio.org/2013/papers/51.pdf, http://iaem.at/Members/zotter/publications/2014_KronlachnerZotter_AmbiTransformationEnhancement_ICSA.pdf
+## Plug-ins
 
+Further reading: [LAC 2013 paper](http://lac.linuxaudio.org/2013/papers/51.pdf), [ICSA 2014 paper](http://iaem.at/Members/zotter/publications/2014_KronlachnerZotter_AmbiTransformationEnhancement_ICSA.pdf)
 
-* ambix_binaural - binaural decoder with various loudspeaker setups in real world studios/venues
+### ambix_binaural
 
-* ambix_decoder - same as binaural decoder but without the convolution, the loudspeaker signals are sent directly to the outputs (single band decoding)
-	* presets for ambix_binaural (including impulse responses) and ambix_decoder are located in the folder ambix_binaural/Presets (or available as separate download) and should be copied in following folders
-		* Windows 7,8: C:\Users\username\AppData\Roaming\ambix\binaural_presets\
-		* MacOS: ~/Library/ambix/binaural_presets/
-		* Linux: ~/ambix/binaural_presets/
+Binaural decoder with impulse responses for various real-world loudspeaker setups and venues.
 
-* ambix_converter - convert between different ambisonic standards on the fly (include different standards in one project), also between 2D/3D
+**Preset search paths:**
 
-* ambix_directional_loudness - amplify, attenuate or filter out certain parts of the spherical soundfielddf
+| Platform | Path |
+|----------|------|
+| Windows | `C:\Users\<username>\AppData\Roaming\ambix\binaural_presets\` |
+| macOS | `~/Library/ambix/binaural_presets/` |
+| Linux | `~/ambix/binaural_presets/` |
 
-* ambix_encoder - panning plug-in with different numbers of input channels - a width parameter spreads those channels equally along the azimuth
+---
 
-* ambix_maxre - apply or reciprocal apply spherical max_re weighting to suppress sidelobes according to Zotter, Frank - "All-Round Ambisonic Panning and Decoding"
+### ambix_decoder
 
-* ambix_mirror - invert or mirror soundfield about x/y/z axis
+Same as `ambix_binaural` but without convolution — loudspeaker signals are sent directly to the outputs (single-band decoding).
 
-* ambix_rotator_z - rotation around z axis
+Uses the same preset format and search paths as `ambix_binaural`.
 
-* ambix_rotator - rotation around xyz axis
+The IEM AllRADecoder is easier [https://plugins.iem.at/docs/allradecoder/](https://plugins.iem.at/docs/allradecoder/) to work with nowadays.
 
-* ambix_vmic - same principle as directional loudness but will not output ambisonics signal but the selected part of the soundfield - similar to the virtual microphone approach
+---
 
-* ambix_warp - warp soundfield towards equator, poles, front or back...* 
+### ambix_converter
 
-* ambix_widening - frequency dependant rotation around the z-axis, use this for source widening or creating diffuse early reflections, article: http://dx.doi.org/10.14279/depositonce-12, Created with help of Franz Zotter and Matthias Frank
+Converts between different Ambisonic standards on the fly (including FuMa ↔ ambiX and 2D ↔ 3D), allowing multiple standards within one project.
 
+---
 
+### ambix_directional_loudness
 
-prerequisites for building
---------------
+Amplifies, attenuates, or filters specific regions of the spherical sound field. Press `S` to toggle solo on the last selected filter.
 
-- cmake, working build environment
-- fftw3, Eigen 3
-- Standalone applications: ASIO SDK if you want ASIO under Windows
+---
 
-Install LINUX dependencies (Debian, Ubuntu):
---------------
-```
+### ambix_encoder
+
+Panning plug-in with a configurable number of input channels. A width parameter spreads channels equally along the azimuth.
+
+- OSC remote control with configurable custom ID; the track name is included in outgoing OSC messages for easier identification
+- Opt+drag to adjust the width of multiple sources simultaneously
+- Automatically advertises itself on the local network (Zeroconf) so the **ambix_visualizer** can discover it without manual IP/port configuration
+
+**Outgoing (sent to configured target):**
+
+| Message | Arguments |
+|---------|-----------|
+| `/ambi_enc` | `id(int) track_name(str) distance(float) azimuth(float) elevation(float) size(float) peak(float) rms(float) [reply_port(int)]` |
+
+Azimuth and elevation in degrees (−180…+180); distance is currently unused (always 2.0); size 0…1; peak and rms linear 0…1 (0 dBFS = 1.0); `reply_port` is appended only when the receiver is bound.
+
+**Incoming (received on configured port):**
+
+| Message | Arguments | Range |
+|---------|-----------|-------|
+| `/ambi_enc_set` | `id(int) distance(float) azimuth(float) elevation(float) size(float)` | az/el deg −180…+180, size 0…1 |
+| `/ambi_enc_subscribe` | `uuid(str) reply_port(int) [name(str)] [visualizer_ip(str)]` | Zeroconf subscription from visualizer |
+| `/ambi_enc_unsubscribe` | `uuid(str)` | Remove a Zeroconf subscription |
+
+---
+
+### ambix_move
+
+6DoF-like soundfield translation and rotation.
+
+- Translates the listener viewpoint by ±5 m in x, y, z on a virtual sampling sphere (configurable reference radius 1–5 m)
+- Rotation follows the same Yaw / Pitch / Roll + quaternion convention as `ambix_rotator`
+- The full 6DoF transformation is computed as a single matrix multiply at runtime (decode → remap directions + apply 1/r gain → re-encode)
+- Independent enable toggles for translation and rotation
+- OSC control on a configurable UDP port (default 7130), useful for binaural playback with 6DoF head-tracking:
+
+| Message | Arguments | Range |
+|---------|-----------|-------|
+| `/rotation` | `pitch yaw roll` | deg, −180…+180 each |
+| `/quaternion` | `qw qx qy qz` | −1…+1 each |
+| `/xyz` | `x y z` | metres, −5…+5 each |
+| `/translation` | `x y z` | alias of `/xyz` |
+| `/6dof` | `x y z qw qx qy qz` | metres + quaternion |
+
+---
+
+### ambix_maxre
+
+Applies (or reciprocally applies) spherical max-rE weighting to suppress sidelobes, as described in Zotter & Frank — *"All-Round Ambisonic Panning and Decoding"*.
+
+---
+
+### ambix_mirror
+
+Inverts or mirrors the sound field about the x, y, or z axis.
+
+---
+
+### ambix_rotator
+
+Rotation around the x, y, and z axes (including quaternion input). OSC control on a configurable UDP port:
+
+| Message | Arguments | Range |
+|---------|-----------|-------|
+| `/rotation` | `pitch yaw roll` | deg, −180…+180 each |
+| `/quaternion` | `qw qx qy qz` | −1…+1 each |
+| `/head_pose` | `user_id x y z pitch yaw roll` | id (int), position (ignored), deg |
+
+---
+
+### ambix_rotator_z
+
+Rotation around the z axis only.
+
+---
+
+### ambix_vmic
+
+Virtual microphone: outputs the selected region of the sound field as an audio signal rather than an Ambisonic stream.
+
+---
+
+### ambix_warp
+
+Warps the sound field towards the equator, poles, front, or back. The GUI supports mouse dragging and undo/redo.
+
+---
+
+### ambix_widening
+
+Frequency-dependent rotation around the z axis for source widening or diffuse early reflections. The GUI supports mouse dragging gestures.
+
+Article: [http://dx.doi.org/10.14279/depositonce-12](http://dx.doi.org/10.14279/depositonce-12) — created with Franz Zotter and Matthias Frank.
+
+---
+
+## Standalone Applications
+
+### ambix_visualizer
+
+Real-time 3D source position visualizer — runs as a macOS desktop app or an **iOS/iPadOS** app (iPad recommended).
+
+- Displays source positions from one or more `ambix_encoder` instances on a 2D Hammer-Aitoff or interactive 3D sphere projection
+- Automatically discovers `ambix_encoder` instances on the local network via Zeroconf (no manual IP/port setup needed); also accepts manual OSC subscriptions for use with other encoders (e.g. IEM MultiEncoder)
+- Listens on a configurable UDP port (default 9000)
+
+See [`ambix_visualizer/README.md`](ambix_visualizer/README.md) for build instructions, iOS deployment, and network setup details.
+
+---
+
+## Prerequisites for Building
+
+CMake, a working build environment, FFTW3, and Eigen 3 are required. Standalone applications additionally require the ASIO SDK for Windows ASIO support.
+
+**Linux** — install dependencies (Debian/Ubuntu):
+
+```bash
 sudo apt install libasound2-dev libjack-jackd2-dev \
     ladspa-sdk \
-    libcurl4-openssl-dev  \
+    libcurl4-openssl-dev \
     libfreetype6-dev \
-    libx11-dev libxcomposite-dev libxcursor-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev \
+    libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev \
     libwebkit2gtk-4.0-dev \
     libglu1-mesa-dev mesa-common-dev \
-	libfftw3-dev \
-	libzita-convolver3 \
-	libzita-convolver-dev \
-	libeigen3-dev
+    libfftw3-dev \
+    libzita-convolver3 \
+    libzita-convolver-dev \
+    libeigen3-dev
 ```
 
-Install MacOSX dependencies (through MacPorts):
---------------
+**macOS** — install dependencies via MacPorts:
 
-```sudo port install eigen3-devel```
-
-
-Install Windows dependencies
---------------
-*getting the dependencies for Windows is a little bit more tricky. you have to get fftw3 and Eigen.*
-
-
-howto build ambix yourself:
---------------
-
-- use cmake gui or cmake/ccmake from terminal:
-
-- adjusts the various parameters to your needs, make sure the libraries are found
-
-**TERMINAL:**
-
-```
-git submodule init
-git submodule update
-mkdir build
-cd build
-ccmake ..
+```bash
+sudo port install eigen3-devel
 ```
 
-- adjust parameters
+**Windows** — download FFTW3 and Eigen manually (see their respective project pages).
 
-then
+Clone the repository including submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/kronihias/ambix/
 ```
-make
-```
 
-*(if you have a multicore processor you can speed up the make process by using `make -j #CPUCORESx1.5`)*
+---
 
-- find the binaries in the *ambix/BUILD/_bin* folder and copy to system VST folder
+## How to Build
 
-**VST installation folders:**
+Use **cmake-gui** or **cmake/ccmake** from the terminal.
 
+1. Initialise submodules (if not cloned with `--recurse-submodules`):
+    ```bash
+    git submodule init
+    git submodule update
+    ```
 
-- MacOSX: `/Library/Audio/Plug-Ins/VST or ~/Library/Audio/Plug-Ins/VST`
-- Windows: eg. `C:\Programm Files\Steinberg\VstPlugins`
-- Linux: `/usr/lib/lxvst` or `/usr/local/lib/lxvst`
+2. Create a build folder and configure:
+    ```bash
+    mkdir build
+    cd build
+    ccmake ..
+    ```
 
-LV2 plug-in
------------
+3. Adjust parameters to your needs, then build:
+    ```bash
+    make -j$(nproc)
+    ```
 
-- compile the plug-ins with the flag BUILD_LV2 ON
+4. Find the binaries in `ambix/BUILD/_bin/` and copy them to your system plug-in folder:
 
-- go to the folder *lv2-ttl-generator* and **> make** for compiling the tool *lv2_ttl_generator*
+    | Format | macOS | Windows | Linux |
+    |--------|-------|---------|-------|
+    | VST2 | `/Library/Audio/Plug-Ins/VST` | `C:\Program Files\Steinberg\VstPlugins` | `/usr/lib/lxvst` or `/usr/local/lib/lxvst` |
 
-- go to the _bin folder (eg. *ambix/BUILD/_bin* ) and execute the script *> ./../../lv2-ttl-generator/generate-ttl.sh*
-this will generate all needed .tll files, afterwards you can copy all .lv2 folders from *ambix/BUILD/_bin/lv2* to /usr/lib/lv2
+---
 
-known problems
------------
-* documentation missing - for now you can check this: 
-http://lac.linuxaudio.org/2013/papers/51.pdf
+## LV2 Plug-ins
 
-http://iaem.at/Members/zotter/publications/2014_KronlachnerZotter_AmbiTransformationEnhancement_ICSA.pdf
+1. Enable the `BUILD_LV2` CMake flag before building.
+2. In the `lv2-ttl-generator/` folder, run `make` to compile the `lv2_ttl_generator` tool.
+3. From the `_bin` folder (e.g. `ambix/BUILD/_bin`), run:
+    ```bash
+    ./../../lv2-ttl-generator/generate-ttl.sh
+    ```
+    This generates all required `.ttl` files. Copy the `.lv2` folders from `ambix/BUILD/_bin/lv2` to `/usr/lib/lv2`.
 
-http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/Kronlachner_Master_Spatial_Transformations_Mobile.pdf
+---
 
-http://www.matthiaskronlachner.com/wp-content/uploads/2013/01/kronlachner_aes_studentdesigncompetition_2014.pdf
+## Known Problems
 
+- Documentation is sparse — refer to the papers linked above for background.
+- GUI-less plug-ins cannot be used as standalones.
+- Linux: LV2 plug-ins don't show the GUI; VST plug-in GUIs may crash — use the host's built-in GUI or the standalone version via Jack.
 
-* GUI less plug-ins can not be used as standalone - therefore GUI for some more of the plug-ins would be nice...
+---
 
-* Linux: LV2 plug-ins don't show the GUI, VST plug-ins GUI might crash - better just stick to the hosts' GUI or help me fix that. you can use the standalone version in any case and connect via Jack
+## Changelog
 
-* different orders require different plug-in instances: maybe VST 3 can fix that with it's dynamic input/output ports. but we'll have to wait for it beeing implemented in appropriate hosts.
+### v0.4.0 (2026-04-19) <!-- omit in toc -->
 
+- VST3 support: all plug-ins now ship as VST3 with a single binary that automatically adjusts to the track's Ambisonic order — VST3 is recommended going forward, VST2 is considered legacy for backward compatibility
+- **New:** `ambix_move` — 6DoF-like soundfield transformation: translate the listener position (x/y/z) and rotate using the same Yaw/Pitch/Roll + quaternion convention as `ambix_rotator`; independent enable toggles for translation and rotation; OSC control on a configurable port, useful for binaural playback with 6DoF head-tracking (small head movements)
+- **New:** `ambix_visualizer` — standalone macOS/Win and iOS/iPadOS/Android app that displays source positions from `ambix_encoder` instances on a 2D or 3D sphere in real time, also compatible with IEM MultiEncoder
+- `ambix_warp`: new interactive GUI with mouse dragging and undo/redo
+- `ambix_widening`: new interactive GUI with mouse dragging gestures
+- `ambix_encoder`: Zeroconf network advertisement for automatic discovery by `ambix_visualizer`; track name included in OSC messages; opt+drag to adjust multiple source widths simultaneously
+- `ambix_binaural`: performance improvements from mcfx_convolver
+- `ambix_directional_loudness`: press `S` to toggle solo on the last selected filter
+- `ambix_rotator`: fix initialisation issue
+- Update to JUCE 8
 
+### v0.3.0 (2022-04-16) <!-- omit in toc -->
 
-changelog
------------
-* v0.3.0 (2022-04-16)
-new builds optimized for Apple Silicon and 64 bit Intel Mac; Win 64 bit; Update to JUCE 7, removed soxr dependency to simplify build
+New builds optimised for Apple Silicon and 64-bit Intel Mac; Windows 64-bit. Update to JUCE 7; removed soxr dependency.
 
-* v0.2.10 (2020-02-06)
-amibx_binaural: fix dropouts/artifacts for hosts that send incomplete block sizes (eg. Adobe, Steinberg); option to store preset within the project -> allows to exchange a DAW (eg. Reaper) project without need to provide the preset files extra, allow to export stored preset as .zip file for recovering it from the project
+### v0.2.10 (2020-02-06) <!-- omit in toc -->
 
-* v0.2.9 (2019-06-12)
-amibx_warp: fixed crash
+`ambix_binaural`: fix dropouts/artifacts for hosts sending incomplete block sizes (e.g. Adobe, Steinberg); option to store preset within the project (enables DAW project exchange without external files); allow exporting stored preset as a `.zip` file.
 
-* v0.2.8 (2017-05-20)
-ambix_binaural: fftw threadsafty improved: fix crash during startup if other plugin uses fftw
-ambix_rotator: add quaternion input
+### v0.2.9 (2019-06-12) <!-- omit in toc -->
 
-* v0.2.7 (2017-03-22)
-ambix_binaural: improved performance, various bugfixes
-ambix_rotator: improved performance
-ambix_encoder: adjustable custom id for remote control
+`ambix_warp`: fixed crash.
 
-* v0.2.6 (2016-04-08) converter: fixed scaling of "O" channel when converting from/to FuMa; binaural: convolution engine fix, preset dir save fix; vmic: gui fix
+### v0.2.8 (2017-05-20) <!-- omit in toc -->
 
-* v0.2.5 (2015-12-06) liblo dependencies removed
-encoder: improved gui performance
-decoder: fixed binaural swap l-r impulse responses bug, added volume control, indicate loaded preset in menu
-directional_loudness: gui and different solo/window behavior (multiple filters are now passed through if soloed), 8 filters by default
-rotator: gui, osc rewrite
-vmic: gui, 8 outputs by default
+`ambix_binaural`: improved FFTW thread-safety to fix startup crash when other plug-ins use FFTW. `ambix_rotator`: add quaternion input.
 
-* v0.2.4 (2015-07-19) improved efficiency for binaural decoder
+### v0.2.7 (2017-03-22) <!-- omit in toc -->
 
-* v0.2.3 (2014-12-27) multichannel encoder display actual source positions, compatibility with audiomulch for saving settings
+`ambix_binaural`: improved performance, various bugfixes. `ambix_rotator`: improved performance. `ambix_encoder`: adjustable custom ID for remote control.
 
-* v0.2.2 (2014-08-18) encoder flickering fix, added osc settings, new control modes for encoder display: right mouse click for relative source movement, press shift to freeze elevation while moving and ctrl to freeze azimuth
+### v0.2.6 (2016-04-08) <!-- omit in toc -->
 
-* v0.2.1 (2014-04-17) fixed vst identifier for Plogue Bidule compatibility
+`ambix_converter`: fixed scaling of the W channel when converting from/to FuMa. `ambix_binaural`: convolution engine fix, preset dir save fix. `ambix_vmic`: GUI fix.
 
-* v0.2.0 (2014-03-30) added ambix_widening, JUCE update, encoder GUI panning fix
+### v0.2.5 (2015-12-06) <!-- omit in toc -->
 
-* (2014-03-15) fixed binaural decoder crash during configuration unloading
+Removed liblo dependency. `ambix_encoder`: improved GUI performance. `ambix_decoder`: fixed binaural L/R impulse response swap, added volume control, indicate loaded preset in menu. `ambix_directional_loudness`: improved solo/window behaviour (multiple filters now pass through when soloed), 8 filters by default. `ambix_rotator`: GUI and OSC rewrite. `ambix_vmic`: GUI update, 8 outputs by default.
 
-* (2014-02-19) warping curve 2 changed slightly (icsa paper), warping pre-emphasis added, encoder abs(elevation) > 90° was wrong!
+### v0.2.4 (2015-07-19) <!-- omit in toc -->
 
-* (2014-02-13) ambix_maxre added
+Improved efficiency for `ambix_binaural`.
 
-* v0.1.0  (2014-01-24) - first release
+### v0.2.3 (2014-12-27) <!-- omit in toc -->
 
+Multichannel encoder displays actual source positions; AudioMulch compatibility for saving settings.
 
-thanks to
------------
-several people and institutions contributed to this software in one or another way, i would like to name them here without particular order: Institute of Electronic Music and Acoustics Graz, Franz Zotter, Winfried Ritsch, Martin Rumori, Florian Hollerweger, Peter Plessas, IOhannes Zmölnig, Thomas Musil, Gerriet K. Sharma, Matthias Frank, Fons Adriaensen, Jörn Nettingsmeier, Filipe Coelho (DISTRHO project), Music Innovation Studies Centre of the Lithuanian Academy of Music and Theatre, Ricardas Kabelis, Mantautas Krukauskas, Tadas Dailyda, Sebastian Grill, the surrsound and linux audio community - to be continued...
+### v0.2.2 (2014-08-18) <!-- omit in toc -->
 
+Encoder flickering fix; added OSC settings; new control modes: right-click for relative source movement, Shift to freeze elevation, Ctrl to freeze azimuth.
 
-author
------------
-2013-2024 Matthias Kronlachner
+### v0.2.1 (2014-04-17) <!-- omit in toc -->
 
-m.kronlachner@gmail.com
-www.matthiaskronlachner.com
+Fixed VST identifier for Plogue Bidule compatibility.
+
+### v0.2.0 (2014-03-30) <!-- omit in toc -->
+
+Added `ambix_widening`; JUCE update; encoder GUI panning fix.
+
+### (2014-03-15) <!-- omit in toc -->
+
+Fixed binaural decoder crash during configuration unloading.
+
+### (2014-02-19) <!-- omit in toc -->
+
+Warping curve 2 adjusted slightly (ICSA paper); warping pre-emphasis added; `ambix_encoder`: fixed abs(elevation) > 90°.
+
+### (2014-02-13) <!-- omit in toc -->
+
+Added `ambix_maxre`.
+
+### v0.1.0 (2014-01-24) <!-- omit in toc -->
+
+First release.
+
+---
+
+**Thanks to:** Institute of Electronic Music and Acoustics Graz, Franz Zotter, Winfried Ritsch, Martin Rumori, Florian Hollerweger, Peter Plessas, IOhannes Zmölnig, Thomas Musil, Gerriet K. Sharma, Matthias Frank, Fons Adriaensen, Jörn Nettingsmeier, Filipe Coelho (DISTRHO project), Daniel Rudrich (IEM Plug-ins), Music Innovation Studies Centre of the Lithuanian Academy of Music and Theatre, Ricardas Kabelis, Mantautas Krukauskas, Tadas Dailyda, Sebastian Grill, the surrsound and Linux audio communities.
+
+---
+
+&copy; 2013–2026 Matthias Kronlachner — m.kronlachner@gmail.com
