@@ -104,7 +104,7 @@ inline int isqrt(uint16_t x) {
     if (p[  2] <= x) p +=   2;
     if (p[  1] <= x) p +=   1;
 
-    return p - squares;
+    return (int)(p - squares);
 }
 
 // convert ACN to l (degree) and m (order)

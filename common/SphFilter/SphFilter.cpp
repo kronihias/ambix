@@ -91,9 +91,9 @@ double SphFilter::GetWeight(Eigen::Vector2d* sph_coord, Eigen::Vector3d carth_co
         // check for wrapping
         if (((*sph_center)(1) + height > M_PI_2))
         {
-            float newazi = (*sph_coord)(0) - M_PI;
-            if (newazi < -M_PI)
-                newazi += 2*M_PI;
+            float newazi = (*sph_coord)(0) - (float)M_PI;
+            if (newazi < -(float)M_PI)
+                newazi += 2.f * (float)M_PI;
             
             carth_az(0) = cos(newazi); // x
             carth_az(1) = sin(newazi); // y
@@ -108,9 +108,9 @@ double SphFilter::GetWeight(Eigen::Vector2d* sph_coord, Eigen::Vector3d carth_co
         
         if (((*sph_center)(1) - height < -M_PI_2))
         {
-            float newazi = (*sph_coord)(0) - M_PI;
-            if (newazi < -M_PI)
-                newazi += 2*M_PI;
+            float newazi = (*sph_coord)(0) - (float)M_PI;
+            if (newazi < -(float)M_PI)
+                newazi += 2.f * (float)M_PI;
             
             carth_az(0) = cos(newazi); // x
             carth_az(1) = sin(newazi); // y
