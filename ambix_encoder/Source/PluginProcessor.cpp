@@ -168,16 +168,21 @@ void Ambix_encoderAudioProcessor::timerCallback() // check if new values and cal
 {
 
     // Timer only runs when refreshOscOutput decided we have destinations
-    // (manual enabled OR at least one subscriber). We still diff here to avoid
-    // spamming identical packets.
-    if (_azimuth_param != azimuth_param ||
-        _elevation_param != elevation_param ||
-        _size_param != size_param ||
-        _rms != rms ||
-        _dpk != dpk)
-    {
+    // (manual enabled OR at least one subscriber). Send only when something
+    // meaningful changed. Position and size use exact comparison (they are set
+    // discretely by user or automation). Meters use a threshold — RMS/DPK are
+    // recomputed from audio every block and fluctuate continuously even for a
+    // steady-level source, so exact equality would fire on every tick.
+    const bool posChanged   = (_azimuth_param   != azimuth_param   ||
+                                _elevation_param != elevation_param ||
+                                _size_param      != size_param);
+
+    constexpr float kMeterThreshold = 0.002f; // ~0.17 dB at -20 dBFS, below visual JND
+    const bool meterChanged = (std::abs (_rms - rms) > kMeterThreshold ||
+                                std::abs (_dpk - dpk) > kMeterThreshold);
+
+    if (posChanged || meterChanged)
         sendOSC();
-    }
 
     // Project-name polling lives on the standalone reaperPollTimer now so it
     // runs even when there are no OSC destinations (e.g. before the first

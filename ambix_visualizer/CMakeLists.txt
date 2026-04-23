@@ -38,7 +38,8 @@ juce_add_gui_app (ambix_visualizer
                                       UIInterfaceOrientationLandscapeRight
                                       UIInterfaceOrientationPortraitUpsideDown
     ICON_BIG                          "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
-    ICON_SMALL                        "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png")
+    ICON_SMALL                        "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
+    PLIST_TO_MERGE                    "<key>NSBonjourServices</key><array><string>_ambix.encoder.v1._udp</string><string>_ambix.visualizer.v1._udp</string></array><key>ITSAppUsesNonExemptEncryption</key><false/>")
 
 # --- Mobile build notes -------------------------------------------------------
 #
@@ -56,6 +57,10 @@ juce_add_gui_app (ambix_visualizer
 #   or (b) wrap this CMake in an Android Studio NDK project with Gradle and
 #   declare INTERNET permission in AndroidManifest.xml.
 # -----------------------------------------------------------------------------
+
+set_target_properties (ambix_visualizer PROPERTIES
+    XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT[variant=Release] "dwarf-with-dsym"
+    XCODE_ATTRIBUTE_DEPLOYMENT_POSTPROCESSING[variant=Release] YES)
 
 juce_generate_juce_header (ambix_visualizer)
 

@@ -102,7 +102,7 @@ SphereView::SphereView (SourceRegistry& r,
     };
     addAndMakeVisible (puckSizeCombo);
 
-    startTimerHz (30);
+    startTimerHz (60);
 }
 
 void SphereView::setFlipLRCallback (std::function<void (bool)> callback)
@@ -578,20 +578,9 @@ void SphereView::mouseDoubleClick (const juce::MouseEvent&)
 
 void SphereView::changeListenerCallback (juce::ChangeBroadcaster*)
 {
-    // Skip snapshot + sort when this tab isn't visible — see matching
-    // comment in HammerAitovView::changeListenerCallback.
-    if (! isShowing())
-    {
-        cacheDirty = true;
-        return;
-    }
-
-    cache = registry.snapshot();
-    std::sort (cache.begin(), cache.end(),
-               [] (const EncoderSource& a, const EncoderSource& b)
-               { return a.lastInteractionMs < b.lastInteractionMs; });
-    cacheDirty = false;
-    repaint();
+    // Defer to the 30 Hz timer — see matching comment in
+    // HammerAitovView::changeListenerCallback.
+    cacheDirty = true;
 }
 
 void SphereView::timerCallback()

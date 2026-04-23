@@ -5,7 +5,8 @@
 #include "AmbiEncParser.h"
 #include "MultiEncoderParser.h"
 
-class OscListenerThread : private juce::Thread
+class OscListenerThread : private juce::Thread,
+                          private juce::AsyncUpdater
 {
 public:
     enum class Kind { Ambix, MultiEncoder };
@@ -34,6 +35,7 @@ public:
 
 private:
     void run() override;
+    void handleAsyncUpdate() override;
 
     Callback onMessage;
     std::unique_ptr<juce::DatagramSocket> socket;
@@ -41,6 +43,11 @@ private:
     std::atomic<int>  packetsReceived { 0 };
     std::atomic<int>  packetsParsed   { 0 };
     int boundPort { 0 };
+
+    // Lock-free SPSC ring buffer: listener thread writes, message thread drains.
+    static constexpr int kFifoCapacity = 256;
+    juce::AbstractFifo fifo { kFifoCapacity };
+    std::vector<IncomingMessage> fifoStorage; // allocated once in ctor, size kFifoCapacity
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscListenerThread)
 };

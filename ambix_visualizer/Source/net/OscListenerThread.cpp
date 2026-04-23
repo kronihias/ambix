@@ -3,6 +3,7 @@
 OscListenerThread::OscListenerThread()
     : juce::Thread ("AmbixOscListener")
 {
+    fifoStorage.resize (kFifoCapacity);
 }
 
 OscListenerThread::~OscListenerThread()
@@ -39,6 +40,8 @@ void OscListenerThread::stopListening()
         socket->shutdown();
 
     stopThread (1000);
+    cancelPendingUpdate();
+    fifo.reset();
     socket.reset();
     boundPort = 0;
 }
@@ -50,7 +53,7 @@ void OscListenerThread::run()
 
     while (! threadShouldExit() && listening.load())
     {
-        const auto ready = socket->waitUntilReady (true, 200);
+        const auto ready = socket->waitUntilReady (true, 20);
         if (ready < 0)
             break;
         if (ready == 0)
@@ -86,11 +89,33 @@ void OscListenerThread::run()
 
         packetsParsed.fetch_add (1);
 
-        auto cb = onMessage;
-        juce::MessageManager::callAsync ([cb, msg]()
+        // Write into the lock-free ring buffer and wake the message thread.
+        int start1, size1, start2, size2;
+        fifo.prepareToWrite (1, start1, size1, start2, size2);
+        const int slot = (size1 > 0) ? start1 : (size2 > 0 ? start2 : -1);
+        if (slot >= 0)
         {
-            if (cb)
-                cb (msg);
-        });
+            fifoStorage[slot] = std::move (msg);
+            fifo.finishedWrite (1);
+            triggerAsyncUpdate(); // coalescing: only posts if not already pending
+        }
+        // else: ring buffer full — drop packet (shouldn't happen at normal rates)
     }
+}
+
+void OscListenerThread::handleAsyncUpdate()
+{
+    const int numReady = fifo.getNumReady();
+    if (numReady <= 0 || ! onMessage)
+        return;
+
+    int start1, size1, start2, size2;
+    fifo.prepareToRead (numReady, start1, size1, start2, size2);
+
+    for (int i = 0; i < size1; ++i)
+        onMessage (fifoStorage[start1 + i]);
+    for (int i = 0; i < size2; ++i)
+        onMessage (fifoStorage[start2 + i]);
+
+    fifo.finishedRead (size1 + size2);
 }

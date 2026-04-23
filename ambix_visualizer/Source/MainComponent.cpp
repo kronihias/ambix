@@ -189,7 +189,11 @@ void MainComponent::persistSettings()
 
 void MainComponent::timerCallback()
 {
-    // Refresh IP label periodically.
+    // Refresh IP label slowly — getAllAddresses() calls getifaddrs() on iOS
+    // which can stall the message thread for 20-50 ms when the WiFi radio is
+    // in power-save state. Once every ~10 s is plenty for a status label.
+    constexpr int kIpRefreshTicks = 40; // 40 × 250 ms = 10 s
+    if (timerTickCount % kIpRefreshTicks == 0)
     {
         const auto addresses = juce::IPAddress::getAllAddresses (false);
         juce::StringArray parts;
@@ -204,6 +208,7 @@ void MainComponent::timerCallback()
                                             : parts.joinIntoString (" / ");
         ipLabel.setText ("IP: " + ipText, juce::dontSendNotification);
     }
+    ++timerTickCount;
 
     if (! listener.isListening())
         return;

@@ -75,7 +75,7 @@ HammerAitovView::HammerAitovView (SourceRegistry& r,
 
     registry.addChangeListener (this);
     cache = registry.snapshot();
-    startTimerHz (30); // for smooth peak-ring animation
+    startTimerHz (60); // for smooth peak-ring animation
 }
 
 HammerAitovView::~HammerAitovView()
@@ -330,26 +330,11 @@ void HammerAitovView::mouseUp (const juce::MouseEvent& e)
 
 void HammerAitovView::changeListenerCallback (juce::ChangeBroadcaster*)
 {
-    // Skip snapshot + sort when this tab isn't visible. Source/group change
-    // broadcasts fire ~33 Hz (every /ambi_enc push) and both HammerAitovView
-    // and SphereView listen; doing the work twice on the message thread for
-    // a view the user can't see turns NSD packet arrival bursts into visible
-    // stutters on the *visible* view. The next time this tab is selected,
-    // resized() triggers a repaint and we rebuild the cache lazily below.
-    if (! isShowing())
-    {
-        cacheDirty = true;
-        return;
-    }
-
-    cache = registry.snapshot();
-    // Oldest first, newest last — paint order. Reversed for hit-test so the
-    // most recently touched puck wins when two overlap.
-    std::sort (cache.begin(), cache.end(),
-               [] (const EncoderSource& a, const EncoderSource& b)
-               { return a.lastInteractionMs < b.lastInteractionMs; });
-    cacheDirty = false;
-    repaint();
+    // Always defer to the 60 Hz timer rather than rebuilding inline. This
+    // decouples the OSC packet rate from the render rate: the message thread
+    // sets a flag here and the timer does one snapshot+sort+repaint per frame,
+    // regardless of how many packets arrived in between.
+    cacheDirty = true;
 }
 
 void HammerAitovView::timerCallback()

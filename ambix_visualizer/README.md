@@ -108,6 +108,50 @@ No Team ID is needed for the simulator.
 
 ---
 
+## Building — Android
+
+Android support requires the Android SDK, NDK, and either Android Studio or a
+manual Gradle setup.
+
+### Prerequisites
+
+1. **Android SDK** — install via Android Studio (recommended)
+2. **Android NDK** — install via Android Studio's SDK Manager
+3. **CMake** ≥ 3.22
+4. **Gradle** (usually bundled with Android Studio)
+
+### Using CMake + Gradle
+
+You'll need to wrap this project in an Android Studio NDK project:
+
+1. Create a new Android Studio NDK project (or use an existing one)
+2. Configure your `build.gradle` to include the CMake build
+3. Set up `AndroidManifest.xml` with required permissions:
+   ```xml
+   <uses-permission android:name="android.permission.INTERNET" />
+   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+   <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+   ```
+4. Build through Android Studio or via Gradle:
+   ```bash
+   ./gradlew assembleDebug    # or assembleRelease
+   ```
+
+### Permissions
+
+ambix_visualizer requires local network access to receive OSC messages from
+ambix_encoder. Ensure these permissions are declared in `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+```
+
+On Android 12+, the app will request runtime permissions for local network
+access on first launch.
+
+---
+
 ## Building as part of the ambix suite
 
 When this directory is added as a subdirectory by the repo-root CMakeLists.txt,
