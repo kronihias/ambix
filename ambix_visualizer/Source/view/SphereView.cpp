@@ -102,6 +102,18 @@ SphereView::SphereView (SourceRegistry& r,
     };
     addAndMakeVisible (puckSizeCombo);
 
+    btnShowMeters.setToggleState (settings.showPuckLevelMeter, juce::dontSendNotification);
+    btnShowMeters.setTooltip ("Show a vertical level meter beside each ambix_encoder source. "
+                              "Applies to both 2D and 3D views.");
+    auto notifyMeters = [this]()
+    {
+        if (onShowMetersChanged)
+            onShowMetersChanged (btnShowMeters.getToggleState());
+    };
+    btnShowMeters.onClick       = notifyMeters;
+    btnShowMeters.onStateChange = notifyMeters;
+    addAndMakeVisible (btnShowMeters);
+
     startTimerHz (60);
 }
 
@@ -113,6 +125,11 @@ void SphereView::setFlipLRCallback (std::function<void (bool)> callback)
 void SphereView::setPuckSizeCallback (std::function<void (AppSettings::PuckSize)> callback)
 {
     onPuckSizeChanged = std::move (callback);
+}
+
+void SphereView::setShowMetersCallback (std::function<void (bool)> callback)
+{
+    onShowMetersChanged = std::move (callback);
 }
 
 void SphereView::setInitialViewState (float yaw, float pitch, bool locked)
@@ -277,6 +294,8 @@ void SphereView::resized()
     bar.removeFromLeft (16);
     puckSizeLabel.setBounds (bar.removeFromLeft (52));
     puckSizeCombo.setBounds (bar.removeFromLeft (96));
+    bar.removeFromLeft (8);
+    btnShowMeters.setBounds (bar.removeFromLeft (96));
 
     const int gpH = groupPanel.getPreferredHeight();
     const int gpW = groupPanel.getPreferredWidth();
@@ -293,6 +312,7 @@ void SphereView::settingsChanged()
     btnFlipLR.setToggleState (settings.flipLeftRight, juce::dontSendNotification);
     puckSizeCombo.setSelectedId (static_cast<int> (settings.puckSize) + 1,
                                  juce::dontSendNotification);
+    btnShowMeters.setToggleState (settings.showPuckLevelMeter, juce::dontSendNotification);
     updateLayout();
     repaint();
 }

@@ -28,6 +28,11 @@ struct AppSettings
     // from the audience side rather than the listener side.
     bool  flipLeftRight          { false };
 
+    // Draw a vertical level meter beside each ambix_encoder puck in the
+    // 2D/3D views. Off by default so the views stay uncluttered; both
+    // views' top bars expose the toggle.
+    bool  showPuckLevelMeter     { false };
+
     // Tab + 3D view state
     int   currentTabIndex        { 0 };
     bool  sphereLocked           { false };

@@ -114,6 +114,21 @@ MainComponent::MainComponent()
     hammerView.setPuckSizeCallback (onPuckSize);
     sphereView.setPuckSizeCallback (onPuckSize);
 
+    // Meter visibility likewise lives on both views' top bars; one toggle
+    // mutates the shared setting, persists, and syncs the sibling so the
+    // state stays identical wherever it's displayed.
+    auto onShowMeters = [this] (bool v)
+    {
+        if (v == settings.showPuckLevelMeter) return;
+        settings.showPuckLevelMeter = v;
+        persistSettings();
+        hammerView.settingsChanged();
+        sphereView.settingsChanged();
+        repaint();
+    };
+    hammerView.setShowMetersCallback (onShowMeters);
+    sphereView.setShowMetersCallback (onShowMeters);
+
     // --- Top bar -------------------------------------------------------------
     settingsButton.setTooltip ("Settings");
     settingsButton.onClick = [this]() { openSettingsPopup(); };

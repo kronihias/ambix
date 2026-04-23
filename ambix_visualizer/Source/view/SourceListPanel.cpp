@@ -606,10 +606,16 @@ void SourceListPanel::drawLevelMeter (juce::Graphics& g,
         return juce::Colour (0xFF52B03B);                      // green
     };
 
-    const float rmsDb  = LevelMapping::linearToDb (s.rmsLinear);
+    const auto nowMsMeter = juce::Time::getMillisecondCounter();
+    // Apply the same stale-OSC fade to both RMS and the peak-hold display
+    // so both parts of the meter fall silent together when updates stop —
+    // otherwise the peak-hold's 1.5 s hold + 1.2 s release leaves a lone
+    // bright segment walking down the meter long after the RMS is quiet.
+    const float fade   = LevelMapping::staleFadeFactor (s.lastLevelUpdateMs, nowMsMeter);
+    const float rmsDb  = LevelMapping::linearToDb (s.rmsLinear * fade);
     const float peakL  = LevelMapping::peakHoldEffective (s.peakHoldLinear,
                                                           s.peakHoldTimeMs,
-                                                          juce::Time::getMillisecondCounter());
+                                                          nowMsMeter) * fade;
     const float peakDb = LevelMapping::linearToDb (peakL);
 
     const float gap    = 2.0f;

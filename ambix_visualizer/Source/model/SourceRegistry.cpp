@@ -47,6 +47,19 @@ void SourceRegistry::applyAmbixUpdate (const AmbixUpdate& update)
             src.elevationDeg = update.elevationDeg;
             src.size         = update.size;
         }
+
+        // Mirror the plugin's own kMeterThreshold. The encoder sends OSC on
+        // position OR meter change, so a frozen meter (paused DAW) paired
+        // with any position movement produces packets with unchanged rms/dpk.
+        // Only advance lastLevelUpdateMs when the level actually moved,
+        // otherwise the meter fade would read those position-driven packets
+        // as "still playing".
+        constexpr float kLevelChangeThreshold = 0.002f;
+        const bool levelMoved = (std::abs (src.rmsLinear  - update.rmsLinear)  > kLevelChangeThreshold
+                              || std::abs (src.peakLinear - update.peakLinear) > kLevelChangeThreshold);
+        if (levelMoved || src.lastLevelUpdateMs == 0)
+            src.lastLevelUpdateMs = now;
+
         src.rmsLinear      = update.rmsLinear;
         src.peakLinear     = update.peakLinear;
 
@@ -113,11 +126,13 @@ void SourceRegistry::applyMultiEncoderUpdate (const MultiEncoderUpdate& update)
                 // mute overrides to silence.
                 src.rmsLinear = src.muted ? 0.0f
                                           : std::pow (10.0f, update.value / 20.0f);
+                src.lastLevelUpdateMs = now;
                 break;
             case Param::Mute:
                 src.muted = update.value >= 0.5f;
                 if (src.muted) src.rmsLinear = 0.0f;
                 else           src.rmsLinear = std::pow (10.0f, src.gainDb / 20.0f);
+                src.lastLevelUpdateMs = now;
                 break;
             case Param::Solo:
                 src.soloed = update.value >= 0.5f;

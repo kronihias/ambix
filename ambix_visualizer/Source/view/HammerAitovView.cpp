@@ -73,6 +73,18 @@ HammerAitovView::HammerAitovView (SourceRegistry& r,
     };
     addAndMakeVisible (puckSizeCombo);
 
+    showMetersToggle.setToggleState (settings.showPuckLevelMeter, juce::dontSendNotification);
+    showMetersToggle.setTooltip ("Show a vertical level meter beside each ambix_encoder source. "
+                                 "Applies to both 2D and 3D views.");
+    auto notifyMeters = [this]()
+    {
+        if (onShowMetersChanged)
+            onShowMetersChanged (showMetersToggle.getToggleState());
+    };
+    showMetersToggle.onClick       = notifyMeters;
+    showMetersToggle.onStateChange = notifyMeters;
+    addAndMakeVisible (showMetersToggle);
+
     registry.addChangeListener (this);
     cache = registry.snapshot();
     startTimerHz (60); // for smooth peak-ring animation
@@ -129,6 +141,7 @@ void HammerAitovView::resized()
     flipLRToggle   .setBounds (146, 8, 110, 32);
     puckSizeLabel  .setBounds (262, 8, 52, 32);
     puckSizeCombo  .setBounds (316, 8, 96, 32);
+    showMetersToggle.setBounds (420, 8, 96, 32);
 
     // Group visibility panel floats at the top-right.
     const int gpH = groupPanel.getPreferredHeight();
@@ -161,6 +174,7 @@ void HammerAitovView::settingsChanged()
     flipLRToggle   .setToggleState (settings.flipLeftRight,       juce::dontSendNotification);
     puckSizeCombo  .setSelectedId  (static_cast<int> (settings.puckSize) + 1,
                                     juce::dontSendNotification);
+    showMetersToggle.setToggleState (settings.showPuckLevelMeter, juce::dontSendNotification);
     rebuildTransform();
     repaint();
 }
@@ -178,6 +192,11 @@ void HammerAitovView::setFlipLRCallback (std::function<void (bool)> callback)
 void HammerAitovView::setPuckSizeCallback (std::function<void (AppSettings::PuckSize)> callback)
 {
     onPuckSizeChanged = std::move (callback);
+}
+
+void HammerAitovView::setShowMetersCallback (std::function<void (bool)> callback)
+{
+    onShowMetersChanged = std::move (callback);
 }
 
 juce::Point<float> HammerAitovView::sphericalToLocal (float azimuthDeg, float elevationDeg) const

@@ -34,6 +34,13 @@ struct EncoderSource
     int          replyPort { 0 };
     bool         replyPortUserSet { false };
     juce::uint32 lastSeenMs { 0 };
+    // Distinct from lastSeenMs: advances only when the incoming level actually
+    // changed. ambix_encoder sends OSC whenever EITHER position OR level
+    // changed, so a paused DAW (no new audio, frozen rms/peak) still emits
+    // packets as long as position moves — those carry stale level values.
+    // The meter fade keys off this, not lastSeenMs, so those stale packets
+    // can't keep a silent source's meter lit.
+    juce::uint32 lastLevelUpdateMs { 0 };
     // Bumped whenever the user interacts with this source (touch / click /
     // drag). Newer interaction brings the puck to the foreground in both
     // views so overlapping pucks are unambiguous to grab again.

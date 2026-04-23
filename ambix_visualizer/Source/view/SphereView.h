@@ -49,6 +49,10 @@ public:
     // can persist the setting and notify the 2D view too.
     void setPuckSizeCallback (std::function<void (AppSettings::PuckSize)> callback);
 
+    // Called from the 3D view's own "Meters" toggle so MainComponent can
+    // persist the setting and notify the 2D view too.
+    void setShowMetersCallback (std::function<void (bool)> callback);
+
 private:
     struct Vec3 { float x, y, z; };
 
@@ -97,6 +101,9 @@ private:
     juce::Label    puckSizeLabel;
     juce::ComboBox puckSizeCombo;
     std::function<void (AppSettings::PuckSize)> onPuckSizeChanged;
+
+    juce::ToggleButton btnShowMeters { "Meters" };
+    std::function<void (bool)> onShowMetersChanged;
 
     struct PuckTouch
     {

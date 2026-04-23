@@ -29,6 +29,7 @@ AppSettings SettingsStore::load()
                                          "upperHemisphereFloorDeg",
                                          static_cast<double>(s.upperHemisphereFloorDeg)));
         s.flipLeftRight           = p->getBoolValue   ("flipLeftRight",        s.flipLeftRight);
+        s.showPuckLevelMeter      = p->getBoolValue   ("showPuckLevelMeter",   s.showPuckLevelMeter);
         s.currentTabIndex         = p->getIntValue    ("currentTabIndex",      s.currentTabIndex);
         s.sphereLocked            = p->getBoolValue   ("sphereLocked",         s.sphereLocked);
         s.sphereYawDeg            = static_cast<float>(p->getDoubleValue ("sphereYawDeg",   static_cast<double>(s.sphereYawDeg)));
@@ -78,6 +79,7 @@ void SettingsStore::save (const AppSettings& s)
     p->setValue ("upperHemisphereFloorDeg",
                  static_cast<double> (s.upperHemisphereFloorDeg));
     p->setValue ("flipLeftRight",          s.flipLeftRight);
+    p->setValue ("showPuckLevelMeter",     s.showPuckLevelMeter);
     p->setValue ("currentTabIndex",        s.currentTabIndex);
     p->setValue ("sphereLocked",           s.sphereLocked);
     p->setValue ("sphereYawDeg",           static_cast<double>(s.sphereYawDeg));

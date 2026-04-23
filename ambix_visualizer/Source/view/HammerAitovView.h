@@ -46,6 +46,10 @@ public:
     // can persist the setting and notify the 3D view too.
     void setPuckSizeCallback (std::function<void (AppSettings::PuckSize)> callback);
 
+    // Called from the 2D view's own "Meters" toggle so MainComponent can
+    // persist the setting and notify the 3D view too.
+    void setShowMetersCallback (std::function<void (bool)> callback);
+
 private:
     juce::Point<float> sphericalToLocal (float azimuthDeg, float elevationDeg) const;
     bool localToSpherical (juce::Point<float> localPt, float& azimuthDeg, float& elevationDeg) const;
@@ -83,6 +87,9 @@ private:
     juce::Label    puckSizeLabel;
     juce::ComboBox puckSizeCombo;
     std::function<void (AppSettings::PuckSize)> onPuckSizeChanged;
+
+    juce::ToggleButton showMetersToggle { "Meters" };
+    std::function<void (bool)> onShowMetersChanged;
 
     // Per-touch drag map (MouseSource index → puck key) so multi-touch lets
     // the user drag multiple pucks simultaneously on iPad.
