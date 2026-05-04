@@ -8,11 +8,6 @@ if not defined MAKENSIS set MAKENSIS="C:\Program Files (x86)\NSIS\makensis.exe"
 set MSBUILD_FLAGS=/t:Build /p:Configuration=Release /p:PreBuildEvent= /p:PostBuildEvent=
 set CMAKE_COMMON=-DNUM_OUTPUTS_DECODER=64 -DFFTW3_INCLUDE_DIR="../win-libs/" -DFFTW3F_LIBRARY="../win-libs/x64/libfftw3f-3.lib"
 
-REM Allow CI (or anyone with Eigen3 outside the standard search paths) to point
-REM cmake at it via env. Local Windows builds with Eigen3 installed system-wide
-REM (or on cmake's default search path) don't need this.
-if defined EIGEN3_INCLUDE_DIR set CMAKE_COMMON=%CMAKE_COMMON% -DEIGEN3_INCLUDE_DIR="%EIGEN3_INCLUDE_DIR%"
-
 REM ── Code signing configuration ───────────────────────────────────────────────
 REM   Set SIGN_CERT to the .p12 certificate file and SIGN_PASS to its password.
 REM   Pass "sign" as a build argument to enable signing.

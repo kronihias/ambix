@@ -37,8 +37,8 @@ jobs:
         id: version
         run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
-      - name: Install Ninja + Eigen3
-        run: brew install ninja eigen
+      - name: Install Ninja
+        run: brew install ninja
 
       - name: Setup macOS code signing
         if: env.SIGN == 'true'
@@ -136,20 +136,6 @@ jobs:
       - name: Install NSIS
         shell: pwsh
         run: choco install -y nsis --no-progress
-
-      - name: Fetch Eigen3 (header-only)
-        shell: bash
-        run: |
-          # Eigen is header-only; download a fixed release tarball, unpack
-          # under $RUNNER_TEMP, and expose its include dir to the batch script.
-          EIGEN_VERSION=3.4.0
-          EIGEN_DIR="$RUNNER_TEMP/eigen-$EIGEN_VERSION"
-          curl -fsSL "https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.gz" \
-            -o "$RUNNER_TEMP/eigen.tar.gz"
-          tar -xzf "$RUNNER_TEMP/eigen.tar.gz" -C "$RUNNER_TEMP"
-          # build_all_win64.bat injects this into CMAKE_COMMON when defined.
-          WIN_PATH=$(cygpath -w "$EIGEN_DIR")
-          echo "EIGEN3_INCLUDE_DIR=$WIN_PATH" >> "$GITHUB_ENV"
 
       - name: Setup Windows code signing
         if: env.SIGN == 'true'
