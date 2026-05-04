@@ -1,0 +1,49 @@
+diff --git a/modules/juce_core/native/juce_Network_windows.cpp b/modules/juce_core/native/juce_Network_windows.cpp
+index b22468b504..948bdd12f9 100644
+--- a/modules/juce_core/native/juce_Network_windows.cpp
++++ b/modules/juce_core/native/juce_Network_windows.cpp
+@@ -609,9 +609,42 @@ void IPAddress::findAllAddresses (Array<IPAddress>& result, bool includeIPv6)
+     }
+ }
+ 
+-IPAddress IPAddress::getInterfaceBroadcastAddress (const IPAddress&)
++IPAddress IPAddress::getInterfaceBroadcastAddress (const IPAddress& interfaceAddress)
+ {
+-    // TODO
++    if (interfaceAddress.isIPv6 || interfaceAddress.isNull())
++        return {};
++
++    GetAdaptersAddressesHelper addressesHelper;
++
++    if (! addressesHelper.callGetAdaptersAddresses())
++        return {};
++
++    for (PIP_ADAPTER_ADDRESSES adapter = addressesHelper.adaptersAddresses; adapter != nullptr; adapter = adapter->Next)
++    {
++        for (auto* unicast = adapter->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next)
++        {
++            if (unicast->Address.lpSockaddr->sa_family != AF_INET)
++                continue;
++
++            auto* sockAddr = unalignedPointerCast<sockaddr_in*> (unicast->Address.lpSockaddr);
++
++            if (MACAddressHelpers::createAddress (sockAddr) != interfaceAddress)
++                continue;
++
++            const auto prefix = unicast->OnLinkPrefixLength;
++            if (prefix == 0 || prefix >= 32)
++                return {};
++
++            const uint32 hostBits = 0xffffffffu >> prefix;
++            const uint32 ipBE = (uint32 (interfaceAddress.address[0]) << 24)
++                              | (uint32 (interfaceAddress.address[1]) << 16)
++                              | (uint32 (interfaceAddress.address[2]) << 8)
++                              |  uint32 (interfaceAddress.address[3]);
++
++            return IPAddress (ipBE | hostBits);
++        }
++    }
++
+     return {};
+ }
+ 

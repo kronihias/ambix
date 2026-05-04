@@ -1,0 +1,224 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: 'Sign + notarize the build (requires secrets to be configured)'
+        type: boolean
+        default: true
+      tag_name:
+        description: 'Tag name to upload artifacts to (leave empty for workflow artifacts only)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # required for `gh release upload`
+
+jobs:
+  # ============================================================================
+  build-macos:
+    runs-on: macos-14    # Apple Silicon; cross-compiles arm64 + x86_64 universal
+    timeout-minutes: 90
+    env:
+      # Effective sign flag: always true for release events; honours dispatch
+      # input otherwise. Auto-downgraded later if signing secrets are missing.
+      SIGN: ${{ (github.event_name == 'release' || inputs.sign) && 'true' || 'false' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Ninja + Eigen3
+        run: brew install ninja eigen
+
+      - name: Setup macOS code signing
+        if: env.SIGN == 'true'
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          CODESIGN_CERTIFICATE_P12: ${{ secrets.CODESIGN_CERTIFICATE_P12 }}
+          CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}
+          CODESIGN_APP: ${{ secrets.CODESIGN_APP }}
+          CODESIGN_INSTALLER: ${{ secrets.CODESIGN_INSTALLER }}
+          NOTARIZE_APPLE_ID: ${{ secrets.NOTARIZE_APPLE_ID }}
+          NOTARIZE_PASSWORD: ${{ secrets.NOTARIZE_PASSWORD }}
+          NOTARIZE_TEAM_ID: ${{ secrets.NOTARIZE_TEAM_ID }}
+        run: |
+          if [ -z "$CODESIGN_CERTIFICATE_P12" ]; then
+            echo "::warning::Signing requested but CODESIGN_CERTIFICATE_P12 secret is empty - falling back to unsigned build."
+            echo "SIGN=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$CODESIGN_CERTIFICATE_P12" | base64 --decode > certificate.p12
+          security import certificate.p12 -P "$CODESIGN_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          rm certificate.p12
+
+          cat > scripts/codesign.env <<EOF
+          CODESIGN_APP="$CODESIGN_APP"
+          CODESIGN_INSTALLER="$CODESIGN_INSTALLER"
+          NOTARIZE_APPLE_ID="$NOTARIZE_APPLE_ID"
+          NOTARIZE_PASSWORD="$NOTARIZE_PASSWORD"
+          NOTARIZE_TEAM_ID="$NOTARIZE_TEAM_ID"
+          EOF
+
+      - name: Build VST3 (signed + notarized)
+        if: env.SIGN == 'true'
+        run: ./scripts/build_osx.sh --vst3
+
+      - name: Build VST3 (unsigned)
+        if: env.SIGN != 'true'
+        run: ./scripts/build_osx.sh --vst3 --no-sign
+
+      - name: Verify installer exists
+        run: |
+          PKG="_OSX_RELEASE/ambix_v${{ steps.version.outputs.version }}_macos_vst3.pkg"
+          if [ ! -f "$PKG" ]; then
+            echo "::error::Expected installer not found: $PKG"
+            ls -la _OSX_RELEASE/ || true
+            exit 1
+          fi
+          ls -lh "$PKG"
+
+      - name: Upload as workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-vst3-installer
+          path: _OSX_RELEASE/ambix_v${{ steps.version.outputs.version }}_macos_vst3.pkg
+          retention-days: 30
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "_OSX_RELEASE/ambix_v${{ steps.version.outputs.version }}_macos_vst3.pkg" \
+            --clobber
+
+  # ============================================================================
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      SIGN: ${{ (github.event_name == 'release' || inputs.sign) && 'true' || 'false' }}
+      # Override defaults baked into build_all_win64.bat for the GH-hosted runner.
+      MSBUILD: '"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"'
+      MAKENSIS: '"C:\Program Files (x86)\NSIS\makensis.exe"'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install -y nsis --no-progress
+
+      - name: Fetch Eigen3 (header-only)
+        shell: bash
+        run: |
+          # Eigen is header-only; download a fixed release tarball, unpack
+          # under $RUNNER_TEMP, and expose its include dir to the batch script.
+          EIGEN_VERSION=3.4.0
+          EIGEN_DIR="$RUNNER_TEMP/eigen-$EIGEN_VERSION"
+          curl -fsSL "https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.gz" \
+            -o "$RUNNER_TEMP/eigen.tar.gz"
+          tar -xzf "$RUNNER_TEMP/eigen.tar.gz" -C "$RUNNER_TEMP"
+          # build_all_win64.bat injects this into CMAKE_COMMON when defined.
+          WIN_PATH=$(cygpath -w "$EIGEN_DIR")
+          echo "EIGEN3_INCLUDE_DIR=$WIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Setup Windows code signing
+        if: env.SIGN == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CODESIGN_PFX: ${{ secrets.WINDOWS_CODESIGN_PFX }}
+          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
+          WINDOWS_INSTALLER_PFX: ${{ secrets.WINDOWS_INSTALLER_PFX }}
+          WINDOWS_INSTALLER_PFX_PASSWORD: ${{ secrets.WINDOWS_INSTALLER_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:WINDOWS_CODESIGN_PFX)) {
+            Write-Host "::warning::Signing requested but WINDOWS_CODESIGN_PFX secret is empty - falling back to unsigned build."
+            "SIGN=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            exit 0
+          }
+
+          # Decode PFX certs into the locations the batch script expects
+          # (relative to scripts/ which is the working dir for build_all_win64.bat).
+          [IO.File]::WriteAllBytes("scripts\DevIDApplication.p12",
+            [Convert]::FromBase64String($env:WINDOWS_CODESIGN_PFX))
+          [IO.File]::WriteAllBytes("scripts\DevIDInstaller.p12",
+            [Convert]::FromBase64String($env:WINDOWS_INSTALLER_PFX))
+
+          # Expose passwords to the batch via env (it now reads them with
+          # `if not defined` so this works without editing the script per-CI).
+          "SIGN_PASS=$env:WINDOWS_CODESIGN_PFX_PASSWORD"      | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "INSTALLER_PASS=$env:WINDOWS_INSTALLER_PFX_PASSWORD" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create build dir
+        shell: cmd
+        run: if not exist build mkdir build
+
+      - name: Build VST3 (signed)
+        if: env.SIGN == 'true'
+        shell: cmd
+        working-directory: scripts
+        run: build_all_win64.bat vst3 sign
+
+      - name: Build VST3 (unsigned)
+        if: env.SIGN != 'true'
+        shell: cmd
+        working-directory: scripts
+        run: build_all_win64.bat vst3
+
+      - name: Verify installer exists
+        shell: cmd
+        run: |
+          set EXE=_WIN_RELEASE\ambix_v${{ steps.version.outputs.version }}_VST3_win64.exe
+          if not exist "%EXE%" (
+            echo ::error::Expected installer not found: %EXE%
+            dir _WIN_RELEASE 2>nul
+            exit /b 1
+          )
+          dir "%EXE%"
+
+      - name: Upload as workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-vst3-installer
+          path: _WIN_RELEASE/ambix_v${{ steps.version.outputs.version }}_VST3_win64.exe
+          retention-days: 30
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "_WIN_RELEASE/ambix_v${{ steps.version.outputs.version }}_VST3_win64.exe" \
+            --clobber

@@ -2,4 +2,10 @@
 ._*
 .vscode
 .claude
-*build*
+build*/
+_*
+
+# Codesigning secrets (never commit)
+scripts/codesign.env
+scripts/*.p12
+scripts/*.pfx
