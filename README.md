@@ -15,28 +15,28 @@ Cross-platform Ambisonic VST/VST3/LV2 plug-ins and standalone applications for m
 ## Table of Contents
 
 - [ambiX — Ambisonic Plug-in Suite](#ambix--ambisonic-plug-in-suite)
-	- [Table of Contents](#table-of-contents)
-	- [Plug-ins](#plug-ins)
-		- [ambix\_binaural](#ambix_binaural)
-		- [ambix\_decoder](#ambix_decoder)
-		- [ambix\_converter](#ambix_converter)
-		- [ambix\_directional\_loudness](#ambix_directional_loudness)
-		- [ambix\_encoder](#ambix_encoder)
-		- [ambix\_move](#ambix_move)
-		- [ambix\_maxre](#ambix_maxre)
-		- [ambix\_mirror](#ambix_mirror)
-		- [ambix\_rotator](#ambix_rotator)
-		- [ambix\_rotator\_z](#ambix_rotator_z)
-		- [ambix\_vmic](#ambix_vmic)
-		- [ambix\_warp](#ambix_warp)
-		- [ambix\_widening](#ambix_widening)
-	- [Standalone Applications](#standalone-applications)
-		- [ambix\_visualizer](#ambix_visualizer)
-	- [Prerequisites for Building](#prerequisites-for-building)
-	- [How to Build](#how-to-build)
-	- [LV2 Plug-ins](#lv2-plug-ins)
-	- [Known Problems](#known-problems)
-	- [Changelog](#changelog)
+  - [Table of Contents](#table-of-contents)
+  - [Plug-ins](#plug-ins)
+    - [ambix\_binaural](#ambix_binaural)
+    - [ambix\_decoder](#ambix_decoder)
+    - [ambix\_converter](#ambix_converter)
+    - [ambix\_directional\_loudness](#ambix_directional_loudness)
+    - [ambix\_encoder](#ambix_encoder)
+    - [ambix\_move](#ambix_move)
+    - [ambix\_maxre](#ambix_maxre)
+    - [ambix\_mirror](#ambix_mirror)
+    - [ambix\_rotator](#ambix_rotator)
+    - [ambix\_rotator\_z](#ambix_rotator_z)
+    - [ambix\_vmic](#ambix_vmic)
+    - [ambix\_warp](#ambix_warp)
+    - [ambix\_widening](#ambix_widening)
+  - [Standalone Applications](#standalone-applications)
+    - [ambix\_visualizer](#ambix_visualizer)
+  - [Prerequisites for Building](#prerequisites-for-building)
+  - [How to Build](#how-to-build)
+  - [LV2 Plug-ins](#lv2-plug-ins)
+  - [Known Problems](#known-problems)
+  - [Changelog](#changelog)
 
 ---
 
@@ -277,6 +277,15 @@ Use **cmake-gui** or **cmake/ccmake** from the terminal.
 ---
 
 ## Changelog
+
+### v0.4.2 (2026-05-05) <!-- omit in toc -->
+
+- `ambix_directional_loudness`: add energy visualizer pre/post modification, add hammer-aitoff projection view, low/high-pass for visualizer signal
+- `ambix Visualizer`: add meter next to puck, performance improvements
+
+### v0.4.1 (2026-04-20) <!-- omit in toc -->
+
+- fix VST3 channel reordering
 
 ### v0.4.0 (2026-04-19) <!-- omit in toc -->
 
