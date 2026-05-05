@@ -19,10 +19,316 @@
 
 
 #include "PluginEditor.h"
+#include "Colormap.h"
+#include "HammerAitovSample.h"
 #include "../../common/JuceCompat.h"
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)
+
+// ============================================================================
+// EnergyColorBar — vertical strip + dB labels, modeled on IEM EnergyVisualizer.
+// ============================================================================
+void EnergyColorBar::paint (juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().reduced (0, 4);
+    const int barWidth   = 14;
+    const int labelWidth = juce::jmax (32, bounds.getWidth() - barWidth - 4);
+
+    auto barRect   = bounds.removeFromLeft (barWidth);
+    auto labelRect = bounds.withTrimmedLeft (4).withWidth (labelWidth);
+
+    // Vertical colormap gradient (top = peak, bottom = floor).
+    if (barRect.getHeight() > 0)
+    {
+        juce::Image grad (juce::Image::ARGB, 1, barRect.getHeight(), false);
+        for (int y = 0; y < barRect.getHeight(); ++y)
+        {
+            const float t = 1.0f - (float) y / (float) (barRect.getHeight() - 1);
+            grad.setPixelAt (0, y, Colormap::sample (map_, t));
+        }
+        g.drawImage (grad,
+                     barRect.getX(), barRect.getY(),
+                     barRect.getWidth(), barRect.getHeight(),
+                     0, 0, 1, barRect.getHeight(), false);
+
+        g.setColour (juce::Colours::white.withAlpha (0.4f));
+        g.drawRect (barRect.toFloat(), 1.0f);
+    }
+
+    // dB labels at top, three intermediate stops, and bottom.
+    g.setColour (juce::Colours::lightgrey);
+    g.setFont (juce::Font (juce::FontOptions { 10.0f, juce::Font::plain }));
+    constexpr int kSteps = 4;
+    const float span = peak_db_ - floor_db_;
+    if (! std::isfinite (span) || span <= 0.f) return;
+
+    for (int i = 0; i <= kSteps; ++i)
+    {
+        const float t      = (float) i / (float) kSteps;       // 0 = bottom, 1 = top
+        const float dbVal  = floor_db_ + t * span;
+        const int   y      = barRect.getBottom() - (int) std::round (t * (float) barRect.getHeight());
+        juce::String s;
+        s << juce::String (dbVal, 1) << " dB";
+        g.drawText (s,
+                    labelRect.getX(), y - 7, labelRect.getWidth(), 14,
+                    juce::Justification::centredLeft, false);
+    }
+}
+
+// ============================================================================
+// VizSettingsPopup — launched from the gear button. Mutates processor's
+// view-state directly and notifies the editor on change.
+// ============================================================================
+VizSettingsPopup::VizSettingsPopup (Ambix_directional_loudnessAudioProcessor& p)
+    : proc_ (p)
+{
+    auto styleToggle = [] (juce::TextButton& b) {
+        b.setClickingTogglesState (true);
+        b.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xff2a2a3a));
+        b.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xff5c5cc5));
+        b.setColour (juce::TextButton::textColourOffId,  juce::Colours::lightgrey);
+        b.setColour (juce::TextButton::textColourOnId,   juce::Colours::white);
+    };
+
+    addAndMakeVisible (lbl_title_);
+    lbl_title_.setText ("Visualization", juce::dontSendNotification);
+    lbl_title_.setFont (juce::Font (juce::FontOptions { 13.0f, juce::Font::bold }));
+    lbl_title_.setColour (juce::Label::textColourId, juce::Colours::aquamarine);
+
+    addAndMakeVisible (btn_autonorm_);
+    btn_autonorm_.setTooltip ("Auto-track peak level (range still user-controlled).");
+    styleToggle (btn_autonorm_);
+    btn_autonorm_.setToggleState (proc_.view_autonorm, juce::dontSendNotification);
+    btn_autonorm_.addListener (this);
+
+    addAndMakeVisible (lbl_range_);
+    lbl_range_.setText ("Range", juce::dontSendNotification);
+    lbl_range_.setFont (juce::Font (juce::FontOptions { 11.0f, juce::Font::plain }));
+    lbl_range_.setJustificationType (juce::Justification::centredRight);
+    lbl_range_.setColour (juce::Label::textColourId, juce::Colours::lightgrey);
+
+    addAndMakeVisible (sld_range_);
+    sld_range_.setSliderStyle (juce::Slider::LinearHorizontal);
+    sld_range_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 18);
+    sld_range_.setRange (6.0, 80.0, 1.0);
+    sld_range_.setValue (proc_.view_range_db, juce::dontSendNotification);
+    sld_range_.setTextValueSuffix (" dB");
+    sld_range_.setDoubleClickReturnValue (true, 25.0);
+    sld_range_.setTooltip ("Dynamic range (dB) covered by the colormap. Double-click to reset.");
+    sld_range_.addListener (this);
+
+    addAndMakeVisible (lbl_peak_);
+    lbl_peak_.setText ("Peak", juce::dontSendNotification);
+    lbl_peak_.setFont (juce::Font (juce::FontOptions { 11.0f, juce::Font::plain }));
+    lbl_peak_.setJustificationType (juce::Justification::centredRight);
+    lbl_peak_.setColour (juce::Label::textColourId, juce::Colours::lightgrey);
+
+    addAndMakeVisible (sld_peak_);
+    sld_peak_.setSliderStyle (juce::Slider::LinearHorizontal);
+    sld_peak_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 18);
+    sld_peak_.setRange (-80.0, 6.0, 1.0);
+    sld_peak_.setValue (proc_.view_peak_db, juce::dontSendNotification);
+    sld_peak_.setTextValueSuffix (" dB");
+    sld_peak_.setDoubleClickReturnValue (true, -25.0);
+    sld_peak_.setTooltip ("Peak level: top of the colormap (only when Auto Level is off). Double-click to reset.");
+    sld_peak_.addListener (this);
+
+    addAndMakeVisible (btn_hpf_);
+    btn_hpf_.setTooltip ("Apply 4th-order Butterworth high-pass to the visualizer signal.");
+    styleToggle (btn_hpf_);
+    btn_hpf_.setToggleState (proc_.view_vis_hpf_on.load(), juce::dontSendNotification);
+    btn_hpf_.addListener (this);
+
+    auto makeLogRange = [] (double low, double high)
+    {
+        juce::NormalisableRange<double> r (low, high,
+            [] (double s, double e, double t) { return s * std::pow (e / s, t); },
+            [] (double s, double e, double v) { return std::log (v / s) / std::log (e / s); });
+        r.interval = 1.0;
+        return r;
+    };
+
+    addAndMakeVisible (sld_hpf_fc_);
+    sld_hpf_fc_.setSliderStyle (juce::Slider::LinearHorizontal);
+    sld_hpf_fc_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 18);
+    sld_hpf_fc_.setNormalisableRange (makeLogRange (10.0, 24000.0));
+    sld_hpf_fc_.setValue ((double) proc_.view_vis_hpf_fc.load(), juce::dontSendNotification);
+    sld_hpf_fc_.setTextValueSuffix (" Hz");
+    sld_hpf_fc_.setDoubleClickReturnValue (true, 500.0);
+    sld_hpf_fc_.setTooltip ("High-pass cutoff (Hz). Double-click to reset.");
+    sld_hpf_fc_.addListener (this);
+
+    addAndMakeVisible (btn_lpf_);
+    btn_lpf_.setTooltip ("Apply 4th-order Butterworth low-pass to the visualizer signal.");
+    styleToggle (btn_lpf_);
+    btn_lpf_.setToggleState (proc_.view_vis_lpf_on.load(), juce::dontSendNotification);
+    btn_lpf_.addListener (this);
+
+    addAndMakeVisible (sld_lpf_fc_);
+    sld_lpf_fc_.setSliderStyle (juce::Slider::LinearHorizontal);
+    sld_lpf_fc_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 18);
+    sld_lpf_fc_.setNormalisableRange (makeLogRange (10.0, 24000.0));
+    sld_lpf_fc_.setValue ((double) proc_.view_vis_lpf_fc.load(), juce::dontSendNotification);
+    sld_lpf_fc_.setTextValueSuffix (" Hz");
+    sld_lpf_fc_.setDoubleClickReturnValue (true, 5000.0);
+    sld_lpf_fc_.setTooltip ("Low-pass cutoff (Hz). Double-click to reset.");
+    sld_lpf_fc_.addListener (this);
+
+    addAndMakeVisible (lbl_smoothing_);
+    lbl_smoothing_.setText ("Smooth", juce::dontSendNotification);
+    lbl_smoothing_.setFont (juce::Font (juce::FontOptions { 11.0f, juce::Font::plain }));
+    lbl_smoothing_.setJustificationType (juce::Justification::centredRight);
+    lbl_smoothing_.setColour (juce::Label::textColourId, juce::Colours::lightgrey);
+
+    addAndMakeVisible (sld_smoothing_);
+    sld_smoothing_.setSliderStyle (juce::Slider::LinearHorizontal);
+    sld_smoothing_.setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 18);
+    sld_smoothing_.setRange (10.0, 2000.0, 1.0);
+    sld_smoothing_.setSkewFactorFromMidPoint (200.0);
+    sld_smoothing_.setValue ((double) proc_.view_smoothing_ms.load(), juce::dontSendNotification);
+    sld_smoothing_.setTextValueSuffix (" ms");
+    sld_smoothing_.setDoubleClickReturnValue (true, 150.0);
+    sld_smoothing_.setTooltip ("Time constant for the energy heatmap (longer = smoother). Double-click to reset.");
+    sld_smoothing_.addListener (this);
+
+    addAndMakeVisible (lbl_colormap_);
+    lbl_colormap_.setText ("Colormap", juce::dontSendNotification);
+    lbl_colormap_.setFont (juce::Font (juce::FontOptions { 11.0f, juce::Font::plain }));
+    lbl_colormap_.setJustificationType (juce::Justification::centredRight);
+    lbl_colormap_.setColour (juce::Label::textColourId, juce::Colours::lightgrey);
+
+    addAndMakeVisible (cb_colormap_);
+    {
+        int idx = 1;
+        for (auto& n : Colormap::getNames())
+            cb_colormap_.addItem (n, idx++);
+        cb_colormap_.setSelectedId ((int) Colormap::fromName (proc_.view_colormap) + 1, juce::dontSendNotification);
+    }
+    cb_colormap_.addListener (this);
+
+    setSize (290, 314);
+    updateEnablement();
+}
+
+void VizSettingsPopup::resized()
+{
+    auto area = getLocalBounds().reduced (10);
+    lbl_title_.setBounds (area.removeFromTop (18));
+    area.removeFromTop (6);
+
+    // Row: [Auto]
+    {
+        auto row = area.removeFromTop (24);
+        const int btnW = 90;
+        btn_autonorm_.setBounds (row.removeFromLeft (btnW));
+    }
+    area.removeFromTop (8);
+
+    constexpr int kLabelW = 70;
+
+    // Row: [Range label][slider]
+    {
+        auto row = area.removeFromTop (22);
+        lbl_range_.setBounds (row.removeFromLeft (kLabelW));
+        sld_range_.setBounds (row);
+    }
+    area.removeFromTop (4);
+
+    // Row: [Peak label][slider]
+    {
+        auto row = area.removeFromTop (22);
+        lbl_peak_.setBounds (row.removeFromLeft (kLabelW));
+        sld_peak_.setBounds (row);
+    }
+    area.removeFromTop (4);
+
+    // Row: [Smooth label][slider]
+    {
+        auto row = area.removeFromTop (22);
+        lbl_smoothing_.setBounds (row.removeFromLeft (kLabelW));
+        sld_smoothing_.setBounds (row);
+    }
+    area.removeFromTop (8);
+
+    // Row: [HP toggle][slider+suffix]
+    {
+        auto row = area.removeFromTop (22);
+        btn_hpf_.setBounds (row.removeFromLeft (kLabelW - 4));
+        row.removeFromLeft (4);
+        sld_hpf_fc_.setBounds (row);
+    }
+    area.removeFromTop (4);
+
+    // Row: [LP toggle][slider+suffix]
+    {
+        auto row = area.removeFromTop (22);
+        btn_lpf_.setBounds (row.removeFromLeft (kLabelW - 4));
+        row.removeFromLeft (4);
+        sld_lpf_fc_.setBounds (row);
+    }
+    area.removeFromTop (8);
+
+    // Row: [Colormap label][combo]
+    {
+        auto row = area.removeFromTop (22);
+        lbl_colormap_.setBounds (row.removeFromLeft (kLabelW));
+        cb_colormap_.setBounds (row);
+    }
+}
+
+void VizSettingsPopup::buttonClicked (juce::Button* b)
+{
+    if (b == &btn_autonorm_)
+    {
+        proc_.view_autonorm = btn_autonorm_.getToggleState();
+        updateEnablement();
+        notifyChanged();
+    }
+    else if (b == &btn_hpf_)
+    {
+        proc_.view_vis_hpf_on.store (btn_hpf_.getToggleState());
+        updateEnablement();
+        notifyChanged();
+    }
+    else if (b == &btn_lpf_)
+    {
+        proc_.view_vis_lpf_on.store (btn_lpf_.getToggleState());
+        updateEnablement();
+        notifyChanged();
+    }
+}
+
+void VizSettingsPopup::sliderValueChanged (juce::Slider* s)
+{
+    if (s == &sld_range_)            proc_.view_range_db = (float) sld_range_.getValue();
+    else if (s == &sld_peak_)        proc_.view_peak_db  = (float) sld_peak_.getValue();
+    else if (s == &sld_smoothing_)   proc_.view_smoothing_ms.store ((float) sld_smoothing_.getValue());
+    else if (s == &sld_hpf_fc_)      proc_.view_vis_hpf_fc.store ((float) sld_hpf_fc_.getValue());
+    else if (s == &sld_lpf_fc_)      proc_.view_vis_lpf_fc.store ((float) sld_lpf_fc_.getValue());
+    notifyChanged();
+}
+
+void VizSettingsPopup::comboBoxChanged (juce::ComboBox* c)
+{
+    if (c == &cb_colormap_)
+    {
+        proc_.view_colormap = cb_colormap_.getText();
+        notifyChanged();
+    }
+}
+
+void VizSettingsPopup::updateEnablement()
+{
+    // Energy on/off lives on the main UI; if the user opens this popup they
+    // generally want all viz settings active. Peak gates on Auto, fc sliders
+    // gate on their respective HP/LP toggles.
+    const bool autoNorm = btn_autonorm_.getToggleState();
+    sld_peak_.setEnabled (! autoNorm);
+    lbl_peak_.setEnabled (! autoNorm);
+    sld_hpf_fc_.setEnabled (btn_hpf_.getToggleState());
+    sld_lpf_fc_.setEnabled (btn_lpf_.getToggleState());
+}
 
 //==============================================================================
 Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioProcessorEditor (Ambix_directional_loudnessAudioProcessor* ownerFilter)
@@ -34,6 +340,9 @@ Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioP
     setLookAndFeel (&globalLaF);
 
     tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
+    // Sit in the same always-on-top layer as the settings CallOutBox so
+    // tooltips for popup controls render above it via toFront() at display.
+    tooltipWindow.setAlwaysOnTop (true);
 
     addAndMakeVisible (lbl_gd);
     lbl_gd.setText("ambix_directional_loudness", dontSendNotification);
@@ -86,17 +395,70 @@ Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioP
     tabbedComponent.onTabChanged = [this]() { _lastTouchedIsRight = false; };
     tabbedComponent2.onTabChanged = [this]() { _lastTouchedIsRight = true; };
 
-    setSize (630, 400);
+    // ------- Toolbar (compact): HA toggle + Settings button only -------
+    auto styleToggle = [] (TextButton& b) {
+        b.setClickingTogglesState (true);
+        b.setColour (TextButton::buttonColourId,   Colour (0xff2a2a3a));
+        b.setColour (TextButton::buttonOnColourId, Colour (0xff5c5cc5));
+        b.setColour (TextButton::textColourOffId,  Colours::lightgrey);
+        b.setColour (TextButton::textColourOnId,   Colours::white);
+    };
+
+    addAndMakeVisible (btn_energy);
+    btn_energy.setTooltip ("Toggle the directional energy heatmap.");
+    styleToggle (btn_energy);
+    btn_energy.setToggleState (ownerFilter->view_energy_on, dontSendNotification);
+    btn_energy.addListener (this);
+
+    addAndMakeVisible (btn_premod);
+    btn_premod.setTooltip ("Visualize signal before (PRE MOD) or after (POST MOD) the directional-loudness modification.");
+    styleToggle (btn_premod);
+    btn_premod.setToggleState (ownerFilter->view_pre_mod, dontSendNotification);
+    btn_premod.addListener (this);
+
+    addAndMakeVisible (btn_projection);
+    btn_projection.setTooltip ("Switch between Rectangular (equirect) and Hammer-Aitoff projection.");
+    styleToggle (btn_projection);
+    btn_projection.setToggleState (ownerFilter->view_proj_ha, dontSendNotification);
+    btn_projection.addListener (this);
+
+    updateToolbarLabels();
+
+    addAndMakeVisible (btn_settings);
+    btn_settings.setButtonText (juce::String::fromUTF8 ("\xe2\x9a\x99"));   // ⚙ gear glyph
+    btn_settings.setTooltip ("Visualization settings (auto-norm, range, peak, smoothing, colormap).");
+    btn_settings.setColour (TextButton::buttonColourId,   Colour (0xff2a2a3a));
+    btn_settings.setColour (TextButton::textColourOffId,  Colours::lightgrey);
+    btn_settings.addListener (this);
+
+    addChildComponent (color_bar);    // visibility tracks energy state
+
+    // Push initial view state into the panning graph.
+    panninggraph.setProjection (ownerFilter->view_proj_ha
+                                ? PanningGraph::Projection::HammerAitoff
+                                : PanningGraph::Projection::Equirect);
+    panninggraph.setColormap (Colormap::fromName (ownerFilter->view_colormap));
+    panninggraph.setEnergyEnabled (ownerFilter->view_energy_on);
+
+    color_bar.setColormap (Colormap::fromName (ownerFilter->view_colormap));
+    color_bar.setVisible (ownerFilter->view_energy_on);
+
+    setResizable (true, true);
+    setResizeLimits (600, 380, 1920, 1200);
+    setSize (1100, 640);
 
     ownerFilter->addChangeListener(this);
 
     changeListenerCallback(nullptr);
 
+    startTimerHz (30);
 }
 
 
 Ambix_directional_loudnessAudioProcessorEditor::~Ambix_directional_loudnessAudioProcessorEditor()
 {
+    stopTimer();
+
     Ambix_directional_loudnessAudioProcessor* ourProcessor = getProcessor();
 
     // remove me as listener for changes
@@ -130,12 +492,54 @@ void Ambix_directional_loudnessAudioProcessorEditor::paint (Graphics& g)
 
 void Ambix_directional_loudnessAudioProcessorEditor::resized()
 {
-    lbl_gd.setBounds (0, 0, 204, 16);
-    filtergraph.setBounds (26, 22, 580, 237);
-    tabbedComponent.setBounds (20, 253, 282, 140);
-    tabbedComponent2.setBounds (322, 253, 282, 140);
-    panninggraph.setBounds (10, 25, 610, 220);
-    btn_solo_reset.setBounds (597, 254, 20, 20);
+    const int W = getWidth();
+    const int H = getHeight();
+
+    // Title (top-left).
+    lbl_gd.setBounds (0, 4, jmin (260, W / 2), 18);
+
+    // Toolbar (top-right, laid out right-to-left so visual order L→R is:
+    // [Energy Visualizer] [PRE/POST MOD] [Rectangular/Hammer-Aitoff] [⚙])
+    {
+        const int y = 2;
+        const int h = 26;
+        int x = W - 8;
+
+        const int wSet = 36;
+        const int wHA  = 130;   // "Hammer-Aitoff" / "Rectangular"
+        const int wPre = 90;    // "PRE MOD" / "POST MOD"
+        const int wEn  = 130;   // "Energy Visualizer ON/OFF"
+
+        x -= wSet; btn_settings  .setBounds (x, y, wSet, h);
+        x -= 6;
+        x -= wHA;  btn_projection.setBounds (x, y, wHA,  h);
+        x -= 6;
+        x -= wPre; btn_premod    .setBounds (x, y, wPre, h);
+        x -= 6;
+        x -= wEn;  btn_energy    .setBounds (x, y, wEn,  h);
+    }
+
+    // Two filter-tab panels at the bottom (fixed height; share width).
+    const int tabsH   = 140;
+    const int tabsTop = H - tabsH - 6;
+    const int gutter  = 18;
+    const int sideMargin = 20;
+    const int tabW = (W - 2 * sideMargin - gutter) / 2;
+    tabbedComponent .setBounds (sideMargin,                       tabsTop, tabW, tabsH);
+    tabbedComponent2.setBounds (sideMargin + tabW + gutter,        tabsTop, tabW, tabsH);
+    btn_solo_reset .setBounds  (W - 33,                             tabsTop + 1, 20, 20);
+
+    // Color bar (always reserves a strip on the right of the graph; hidden
+    // when energy is off).
+    const int colorBarW    = 70;
+    const int colorBarGap  = 8;
+    const int graphTop     = 32;            // 28 toolbar + 4 padding
+    const int graphBottom  = tabsTop - 8;
+    const int graphH       = jmax (60, graphBottom - graphTop);
+    const int graphRight   = W - 10 - colorBarGap - colorBarW;
+    panninggraph.setBounds (10, graphTop, graphRight - 10, graphH);
+    filtergraph .setBounds (10, graphTop, graphRight - 10, graphH); // legacy placeholder
+    color_bar   .setBounds (graphRight + colorBarGap, graphTop, colorBarW, graphH);
 }
 
 
@@ -167,6 +571,29 @@ void Ambix_directional_loudnessAudioProcessorEditor::changeListenerCallback (Cha
 
 
     } else {
+        // Re-sync the main-UI toggles (state may have been restored by the
+        // host or mutated by the popup).
+        if (btn_projection.getToggleState() != ourProcessor->view_proj_ha)
+            btn_projection.setToggleState (ourProcessor->view_proj_ha, dontSendNotification);
+        if (btn_energy.getToggleState() != ourProcessor->view_energy_on)
+            btn_energy.setToggleState (ourProcessor->view_energy_on, dontSendNotification);
+        if (btn_premod.getToggleState() != ourProcessor->view_pre_mod)
+            btn_premod.setToggleState (ourProcessor->view_pre_mod, dontSendNotification);
+        updateToolbarLabels();
+
+        const auto cmName = ourProcessor->view_colormap;
+        panninggraph.setProjection (ourProcessor->view_proj_ha
+                                    ? PanningGraph::Projection::HammerAitoff
+                                    : PanningGraph::Projection::Equirect);
+        panninggraph.setColormap (Colormap::fromName (cmName));
+        color_bar.setColormap (Colormap::fromName (cmName));
+
+        // Push the appropriate mesh (HA or equirect) before enabling energy.
+        pushMeshForProjection();
+
+        panninggraph.setEnergyEnabled (ourProcessor->view_energy_on);
+        color_bar.setVisible (ourProcessor->view_energy_on);
+
         bool onesolo = false;
 
         for (int i=0; i < NUM_FILTERS; i++)
@@ -210,13 +637,230 @@ void Ambix_directional_loudnessAudioProcessorEditor::changeListenerCallback (Cha
 
 void Ambix_directional_loudnessAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 {
+    auto* ourProcessor = getProcessor();
+
     if (buttonThatWasClicked == &btn_solo_reset)
     {
-        Ambix_directional_loudnessAudioProcessor* ourProcessor = getProcessor();
-
-        for (int i=0; i<NUM_FILTERS; i++) {
+        for (int i=0; i<NUM_FILTERS; i++)
             setParameterNotifyingHost(ourProcessor, PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WindowParam, 0.f);
+        return;
+    }
+
+    if (buttonThatWasClicked == &btn_projection)
+    {
+        const bool ha = btn_projection.getToggleState();
+        ourProcessor->view_proj_ha = ha;
+        panninggraph.setProjection (ha ? PanningGraph::Projection::HammerAitoff
+                                       : PanningGraph::Projection::Equirect);
+        pushMeshForProjection();
+        updateToolbarLabels();
+        return;
+    }
+
+    if (buttonThatWasClicked == &btn_energy)
+    {
+        const bool on = btn_energy.getToggleState();
+        ourProcessor->view_energy_on = on;
+        panninggraph.setEnergyEnabled (on);
+        color_bar.setVisible (on);
+        if (on) pushMeshForProjection();
+        updateToolbarLabels();
+        return;
+    }
+
+    if (buttonThatWasClicked == &btn_premod)
+    {
+        ourProcessor->view_pre_mod = btn_premod.getToggleState();
+        // Reset peak follower so the next-mode auto-norm catches up quickly.
+        smoothed_max_db_ = -20.f;
+        updateToolbarLabels();
+        return;
+    }
+
+    if (buttonThatWasClicked == &btn_settings)
+    {
+        openSettingsPopup();
+        return;
+    }
+}
+
+void Ambix_directional_loudnessAudioProcessorEditor::openSettingsPopup()
+{
+    auto popup = std::make_unique<VizSettingsPopup> (*getProcessor());
+    popup->onChanged = [this]() { onViewStateChanged(); };
+    juce::CallOutBox::launchAsynchronously (std::move (popup),
+                                            btn_settings.getScreenBounds(),
+                                            nullptr);
+    // The callout stays in its default always-on-top layer; we lift the
+    // editor's tooltip window into the same layer (see constructor) so the
+    // tooltip's toFront() brings it on top of the callout.
+}
+
+void Ambix_directional_loudnessAudioProcessorEditor::updateToolbarLabels()
+{
+    // Show the *current* state on the toggles so it's obvious what's
+    // active rather than what would happen if you click.
+    btn_energy   .setButtonText (btn_energy.getToggleState()
+                                  ? "Energy Visualizer ON"
+                                  : "Energy Visualizer OFF");
+    btn_premod   .setButtonText (btn_premod.getToggleState()
+                                  ? "PRE MOD"
+                                  : "POST MOD");
+    btn_projection.setButtonText (btn_projection.getToggleState()
+                                  ? "Hammer-Aitoff"
+                                  : "Rectangular");
+}
+
+void Ambix_directional_loudnessAudioProcessorEditor::pushMeshForProjection()
+{
+    auto* p = getProcessor();
+    if (p == nullptr) return;
+
+    const bool wantHA = p->view_proj_ha;
+
+    // Skip if the right mesh is already in place.
+    if (_meshPushed && _meshIsHA == wantHA) return;
+
+    if (wantHA)
+    {
+        const auto& dirs = p->getGridDirectionsCart();
+        if (dirs.empty()) return;
+        std::vector<int> idx (HammerAitovSample::kIndices,
+                              HammerAitovSample::kIndices + HammerAitovSample::kNumTriangles * 3);
+        panninggraph.setMesh (dirs, std::move (idx));
+    }
+    else
+    {
+        // Build (lazily, once) the equirect grid's triangle indices.
+        const int Naz = p->getEqGridNaz();
+        const int Nel = p->getEqGridNel();
+        const auto& dirs = p->getGridDirectionsEq();
+        if (dirs.empty() || Naz <= 0 || Nel <= 1) return;
+
+        if ((int) eq_indices_.size() / 6 != (Naz * (Nel - 1))
+            || eq_naz_ != Naz || eq_nel_ != Nel)
+        {
+            eq_indices_.clear();
+            eq_indices_.reserve ((size_t) Naz * (size_t) (Nel - 1) * 6);
+            for (int j = 0; j < Nel - 1; ++j)
+            {
+                for (int i = 0; i < Naz; ++i)
+                {
+                    const int iN = (i + 1) % Naz;
+                    const int v00 =       j * Naz + i;
+                    const int v10 =       j * Naz + iN;
+                    const int v01 = (j + 1) * Naz + i;
+                    const int v11 = (j + 1) * Naz + iN;
+                    eq_indices_.push_back (v00); eq_indices_.push_back (v10); eq_indices_.push_back (v11);
+                    eq_indices_.push_back (v00); eq_indices_.push_back (v11); eq_indices_.push_back (v01);
+                }
+            }
+            eq_naz_ = Naz;
+            eq_nel_ = Nel;
         }
+        panninggraph.setMesh (dirs, eq_indices_);
+    }
+
+    _meshPushed = true;
+    _meshIsHA   = wantHA;
+}
+
+void Ambix_directional_loudnessAudioProcessorEditor::onViewStateChanged()
+{
+    auto* p = getProcessor();
+    panninggraph.setColormap (Colormap::fromName (p->view_colormap));
+    color_bar.setColormap   (Colormap::fromName (p->view_colormap));
+    panninggraph.setEnergyEnabled (p->view_energy_on);
+    color_bar.setVisible (p->view_energy_on);
+
+    // Push grid directions on first energy-on if needed.
+    if (p->view_energy_on)
+        pushMeshForProjection();
+
+    // Reset smoothed peak follower so auto-norm rediscovers the level fast
+    // when the user toggles auto on.
+    smoothed_max_db_ = -20.f;
+}
+
+void Ambix_directional_loudnessAudioProcessorEditor::timerCallback()
+{
+    auto* p = getProcessor();
+    if (p == nullptr) return;
+
+    // Lazy mesh push once the processor has its grids initialized, and
+    // re-push when the projection changes (handled inside the helper).
+    if (p->view_energy_on)
+        pushMeshForProjection();
+
+    if (! p->view_energy_on)
+        return;
+
+    pushEnergyToGraph();
+}
+
+void Ambix_directional_loudnessAudioProcessorEditor::pushEnergyToGraph()
+{
+    auto* p = getProcessor();
+    const bool postMod = ! p->view_pre_mod;
+    const int n = p->view_proj_ha
+                    ? p->getGridEnergySnapshot   (energy_snapshot_, postMod)
+                    : p->getGridEnergySnapshotEq (energy_snapshot_, postMod);
+    if (n <= 0) return;
+
+    // Convert each grid energy (linear RMS²) to dB; track block max for
+    // auto-norm peak following.
+    std::vector<float> tValues ((size_t) n, 0.f);
+    std::vector<float> dbValues((size_t) n, -100.f);
+    float blockMax = -std::numeric_limits<float>::infinity();
+    for (int i = 0; i < n; ++i)
+    {
+        const float lin = std::sqrt (jmax (0.f, energy_snapshot_[(size_t) i])); // amplitude RMS
+        const float db  = Colormap::linearToDb (lin);
+        dbValues[(size_t) i] = db;
+        if (db > blockMax) blockMax = db;
+    }
+
+    const bool  autoNorm = p->view_autonorm;
+    const float rangeDb  = jmax (6.f, p->view_range_db);
+
+    float peakDb;
+    if (autoNorm)
+    {
+        // Peak follows max with fast attack / slow release. Clamp to a
+        // sensible floor so silent input doesn't drag the colormap top
+        // down into -∞ territory and freeze the auto-norm there. -80 dB
+        // is below typical noise floors and SH-decode numerical noise,
+        // so true silence reads as a flat-floor (uniform-blue) map.
+        constexpr float aUp        = 0.50f;  // ~70 ms attack at 30 Hz
+        constexpr float aDown      = 0.05f;  // ~700 ms release
+        constexpr float kMinPeakDb = -80.0f;
+        if (std::isfinite (blockMax))
+        {
+            const float a = (blockMax > smoothed_max_db_) ? aUp : aDown;
+            smoothed_max_db_ = smoothed_max_db_ + a * (blockMax - smoothed_max_db_);
+        }
+        smoothed_max_db_ = jmax (kMinPeakDb, smoothed_max_db_);
+        peakDb = smoothed_max_db_;
+    }
+    else
+    {
+        peakDb = p->view_peak_db;
+    }
+
+    const float floorDb = peakDb - rangeDb;
+
+    for (int i = 0; i < n; ++i)
+        tValues[(size_t) i] = jlimit (0.0f, 1.0f, (dbValues[(size_t) i] - floorDb) / rangeDb);
+
+    panninggraph.setEnergyT (tValues);
+
+    // Refresh the color bar so its labels match the active dB range.
+    if (! approximatelyEqual (displayed_floor_db_, floorDb)
+        || ! approximatelyEqual (displayed_peak_db_,  peakDb))
+    {
+        displayed_floor_db_ = floorDb;
+        displayed_peak_db_  = peakDb;
+        color_bar.setRange (floorDb, peakDb);
     }
 }
 

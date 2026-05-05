@@ -196,6 +196,48 @@ public:
     int filter_sel_id_1;
     int filter_sel_id_2;
 
+    // View-state (persisted alongside parameters in the XML state but NOT
+    // exposed as host-automated parameters). Mutated by the editor; read
+    // back on plugin reload.
+    bool   view_proj_ha    = true;        // false = equirect, true = HA
+    bool   view_energy_on  = true;
+    bool   view_autonorm   = true;
+    bool   view_pre_mod    = false;       // true = pre-Sh_transf, false = post
+    float  view_range_db   = 25.f;        // dB span of the colormap (always user-controlled)
+    float  view_peak_db    = -25.f;       // top of colormap when not auto
+    juce::String view_colormap = "jet";
+
+    // Smoothing time constant for the energy heatmap (ms). Read on the audio
+    // thread via std::memory_order_relaxed; the value is small and atomic.
+    std::atomic<float> view_smoothing_ms { 150.f };
+
+    // Optional 4th-order Butterworth HP/LP filter applied only to the
+    // visualizer signal (pre and post mod taps), so the energy heatmap can be
+    // band-limited without affecting the audio output.
+    std::atomic<bool>  view_vis_hpf_on { false };
+    std::atomic<bool>  view_vis_lpf_on { false };
+    std::atomic<float> view_vis_hpf_fc { 500.f };
+    std::atomic<float> view_vis_lpf_fc { 5000.f };
+
+    // ------------------------------------------------------------------------
+    // Energy visualization API (used by the editor on its GUI timer thread).
+    // ------------------------------------------------------------------------
+
+    // Cartesian unit vectors of the HA visualization grid (IEM 426 points).
+    const std::vector<Eigen::Vector3d>& getGridDirectionsCart() const { return grid_dirs_cart_; }
+
+    // Cartesian unit vectors of the equirect grid (regular Naz × Nel az/el).
+    const std::vector<Eigen::Vector3d>& getGridDirectionsEq() const { return grid_dirs_eq_; }
+    int  getEqGridNaz() const { return eq_grid_naz_; }
+    int  getEqGridNel() const { return eq_grid_nel_; }
+
+    // Copy snapshots of the smoothed per-grid-point linear RMS² energy.
+    // Returns the number of grid points; uses a brief spin-lock against
+    // the audio thread. `postMod=true` returns the energy of the modified
+    // (post-Sh_transf) signal instead of the raw input.
+    int getGridEnergySnapshot   (std::vector<float>& out, bool postMod = false) const;
+    int getGridEnergySnapshotEq (std::vector<float>& out, bool postMod = false) const;
+
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
@@ -238,6 +280,84 @@ private:
     Eigen::MatrixXd Sh_transf; // Transformation Matrix
 
     Eigen::MatrixXd _Sh_transf; // Old Transformation Matrix
+
+    // --- Input-energy tap (pre-`Sh_transf`) for the heatmap visualization ---
+
+    // Visualization decode matrix: rows = HA-uniform sample points (426),
+    // cols = AMBI_CHANNELS. Built once in calcParams(). Independent from the
+    // audio-path t-design so the heatmap can match IEM's EnergyVisualizer
+    // exactly without disturbing the directional-loudness DSP.
+    Eigen::MatrixXd Sh_matrix_viz_;
+
+    // Smoothed RMS² per viz grid point (size = HammerAitovSample::kNumPoints).
+    // _post_ variants hold the energy of the modified (post-Sh_transf) signal.
+    std::vector<float> grid_energy_smoothed_;
+    std::vector<float> grid_energy_post_smoothed_;
+    mutable juce::SpinLock grid_energy_lock_;
+
+    // Pre-allocated scratch — sized in calcParams() once the grid and channel
+    // count are known. Must not allocate inside processBlock.
+    Eigen::VectorXd grid_energy_block_;       // size = viz grid count (pre)
+    Eigen::VectorXd grid_energy_post_block_;  // size = viz grid count (post)
+    Eigen::VectorXd grid_decode_scratch_;     // size = viz grid count
+    Eigen::VectorXd input_scratch_;           // size = AMBI_CHANNELS
+
+    // Cartesian unit vectors of the HA visualization grid (IEM 426 points).
+    std::vector<Eigen::Vector3d> grid_dirs_cart_;
+
+    // ----- Equirect (regular az/el) grid: independent decode + energy buffer.
+    Eigen::MatrixXd Sh_matrix_eq_;
+    std::vector<Eigen::Vector3d> grid_dirs_eq_;
+    std::vector<float>           grid_energy_eq_smoothed_;
+    std::vector<float>           grid_energy_eq_post_smoothed_;
+    Eigen::VectorXd              grid_energy_eq_block_;
+    Eigen::VectorXd              grid_energy_eq_post_block_;
+    Eigen::VectorXd              grid_decode_eq_scratch_;
+    int eq_grid_naz_ = 24;   // 15° azimuth step
+    int eq_grid_nel_ = 19;   // 10° elevation step (incl. both poles)
+
+    double sample_rate_ = 48000.0;
+
+    // ----- 4th-order Butterworth filtering for the visualizer-only path -----
+    // RBJ-cookbook biquad in Direct Form II Transposed. 4th-order = 2 sections
+    // cascaded with the two Butterworth Q values for pole pairs at ±π/8 / ±3π/8.
+    struct VizBiquad
+    {
+        float b0 = 1.f, b1 = 0.f, b2 = 0.f, a1 = 0.f, a2 = 0.f;
+        inline float process (float x, float& z1, float& z2) const noexcept
+        {
+            const float y = b0 * x + z1;
+            z1 = b1 * x + z2 - a1 * y;
+            z2 = b2 * x - a2 * y;
+            return y;
+        }
+    };
+    struct VizFilter4 { VizBiquad s1, s2; };
+
+    static void designVizHighPass (VizFilter4& f, float sr, float fc);
+    static void designVizLowPass  (VizFilter4& f, float sr, float fc);
+
+    VizFilter4 hpf_design_;
+    VizFilter4 lpf_design_;
+    float      hpf_fc_cached_ = -1.f;
+    float      lpf_fc_cached_ = -1.f;
+
+    // Per-channel filter state — 4 floats per channel (s1.z1, s1.z2, s2.z1,
+    // s2.z2). Pre and post taps share the state: this is for visualization
+    // only, not audio playback, so the brief state-mismatch transient when
+    // alternating between pre and post signals is invisible after the energy
+    // smoothing and not worth a 2× state cost.
+    std::vector<float> state_hpf_, state_lpf_;
+
+    // Scratch buffers for the filtered visualizer signal (sized in
+    // prepareToPlay; only populated when at least one filter is active).
+    juce::AudioBuffer<float> filt_pre_buf_;
+    juce::AudioBuffer<float> filt_post_buf_;
+
+    void applyVizFilters (const juce::AudioBuffer<float>& src,
+                          juce::AudioBuffer<float>& dst,
+                          int numCh, int numSamples,
+                          bool hpfOn, bool lpfOn);
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_directional_loudnessAudioProcessor)

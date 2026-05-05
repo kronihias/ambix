@@ -19,7 +19,25 @@
 
 #include "PanningGraph.h"
 #include "../../common/JuceCompat.h"
+#include "HammerAitov.h"
+#include "HammerAitovSample.h"
 
+namespace
+{
+    // The IEM Hammer-Aitoff `sphericalToXY` we use is normalized so its image
+    // is the unit disk (|h|≤1). That means the chart's natural shape is a
+    // circle of radius 1 in HA space (NOT the textbook 2:1 ellipse with
+    // half-axes √2 / (1/√2)).
+
+    // Build a unit cartesian vector from azimuth/elevation in radians.
+    inline void sphToCart (float azRad, float elRad, float& x, float& y, float& z)
+    {
+        const float cE = std::cos (elRad);
+        x = std::cos (azRad) * cE;
+        y = std::sin (azRad) * cE;
+        z = std::sin (elRad);
+    }
+}
 
 PanningGraph::PanningGraph (AudioProcessor* processor) :
                             lxmargin(30.f),
@@ -29,34 +47,54 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
                             one_filter_solo_(false),
                             mouse_near_filter_id(-1)
 {
-    tooltipWindow.setMillisecondsBeforeTipAppears (200); // tooltip delay
+    tooltipWindow.setMillisecondsBeforeTipAppears (200);
 
     myprocessor_ = processor;
 
-    // this draws the rectangular/elliptical shape
     for (int i=0; i<NUM_FILTERS; i++)
     {
         graphs_.add(new GraphComponent(i));
         addAndMakeVisible(graphs_.getLast());
     }
 
-    // this is the drag button
     for (int i=0; i < NUM_FILTERS; i++)
     {
-        btn_drag.add(new ImageButton (String(i)));
+        btn_drag.add(new FilterPuckButton (String(i)));
 
         btn_drag.getLast()->addListener(this);
         btn_drag.getLast()->setImages (false, true, true,
                                        ImageCache::getFromMemory (drag_off_png, drag_off_pngSize), 1.000f, Colour (0x00000000),
                                        ImageCache::getFromMemory (drag_over_png, drag_over_pngSize), 1.000f, Colour (0x00000000),
-                                       ImageCache::getFromMemory (drag_on_png, drag_on_pngSize), 1.000f, Colour (0x00000000));
+                                       ImageCache::getFromMemory (drag_on_png,  drag_on_pngSize),  1.000f, Colour (0x00000000));
         btn_drag.getLast()->setTriggeredOnMouseDown(true);
         btn_drag.getLast()->setRepeatSpeed(50, 50);
-        String tooltip("Filter ");
-        tooltip << i+1;
-        btn_drag.getLast()->setTooltip(tooltip);
 
-        // the label
+        // Double-click on the puck → reset that filter's gain to 0 dB.
+        btn_drag.getLast()->onDoubleClick = [this, i]()
+        {
+            const int paridx = PARAMS_PER_FILTER * i
+                                + Ambix_directional_loudnessAudioProcessor::GainParam;
+            setParameterNotifyingHost (myprocessor_, paridx, DbToParam (0.0f));
+        };
+
+        // Hovering the puck → show floating gain readout (sticky); on exit,
+        // start the normal fade-out.
+        btn_drag.getLast()->onHoverChanged = [this, i] (bool hovering)
+        {
+            if (hovering)
+            {
+                showGainLabel (i, /*sticky=*/ true);
+            }
+            else if (i < lbl_gain_db_.size())
+            {
+                gain_label_until_ms_[(size_t) i]
+                    = (juce::int64) juce::Time::getMillisecondCounter()
+                        + kGainLabelHoldMs + kGainLabelFadeMs;
+                if (! isTimerRunning())
+                    startTimerHz (30);
+            }
+        };
+
         String label(i+1);
         lbl_drag.add(new Label(label));
         lbl_drag.getLast()->setText(label, dontSendNotification);
@@ -67,16 +105,59 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
         lbl_drag.getLast()->setColour (Label::textColourId, Colours::white);
         lbl_drag.getLast()->setColour (TextEditor::textColourId, Colours::black);
         lbl_drag.getLast()->setColour (TextEditor::backgroundColourId, Colour (0x00000000));
-
     }
 
-    // add to the parent component in reverse order...
     for (int i=NUM_FILTERS-1; i >= 0; i--)
     {
         addAndMakeVisible(btn_drag.getUnchecked(i));
         addAndMakeVisible(lbl_drag.getUnchecked(i));
     }
 
+    // Transient gain-dB labels shown next to the filter puck while the user
+    // is actively changing gain. Hidden by default; fades out via timer.
+    for (int i = 0; i < NUM_FILTERS; ++i)
+    {
+        auto* l = new GainHoverLabel ("gainDb_" + String (i + 1));
+        l->setFont (Font (FontOptions { 12.0f, Font::bold }));
+        l->setJustificationType (Justification::centred);
+        l->setColour (Label::textColourId,       Colours::white);
+        l->setColour (Label::backgroundColourId, Colour (0xa0000000));
+        l->setColour (Label::outlineColourId,    Colour (0x60ffffff));
+        l->setEditable (false, false, false);
+        // Allow the label itself to receive hover events (children remain
+        // unaffected). Clicks reach the label but do nothing — there's no
+        // edit mode and no click handler.
+        l->setInterceptsMouseClicks (true, false);
+        l->setVisible (false);
+        l->setBorderSize (BorderSize<int> (1, 4, 1, 4));
+        l->onHoverChanged = [this, i] (bool hovering)
+        {
+            if (i >= lbl_gain_db_.size()) return;
+            auto* lab = lbl_gain_db_.getUnchecked (i);
+            if (! lab->isVisible()) return;
+            if (hovering)
+            {
+                lab->setAlpha (1.0f);
+                gain_label_until_ms_[(size_t) i] = std::numeric_limits<juce::int64>::max();
+            }
+            else
+            {
+                gain_label_until_ms_[(size_t) i]
+                    = (juce::int64) juce::Time::getMillisecondCounter()
+                        + kGainLabelHoldMs + kGainLabelFadeMs;
+                if (! isTimerRunning())
+                    startTimerHz (30);
+            }
+        };
+        // addChildComponent (not addAndMakeVisible) so the label stays
+        // hidden until showGainLabel makes it visible — addAndMakeVisible
+        // would have flipped setVisible back to true and we'd see an empty
+        // black box at startup.
+        addChildComponent (l);
+        lbl_gain_db_.add (l);
+    }
+    last_gain_db_.fill (std::nanf (""));
+    gain_label_until_ms_.fill (0);
 }
 
 PanningGraph::~PanningGraph()
@@ -85,309 +166,690 @@ PanningGraph::~PanningGraph()
     graphs_.clear();
 }
 
+// ============================================================================
+// Projection helpers
+// ============================================================================
+
+Rectangle<int> PanningGraph::getProjectionBounds() const
+{
+    Rectangle<int> drawable ((int) lxmargin,
+                             (int) tymargin,
+                             (int) (getWidth()  - lxmargin - rxmargin),
+                             (int) (getHeight() - tymargin - bymargin));
+
+    if (projection_ == Projection::Equirect)
+        return drawable;
+
+    // HA: canonical 2:1 ellipse letterboxed inside the drawable. Matches IEM
+    // EnergyVisualizer — both poles and both seams are visible, with black
+    // bars on the long axis when the panel is wider than 2:1.
+    const float dw = (float) drawable.getWidth();
+    const float dh = (float) drawable.getHeight();
+    int w, h;
+    if (dw / dh > 2.0f) { h = (int) dh; w = h * 2; }
+    else                { w = (int) dw; h = w / 2; }
+    const int x = drawable.getX() + (drawable.getWidth()  - w) / 2;
+    const int y = drawable.getY() + (drawable.getHeight() - h) / 2;
+    return { x, y, w, h };
+}
+
+Point<float> PanningGraph::sphericalToScreen (float azDeg, float elDeg) const
+{
+    const auto rect = getProjectionBounds();
+
+    if (projection_ == Projection::Equirect)
+    {
+        const float x = (float) rect.getX() + rect.getWidth()  * (azDeg + 180.f) / 360.f;
+        const float y = (float) rect.getY() + rect.getHeight() * (-elDeg + 90.f) / 180.f;
+        return { x, y };
+    }
+
+    // HA: IEM's `sphericalToXY` is normalized to a unit disk; we scale x by 2
+    // to recover the canonical 2:1 ellipse (matches IEM EnergyVisualizer's
+    // chart aspect). Map ellipse extent [-2,2] × [-1,1] linearly onto the
+    // letterboxed 2:1 box returned by getProjectionBounds().
+    //
+    // The IEM convention puts positive azimuth on the *left* of the chart;
+    // we flip x so positive azimuth lands on the *right*, matching the
+    // rectangular projection.
+    float hx, hy;
+    HammerAitov::sphericalToXY (azDeg * MathConstants<float>::pi / 180.f,
+                                elDeg * MathConstants<float>::pi / 180.f,
+                                hx, hy);
+    hx = -hx;
+    hx *= 2.f;
+    const float u = (hx + 2.f) * 0.25f;
+    const float v = (1.f - hy) * 0.5f;
+    return { (float) rect.getX() + u * (float) rect.getWidth(),
+             (float) rect.getY() + v * (float) rect.getHeight() };
+}
+
+bool PanningGraph::screenToSpherical (Point<float> px, float& azDeg, float& elDeg) const
+{
+    const auto rect = getProjectionBounds();
+    if (rect.getWidth() <= 0 || rect.getHeight() <= 0) return false;
+
+    if (projection_ == Projection::Equirect)
+    {
+        const float u = (px.x - rect.getX()) / (float) rect.getWidth();
+        const float v = (px.y - rect.getY()) / (float) rect.getHeight();
+        azDeg = jlimit (-180.f, 180.f, u * 360.f - 180.f);
+        elDeg = jlimit  (-90.f,  90.f, 90.f - v * 180.f);
+        return true;
+    }
+
+    const float u = (px.x - rect.getX()) / (float) rect.getWidth();
+    const float v = (px.y - rect.getY()) / (float) rect.getHeight();
+    const float hx = u * 4.f - 2.f;     // [-2, 2]
+    const float hy = 1.f - v * 2.f;     // [-1, 1]
+
+    // Inverse expects the unit-disk normalization, so undo the x-scale.
+    // We also flip the sign of hx to match the forward map's flip (positive
+    // az → right on screen).
+    const float hxUnit = -hx * 0.5f;
+    if (! HammerAitov::isInside (hxUnit, hy)) return false;
+
+    float az, el;
+    HammerAitov::XYToSpherical (hxUnit, hy, az, el);
+    azDeg = az * 180.f / MathConstants<float>::pi;
+    elDeg = el * 180.f / MathConstants<float>::pi;
+    return true;
+}
+
+// Equirect-only screen↔deg helpers (kept for the existing drag-resize math
+// where a linear pixel-to-degree mapping is the intended UX in both modes).
+int   PanningGraph::degtoypos (float deg) const
+{
+    float h = (float) getHeight() - tymargin - bymargin;
+    return (int) (tymargin + h * (-deg + 90.f) / 180.f);
+}
+float PanningGraph::ypostodeg (int ypos) const
+{
+    float h = (float) getHeight() - tymargin - bymargin;
+    return 90.f - (ypos - tymargin) / h * 180.f;
+}
+int   PanningGraph::degtoxpos (float deg) const
+{
+    float w = (float) getWidth() - lxmargin - rxmargin;
+    return (int) (lxmargin + w * (deg + 180.f) / 360.f);
+}
+float PanningGraph::xpostodeg (int xpos) const
+{
+    float w = (float) getWidth() - lxmargin - rxmargin;
+    return (xpos - lxmargin) / w * 360.f - 180.f;
+}
+
+// ============================================================================
+// Paint / resize
+// ============================================================================
+
 void PanningGraph::paint (Graphics& g)
 {
+    const int width  = getWidth();
+    const int height = getHeight();
 
-    int width = getWidth();
-    int height = getHeight();
-
-    // background
-    if (one_filter_solo_)
-    {
+    // Panel background. The legacy "solo-active" cue painted a fully
+    // transparent rect to dim the panel — but with the heatmap layer on top,
+    // that left the visualizer barely visible against the editor's dark
+    // backdrop. When the energy heatmap is enabled, always paint the
+    // gradient so the heatmap has a consistent surface to alpha-blend over.
+    // (Solo state stays visually obvious via the soloed filter's yellow
+    // stroke and the highlighted "S" indicator.)
+    const bool dimForSolo = one_filter_solo_ && ! energy_enabled_;
+    if (dimForSolo)
         g.setColour (Colour (0x00ffffff));
-    } else {
-        g.setGradientFill (ColourGradient (Colour (0xff232338), width / 2, height / 2, Colour (0xff21222a), 2.5f, getHeight() / 2, true));
+    else
+        g.setGradientFill (ColourGradient (Colour (0xff232338), width / 2, height / 2,
+                                           Colour (0xff21222a), 2.5f, height / 2, true));
+
+    g.fillRoundedRectangle (lxmargin, tymargin,
+                            width - lxmargin - rxmargin,
+                            height - tymargin - bymargin, 10.000f);
+
+    // Heatmap (if enabled and image valid). Drawn underneath the grid lines.
+    // The lookup image is at moderate resolution; JUCE scales it to fit.
+    // In HA mode we clip to the chart ellipse so the rasterized stairsteps
+    // along the chart boundary are masked into a smooth curve.
+    if (energy_enabled_ && heatmap_image_.isValid())
+    {
+        Graphics::ScopedSaveState ss (g);
+        Path clip;
+        if (projection_ == Projection::HammerAitoff)
+            clip.addEllipse (projection_bounds_.toFloat());
+        else
+            clip.addRoundedRectangle ((float) lxmargin, (float) tymargin,
+                                      (float) (width - lxmargin - rxmargin),
+                                      (float) (height - tymargin - bymargin),
+                                      10.000f);
+        g.reduceClipRegion (clip);
+        g.drawImage (heatmap_image_,
+                     projection_bounds_.getX(),     projection_bounds_.getY(),
+                     projection_bounds_.getWidth(), projection_bounds_.getHeight(),
+                     0, 0,
+                     heatmap_image_.getWidth(),     heatmap_image_.getHeight(),
+                     /*fillAlphaChannelWithCurrentBrush*/ false);
     }
 
-
-
-    g.fillRoundedRectangle (lxmargin, tymargin, width - lxmargin - rxmargin, height-tymargin-bymargin, 10.000f);
-
+    // Axis labels (elevation on the left margin, azimuth on the bottom margin).
     g.setColour (Colour (0x60ffffff));
 
-    int elgridlines = 180/45+1;
-
-    for (int i=0; i < elgridlines; i++)
     {
-        float deg_val = 90-i*45;
+        const int elgridlines = 180/45 + 1;
+        for (int i=0; i < elgridlines; i++)
+        {
+            float deg_val = 90.f - i * 45.f;
+            auto p = sphericalToScreen (0.f, deg_val);
+            String axislabel = String((int)deg_val); axislabel << "°";
+            g.setFont (Font (FontOptions {"Arial Rounded MT", 12.0f, Font::plain}));
+            // place label aligned with the actual y of the parallel
+            g.drawText (axislabel, 0, ((int) p.y) - 6, 34, 12, Justification::centred, false);
+        }
 
-        int ypos = degtoypos(deg_val);
-
-        // text
-        String axislabel = String((int)deg_val);
-        axislabel << "°";
-        g.setFont (Font (FontOptions {"Arial Rounded MT", 12.0f, Font::plain}));
-        g.drawText (axislabel, 0, ypos-6, 34, 12, Justification::centred, false);
-        // g.drawText (String ("-") + axisLabel, 6, (int) (numHorizontalLines * (height - 5) / (numHorizontalLines + 1) + 3.5f), 45, 12, Justification::left, false);
-    }
-
-    int azgridlines = 360/45+1;
-
-    for (int i=0; i < azgridlines; i++)
-    {
-        float deg_val = 180-i*45;
-
-        int xpos = degtoxpos(deg_val);
-
-        // text
-        String axislabel = String((int)deg_val);
-        axislabel << "°";
-        g.setFont (Font (FontOptions {"Arial Rounded MT", 12.0f, Font::plain}));
-        g.drawText (axislabel, xpos-22, getHeight()-bymargin, 44, 12, Justification::centred, false);
+        const int azgridlines = 360/45 + 1;
+        for (int i=0; i < azgridlines; i++)
+        {
+            float deg_val = 180.f - i * 45.f;
+            auto p = sphericalToScreen (deg_val, 0.f);
+            String axislabel = String((int)deg_val); axislabel << "°";
+            g.setFont (Font (FontOptions {"Arial Rounded MT", 12.0f, Font::plain}));
+            g.drawText (axislabel, ((int) p.x) - 22, getHeight() - bymargin, 44, 12, Justification::centred, false);
+        }
     }
 
     g.setColour (Colour (0x60ffffff));
     g.strokePath (path_grid, PathStrokeType (0.25f));
 
-
     g.setColour (Colour (0xffffffff));
     g.strokePath (path_w_grid, PathStrokeType (0.25f));
-
 }
 
 void PanningGraph::resized()
 {
-    int width = getWidth();
-    int height = getHeight();
+    const int width  = getWidth();
+    const int height = getHeight();
 
-    for (int i=0; i<graphs_.size(); i++) {
+    for (int i=0; i<graphs_.size(); i++)
         graphs_.getUnchecked(i)->setBounds(0, 0, width, height);
-    }
 
-    // create the grid path
-    path_w_grid.clear();
+    projection_bounds_ = getProjectionBounds();
+    rebuildGridLines();
+    rebuildPixelCartCache();
+    rebuildAllFilterPaths();
+    rebuildHeatmapMesh();
+
+    // Re-position drag buttons/labels for valid filters.
+    for (int i = 0; i < NUM_FILTERS; ++i)
+    {
+        if (! filter_states_[i].valid) continue;
+        auto p = sphericalToScreen (filter_states_[i].az, filter_states_[i].el);
+        btn_drag.getUnchecked(i)->setBounds ((int) p.x - 8, (int) p.y - 8, 16, 16);
+        lbl_drag.getUnchecked(i)->setBounds ((int) p.x - 12, (int) p.y - 12, 26, 24);
+    }
+}
+
+void PanningGraph::rebuildGridLines()
+{
     path_grid.clear();
+    path_w_grid.clear();
 
-
-    int el_gridlines = 180/45+1;
-
-    for (int i=0; i < el_gridlines; i++)
+    auto addLine = [&] (Path& p, Point<float> from, Point<float> to)
     {
-        float deg_val = -90+i*45;
+        p.startNewSubPath (from);
+        p.lineTo (to);
+    };
 
-        int ypos = degtoypos(deg_val);
-
-        if (deg_val == 0)
+    if (projection_ == Projection::Equirect)
+    {
+        const int el_gridlines = 180/45 + 1;
+        for (int i=0; i < el_gridlines; ++i)
         {
-            path_w_grid.startNewSubPath(degtoxpos(-180), ypos);
-            path_w_grid.lineTo(degtoxpos(180), ypos);
-        }
-        else
-        {
-            path_grid.startNewSubPath(degtoxpos(-180), ypos);
-            path_grid.lineTo(degtoxpos(180), ypos);
+            float deg_val = -90.f + i*45.f;
+            Path& target = (deg_val == 0.f) ? path_w_grid : path_grid;
+            addLine (target,
+                     sphericalToScreen (-180.f, deg_val),
+                     sphericalToScreen ( 180.f, deg_val));
         }
 
+        const int az_gridlines = 360/45 + 1;
+        for (int i=0; i < az_gridlines; ++i)
+        {
+            float deg_val = -180.f + i*45.f;
+            Path& target = (deg_val == 0.f) ? path_w_grid : path_grid;
+            addLine (target,
+                     sphericalToScreen (deg_val,  90.f),
+                     sphericalToScreen (deg_val, -90.f));
+        }
+    }
+    else
+    {
+        // HA: meridians and parallels are curves — sample densely.
+        constexpr int kSamples = 64;
+
+        // Parallels (constant elevation).
+        const int el_gridlines = 180/45 + 1;
+        for (int i=0; i < el_gridlines; ++i)
+        {
+            float el = -90.f + i*45.f;
+            Path& target = (el == 0.f) ? path_w_grid : path_grid;
+            target.startNewSubPath (sphericalToScreen (-180.f, el));
+            for (int s=1; s <= kSamples; ++s)
+            {
+                float az = -180.f + (360.f * s) / kSamples;
+                target.lineTo (sphericalToScreen (az, el));
+            }
+        }
+
+        // Meridians (constant azimuth). In HA, az=+180° and az=-180° map to
+        // the LEFT and RIGHT chart edges respectively (different curves on
+        // screen even though they're the same antimeridian on the sphere).
+        // Draw both — the previous "skip duplicate" guard was hiding the
+        // right-edge meridian.
+        const int az_gridlines = 360/45 + 1;
+        for (int i=0; i < az_gridlines; ++i)
+        {
+            float az = -180.f + i*45.f;
+            Path& target = (az == 0.f) ? path_w_grid : path_grid;
+
+            target.startNewSubPath (sphericalToScreen (az, -90.f));
+            for (int s=1; s <= kSamples; ++s)
+            {
+                float el = -90.f + (180.f * s) / kSamples;
+                target.lineTo (sphericalToScreen (az, el));
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Filter shape construction
+// ============================================================================
+
+void PanningGraph::rebuildAllFilterPaths()
+{
+    for (int i = 0; i < NUM_FILTERS; ++i)
+        if (filter_states_[i].valid)
+            rebuildFilterPath (i);
+}
+
+void PanningGraph::rebuildFilterPath (int idx)
+{
+    const auto& fs = filter_states_[idx];
+
+    // HA mode: bypass the path renderer entirely — rasterize a per-pixel mask
+    // via the spherical inside-test. This trivially handles seam crossings,
+    // pole wraps, and multi-piece regions that break a path-based renderer.
+    if (projection_ == Projection::HammerAitoff)
+    {
+        rasterizeFilterMaskHA (idx);
+        return;
     }
 
+    Path filterarea;
 
-    int az_gridlines = 360/45+1;
-
-    for (int i=0; i < az_gridlines; i++)
+    if (projection_ == Projection::Equirect)
     {
-        float deg_val = -180+i*45;
+        // Preserve the existing equirect look (addEllipse / addRectangle plus
+        // pole and azimuth wrap-arounds).
+        const float az = fs.az;
+        const float el = fs.el;
+        const float w_deg  = fs.width;
+        const float h_deg  = fs.height;
 
-        int xpos = degtoxpos(deg_val);
-
-        if (deg_val == 0)
+        if (! fs.shape) // circle
         {
-            path_w_grid.startNewSubPath(xpos, degtoypos(90));
-            path_w_grid.lineTo(xpos, degtoypos(-90));
-        }
-        else
-        {
-            path_grid.startNewSubPath(xpos, degtoypos(90));
-            path_grid.lineTo(xpos, degtoypos(-90));
-        }
+            int x = degtoxpos(az);
+            int y = degtoypos(el);
+            int w = degtoxpos(w_deg) - degtoxpos(0.f);
+            int h = degtoypos(w_deg) - degtoypos(0.f);
 
+            filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
+
+            if (az + w_deg > 180.f)
+            {
+                int x2 = degtoxpos(az - 360.f);
+                filterarea.addEllipse(x2-w, y-h, 2*w, 2*h);
+            }
+            if (az - w_deg < -180.f)
+            {
+                int x2 = degtoxpos(az + 360.f);
+                filterarea.addEllipse(x2-w, y-h, 2*w, 2*h);
+            }
+            if (el + h_deg > 90.f)
+            {
+                float newaz = az - 180.f; if (newaz < -180.f) newaz += 360.f;
+                int x2 = degtoxpos(newaz);
+                int y2 = degtoypos(180.f - el);
+                filterarea.addEllipse(x2-w, y2-h, 2*w, 2*h);
+            }
+            if (el - h_deg < -90.f)
+            {
+                float newaz = az - 180.f; if (newaz < -180.f) newaz += 360.f;
+                int x2 = degtoxpos(newaz);
+                int y2 = degtoypos(-180.f - el);
+                filterarea.addEllipse(x2-w, y2-h, 2*w, 2*h);
+            }
+        }
+        else // rectangle
+        {
+            int x = degtoxpos(az);
+            int y = degtoypos(el);
+            int w = degtoxpos(w_deg) - degtoxpos(0.f);
+            int h = degtoypos(h_deg) - degtoypos(0.f);
+
+            filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
+
+            if (az + w_deg > 180.f)
+            {
+                int x2 = degtoxpos(az - 360.f);
+                filterarea.addRectangle(x2-w, y-h, 2*w, 2*h);
+            }
+            if (az - w_deg < -180.f)
+            {
+                int x2 = degtoxpos(az + 360.f);
+                filterarea.addRectangle(x2-w, y-h, 2*w, 2*h);
+            }
+            if (el + h_deg > 90.f)
+            {
+                float newaz = az - 180.f; if (newaz < -180.f) newaz += 360.f;
+                int x2 = degtoxpos(newaz);
+                int y2 = degtoypos(180.f - el);
+                filterarea.addRectangle(x2-w, y2-h, 2*w, 2*h);
+            }
+            if (el - h_deg < -90.f)
+            {
+                float newaz = az - 180.f; if (newaz < -180.f) newaz += 360.f;
+                int x2 = degtoxpos(newaz);
+                int y2 = degtoypos(-180.f - el);
+                filterarea.addRectangle(x2-w, y2-h, 2*w, 2*h);
+            }
+        }
+    }
+    // (HA branch handled above by rasterizeFilterMaskHA.)
+
+    graphs_.getUnchecked (idx)->setPath (&filterarea, fs.gain, fs.solo, one_filter_solo_);
+    graphs_.getUnchecked (idx)->repaint();
+}
+
+// ============================================================================
+// Per-pixel cartesian cache + filter-mask rasterizer (HA mode)
+// ============================================================================
+
+void PanningGraph::rebuildPixelCartCache()
+{
+    pixel_cart_.clear();
+    pixel_cart_W_ = pixel_cart_H_ = 0;
+    if (projection_ != Projection::HammerAitoff) return;
+
+    const auto rect = projection_bounds_;
+    const int dispW = rect.getWidth();
+    const int dispH = rect.getHeight();
+    if (dispW <= 0 || dispH <= 0) return;
+
+    constexpr int kMaxDim = 480;
+    int W = dispW, H = dispH;
+    if (W > kMaxDim || H > kMaxDim)
+    {
+        const float s = (float) kMaxDim / (float) jmax (W, H);
+        W = jmax (4, (int) std::round (W * s));
+        H = jmax (4, (int) std::round (H * s));
+    }
+    pixel_cart_W_ = W;
+    pixel_cart_H_ = H;
+    pixel_cart_.assign ((size_t) W * (size_t) H, juce::Vector3D<float> (2.f, 0.f, 0.f));
+
+    const float invSX = (float) dispW / (float) W;
+    const float invSY = (float) dispH / (float) H;
+    const float deg2rad = MathConstants<float>::pi / 180.f;
+
+    for (int y = 0; y < H; ++y)
+    {
+        for (int x = 0; x < W; ++x)
+        {
+            const float sx = (float) rect.getX() + (x + 0.5f) * invSX;
+            const float sy = (float) rect.getY() + (y + 0.5f) * invSY;
+            float az_deg, el_deg;
+            if (! screenToSpherical ({ sx, sy }, az_deg, el_deg)) continue;
+            const float azR = az_deg * deg2rad;
+            const float elR = el_deg * deg2rad;
+            float cx, cy, cz; sphToCart (azR, elR, cx, cy, cz);
+            pixel_cart_[(size_t) y * (size_t) W + (size_t) x]
+                = juce::Vector3D<float> (cx, cy, cz);
+        }
+    }
+}
+
+void PanningGraph::rasterizeFilterMaskHA (int idx)
+{
+    const auto& fs = filter_states_[idx];
+
+    if (pixel_cart_.empty() || pixel_cart_W_ <= 0 || pixel_cart_H_ <= 0
+        || projection_bounds_.getWidth() <= 0 || projection_bounds_.getHeight() <= 0)
+    {
+        // Mask not buildable yet — clear whatever was there.
+        graphs_.getUnchecked (idx)->setMask (Image(), Image(), projection_bounds_,
+                                             fs.gain, fs.solo, one_filter_solo_);
+        graphs_.getUnchecked (idx)->repaint();
+        return;
     }
 
+    const int W = pixel_cart_W_;
+    const int H = pixel_cart_H_;
 
-}
+    const float deg2rad = MathConstants<float>::pi / 180.f;
+    const float fcAz = fs.az * deg2rad;
+    const float fcEl = fs.el * deg2rad;
+    const float wRad = fs.width  * deg2rad;
+    const float hRad = fs.height * deg2rad;
 
-int PanningGraph::degtoypos (float deg)
-{
-    float height = (float) getHeight()-tymargin-bymargin;
+    float fcx, fcy, fcz; sphToCart (fcAz, fcEl, fcx, fcy, fcz);
 
-    return tymargin+height*(-deg+90)/180;
-}
+    // Anti-aliased rasterization: a pixel's fill alpha smoothly transitions
+    // from 1 (well inside) to 0 (well outside) over a small angular band
+    // centered on the boundary. Converting that angular band to a dot-product
+    // band uses the local rate |d(dot)/d(angle)| = sin(width). Stroke alpha
+    // peaks ON the boundary and falls off symmetrically over the same band.
+    // Result: smooth fill edges and a soft outline ring, anti-aliased at
+    // sub-pixel level rather than the hard 1-bit mask we had before.
+    constexpr float kEdgeAngularRad = 1.5f * MathConstants<float>::pi / 180.f; // ~1.5°
+    const float epsW = std::max (1e-4f, std::sin (wRad) * kEdgeAngularRad);
+    const float epsH = std::max (1e-4f, std::sin (hRad) * kEdgeAngularRad);
 
-float PanningGraph::ypostodeg (int ypos)
-{
-    float height = (float) getHeight()-tymargin-bymargin;
+    auto smoothFill = [] (float dotDelta, float eps) {
+        // 0 at dotDelta = -eps, 1 at dotDelta = +eps, smoothstep between.
+        const float t = jlimit (0.0f, 1.0f, (dotDelta + eps) * 0.5f / eps);
+        return t * t * (3.0f - 2.0f * t);
+    };
+    auto edgeAlpha = [] (float dotDelta, float eps) {
+        // Triangular kernel: 1 at dotDelta=0, 0 at |dotDelta|>=eps.
+        const float a = 1.0f - std::abs (dotDelta) / eps;
+        return jlimit (0.0f, 1.0f, a);
+    };
 
-    return 90-(ypos-tymargin)/height*180;
-}
+    Image fillImg   (Image::ARGB, W, H, true);
+    Image strokeImg (Image::ARGB, W, H, true);
+    Image::BitmapData fbd (fillImg,   Image::BitmapData::writeOnly);
+    Image::BitmapData sbd (strokeImg, Image::BitmapData::writeOnly);
 
-int PanningGraph::degtoxpos (float deg)
-{
-    float width = (float) getWidth()-lxmargin-rxmargin;
+    if (! fs.shape)
+    {
+        // Circular: angle from center via dot product.
+        const float cosW = std::cos (wRad);
+        for (int y = 0; y < H; ++y)
+        {
+            auto* fRow = fbd.getLinePointer (y);
+            auto* sRow = sbd.getLinePointer (y);
+            for (int x = 0; x < W; ++x)
+            {
+                const auto& p = pixel_cart_[(size_t) y * (size_t) W + (size_t) x];
+                if (p.x > 1.5f) continue;
+                const float dot      = p.x * fcx + p.y * fcy + p.z * fcz;
+                const float dotDelta = dot - cosW; // >0 inside, <0 outside
 
-    return lxmargin + width*(deg+180)/360;
-}
+                const float fA = smoothFill (dotDelta, epsW);
+                const float sA = edgeAlpha (dotDelta, epsW);
+                if (fA > 0.0f)
+                {
+                    juce::PixelARGB pa ((juce::uint8) (fA * 255.0f), 255, 255, 255);
+                    *reinterpret_cast<juce::PixelARGB*> (fRow + x * fbd.pixelStride) = pa;
+                }
+                if (sA > 0.0f)
+                {
+                    juce::PixelARGB pa ((juce::uint8) (sA * 255.0f), 255, 255, 255);
+                    *reinterpret_cast<juce::PixelARGB*> (sRow + x * sbd.pixelStride) = pa;
+                }
+            }
+        }
+    }
+    else
+    {
+        // Rectangular: independent az and el angular distances.
+        const float cosW = std::cos (wRad);
+        const float cosH = std::cos (hRad);
+        const float fcAzCos = std::cos (fcAz);
+        const float fcAzSin = std::sin (fcAz);
+        const float fcElCos = std::cos (fcEl);
+        const float fcElSin = std::sin (fcEl);
+        for (int y = 0; y < H; ++y)
+        {
+            auto* fRow = fbd.getLinePointer (y);
+            auto* sRow = sbd.getLinePointer (y);
+            for (int x = 0; x < W; ++x)
+            {
+                const auto& p = pixel_cart_[(size_t) y * (size_t) W + (size_t) x];
+                if (p.x > 1.5f) continue;
+                const float pAz = std::atan2 (p.y, p.x);
+                const float pEl = std::asin  (jlimit (-1.f, 1.f, p.z));
+                const float dotAz = std::cos (pAz) * fcAzCos + std::sin (pAz) * fcAzSin;
+                const float dotEl = std::cos (pEl) * fcElCos + std::sin (pEl) * fcElSin;
+                const float ddAz  = dotAz - cosW;
+                const float ddEl  = dotEl - cosH;
 
-float PanningGraph::xpostodeg (int xpos)
-{
-    float width = (float) getWidth()-lxmargin-rxmargin;
+                // Fill = intersection of two half-spaces.
+                const float fA = smoothFill (ddAz, epsW) * smoothFill (ddEl, epsH);
 
-    return (xpos-lxmargin)/width*360-180;
+                // Stroke = on either edge while well inside the perpendicular axis.
+                const float strokeAz = edgeAlpha (ddAz, epsW) * smoothFill (ddEl + epsH, epsH * 2.f);
+                const float strokeEl = edgeAlpha (ddEl, epsH) * smoothFill (ddAz + epsW, epsW * 2.f);
+                const float sA = std::max (strokeAz, strokeEl);
+
+                if (fA > 0.0f)
+                {
+                    juce::PixelARGB pa ((juce::uint8) (fA * 255.0f), 255, 255, 255);
+                    *reinterpret_cast<juce::PixelARGB*> (fRow + x * fbd.pixelStride) = pa;
+                }
+                if (sA > 0.0f)
+                {
+                    juce::PixelARGB pa ((juce::uint8) (sA * 255.0f), 255, 255, 255);
+                    *reinterpret_cast<juce::PixelARGB*> (sRow + x * sbd.pixelStride) = pa;
+                }
+            }
+        }
+    }
+
+    graphs_.getUnchecked (idx)->setMask (std::move (fillImg), std::move (strokeImg),
+                                          projection_bounds_,
+                                          fs.gain, fs.solo, one_filter_solo_);
+    graphs_.getUnchecked (idx)->repaint();
 }
 
 void PanningGraph::setFilter(int idx, float az, float el, bool shape, float width, float height, float gain, bool solo)
 {
-    // restrict the angles
-    if (el > 90.f)
+    // Wrap angles to canonical ranges (matches old behavior).
+    if (el >  90.f) { el = 180.f - el; az += 180.f; }
+    if (el < -90.f) { el = 180.f + el; az += 180.f; }
+    if (az >  180.f) az -= 360.f;
+    if (az < -180.f) az += 360.f;
+
+    filter_states_[idx] = { az, el, shape, width, height, gain, solo, true };
+
+    // Update drag handle position via the active projection.
+    auto p = sphericalToScreen (az, el);
+    btn_drag.getUnchecked(idx)->setBounds ((int) p.x - 8, (int) p.y - 8, 16, 16);
+    lbl_drag.getUnchecked(idx)->setBounds ((int) p.x - 12, (int) p.y - 12, 26, 24);
+
+    // If the gain label is currently visible, follow the puck.
+    if (idx < lbl_gain_db_.size() && lbl_gain_db_.getUnchecked (idx)->isVisible())
+        positionGainLabel (idx);
+
+    // Show the transient gain-dB readout next to the puck whenever the gain
+    // changes (skip on the very first setFilter after construction — that
+    // carries saved/default state, with prev = NaN).
+    const float prev = last_gain_db_[(size_t) idx];
+    const bool gainChanged = std::isfinite (prev)
+                              && std::abs (prev - gain) > 0.05f;
+    last_gain_db_[(size_t) idx] = gain;
+    if (gainChanged)
+        showGainLabel (idx, /*sticky=*/ false);
+
+    rebuildFilterPath (idx);
+}
+
+void PanningGraph::showGainLabel (int idx, bool sticky)
+{
+    if (idx >= lbl_gain_db_.size() || ! filter_states_[(size_t) idx].valid) return;
+    auto* l = lbl_gain_db_.getUnchecked (idx);
+    const float gain = filter_states_[(size_t) idx].gain;
+    String text;
+    if (gain >  0.05f) text << "+";
+    text << String (gain, 1) << " dB";
+    l->setText (text, dontSendNotification);
+    l->setAlpha (1.0f);
+    l->setVisible (true);
+    positionGainLabel (idx);
+    gain_label_until_ms_[(size_t) idx] = sticky
+        ? std::numeric_limits<juce::int64>::max()
+        : (juce::int64) juce::Time::getMillisecondCounter()
+             + kGainLabelHoldMs + kGainLabelFadeMs;
+    if (! isTimerRunning())
+        startTimerHz (30);
+}
+
+void PanningGraph::positionGainLabel (int idx)
+{
+    if (idx >= lbl_gain_db_.size() || ! filter_states_[(size_t) idx].valid) return;
+    const auto p = sphericalToScreen (filter_states_[(size_t) idx].az,
+                                      filter_states_[(size_t) idx].el);
+    const int labelW = 60;
+    const int labelH = 16;
+    int x = (int) p.x - labelW / 2;
+    int y = (int) p.y + 14;                                  // below the puck
+    if (y + labelH > getHeight() - (int) bymargin)
+        y = (int) p.y - 14 - labelH;                          // above if no room below
+    x = jlimit ((int) lxmargin + 2, getWidth() - (int) rxmargin - 2 - labelW, x);
+    lbl_gain_db_.getUnchecked (idx)->setBounds (x, y, labelW, labelH);
+    lbl_gain_db_.getUnchecked (idx)->toFront (false);
+}
+
+void PanningGraph::timerCallback()
+{
+    const auto now = (juce::int64) juce::Time::getMillisecondCounter();
+
+    bool anyVisible = false;
+    for (int i = 0; i < lbl_gain_db_.size(); ++i)
     {
-        el = 180.f-el;
-        az += 180.f;
+        const auto until = gain_label_until_ms_[(size_t) i];
+        if (until <= 0) continue;
+        const auto remaining = until - now;
+        if (remaining <= 0)
+        {
+            lbl_gain_db_.getUnchecked (i)->setVisible (false);
+            gain_label_until_ms_[(size_t) i] = 0;
+            continue;
+        }
+        anyVisible = true;
+        if (remaining < kGainLabelFadeMs)
+        {
+            const float a = (float) remaining / (float) kGainLabelFadeMs;
+            lbl_gain_db_.getUnchecked (i)->setAlpha (jlimit (0.0f, 1.0f, a));
+        }
+        else
+        {
+            lbl_gain_db_.getUnchecked (i)->setAlpha (1.0f);
+        }
     }
 
-    if (el < -90.f)
-    {
-        el = 180.f+el;
-        az += 180.f;
-    }
-
-    if (az > 180.f)
-        az -= 360.f;
-
-    if (az < -180.f)
-        az += 360.f;
-
-    // set the drag button
-    btn_drag.getUnchecked(idx)->setBounds (degtoxpos(az)-8, degtoypos(el)-8, 16, 16);
-
-    // set the label
-    lbl_drag.getUnchecked(idx)->setBounds (degtoxpos(az)-12, degtoypos(el)-12, 26, 24);
-
-    // create the path for the area display
-
-    Path filterarea;
-    filterarea.clear();
-
-
-    if (!shape) {
-        // circle
-        int x = degtoxpos(az);
-        int y = degtoypos(el);
-        int w = degtoxpos(width)-degtoxpos(0.f);
-        int h = degtoypos(width)-degtoypos(0.f);
-
-        filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
-
-        // check if area goes beyond +-180
-        if (az+width > 180)
-        {
-            int x = degtoxpos(az-360);
-            int y = degtoypos(el);
-            int w = degtoxpos(width)-degtoxpos(0.f);
-            int h = degtoypos(width)-degtoypos(0.f);
-
-            filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
-        }
-        if (az-width < -180)
-        {
-            int x = degtoxpos(az+360);
-            int y = degtoypos(el);
-            int w = degtoxpos(width)-degtoxpos(0.f);
-            int h = degtoypos(width)-degtoypos(0.f);
-
-            filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
-        }
-        if (el+height > 90)
-        {
-            int newaz = az-180;
-            if (newaz < -180)
-                newaz+=360;
-            int x = degtoxpos(newaz);
-            int y = degtoypos(180-el);
-            int w = degtoxpos(width)-degtoxpos(0.f);
-            int h = degtoypos(width)-degtoypos(0.f);
-
-            filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
-        }
-        if (el-height < -90)
-        {
-            int newaz = az-180;
-            if (newaz < -180)
-                newaz+=360;
-            int x = degtoxpos(newaz);
-            int y = degtoypos(-180-el);
-            int w = degtoxpos(width)-degtoxpos(0.f);
-            int h = degtoypos(width)-degtoypos(0.f);
-
-            filterarea.addEllipse(x-w, y-h, 2*w, 2*h);
-        }
-
-    } else {
-        // rectangle
-        int x = degtoxpos(az);
-        int y = degtoypos(el);
-        int w = degtoxpos(width)-degtoxpos(0.f);
-        int h = degtoypos(height)-degtoypos(0.f);
-
-        filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
-
-
-        // check if area goes beyond +-180
-        // wrapping about the poles is not done yet!
-        if (az+width > 180)
-        {
-            int x = degtoxpos(az-360);
-            int y = degtoypos(el);
-            int w = degtoxpos(width)-degtoxpos(0.f);
-            int h = degtoypos(height)-degtoypos(0.f);
-
-            filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
-        }
-        if (az-width < -180)
-        {
-            int x = degtoxpos(az+360);
-            int y = degtoypos(el);
-            int w = degtoxpos(width)-degtoxpos(0.f);
-            int h = degtoypos(height)-degtoypos(0.f);
-
-            filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
-        }
-
-        if (el+height > 90)
-        {
-            int newaz = az-180;
-            if (newaz < -180)
-                newaz+=360;
-            int x = degtoxpos(newaz);
-            int y = degtoypos(180-el);
-            int w = degtoxpos(width)-degtoxpos(0.f);
-            int h = degtoypos(height)-degtoypos(0.f);
-
-            filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
-        }
-        if (el-height < -90)
-        {
-            int newaz = az-180;
-            if (newaz < -180)
-                newaz+=360;
-            int x = degtoxpos(newaz);
-            int y = degtoypos(-180-el);
-            int w = degtoxpos(width)-degtoxpos(0.f);
-            int h = degtoypos(height)-degtoypos(0.f);
-
-            filterarea.addRectangle(x-w, y-h, 2*w, 2*h);
-        }
-
-
-    }
-
-
-    // filterarea.lineTo(100, 100);
-
-    // filterarea
-    //if (idx < graphs_.size())
-    //{
-        graphs_.getUnchecked(idx)->setPath(&filterarea, gain, solo, one_filter_solo_);
-        graphs_.getUnchecked(idx)->repaint();
-    //}
-
+    if (! anyVisible)
+        stopTimer();
 }
 
 void PanningGraph::setOneFilterSolo(bool is_one_solo)
@@ -395,15 +857,340 @@ void PanningGraph::setOneFilterSolo(bool is_one_solo)
     one_filter_solo_ = is_one_solo;
 }
 
+// ============================================================================
+// View-mode setters
+// ============================================================================
+
+void PanningGraph::setProjection (Projection p)
+{
+    if (projection_ == p) return;
+    projection_ = p;
+    projection_bounds_ = getProjectionBounds();
+    rebuildGridLines();
+    rebuildPixelCartCache();
+    rebuildAllFilterPaths();
+    rebuildHeatmapMesh();
+
+    // Reposition drag handles to match new projection.
+    for (int i = 0; i < NUM_FILTERS; ++i)
+    {
+        if (! filter_states_[i].valid) continue;
+        auto pt = sphericalToScreen (filter_states_[i].az, filter_states_[i].el);
+        btn_drag.getUnchecked(i)->setBounds ((int) pt.x - 8, (int) pt.y - 8, 16, 16);
+        lbl_drag.getUnchecked(i)->setBounds ((int) pt.x - 12, (int) pt.y - 12, 26, 24);
+    }
+
+    repaint();
+}
+
+void PanningGraph::setEnergyEnabled (bool on)
+{
+    if (energy_enabled_ == on) return;
+    energy_enabled_ = on;
+    if (! on)
+    {
+        heatmap_image_ = Image();
+    }
+    else
+    {
+        // Rebuild fully — the image was destroyed on disable, and after a
+        // projection switch the cached vertex pixels may be stale.
+        rebuildHeatmapMesh();
+    }
+    // Drop the gain-tinted fill from filter overlays while the heatmap is
+    // showing so it stays unobstructed.
+    for (int i = 0; i < graphs_.size(); ++i)
+        graphs_.getUnchecked (i)->setSuppressFill (on);
+    repaint();
+}
+
+void PanningGraph::setColormap (Colormap::Map m)
+{
+    if (colormap_ == m) return;
+    colormap_ = m;
+    if (energy_enabled_)
+    {
+        renderHeatmapImage();
+        repaint();
+    }
+}
+
+void PanningGraph::setMesh (std::vector<Eigen::Vector3d> dirs, std::vector<int> indices)
+{
+    grid_dirs_     = std::move (dirs);
+    mesh_indices_  = std::move (indices);
+    grid_t_.assign (grid_dirs_.size(), 0.f);
+    rebuildHeatmapMesh();
+}
+
+void PanningGraph::setGridDirections (const std::vector<Eigen::Vector3d>& dirs)
+{
+    // Legacy entry point: assume the IEM HA-mesh indices.
+    std::vector<int> idx (HammerAitovSample::kIndices,
+                          HammerAitovSample::kIndices + HammerAitovSample::kNumTriangles * 3);
+    setMesh (dirs, std::move (idx));
+}
+
+void PanningGraph::setEnergyT (const std::vector<float>& tValues)
+{
+    if (! energy_enabled_) return;
+    if (tValues.size() != grid_t_.size()) return;
+    grid_t_ = tValues;
+    renderHeatmapImage();
+    repaint (projection_bounds_);
+}
+
+// ============================================================================
+// Heatmap pixel lookup + rendering
+// ============================================================================
+
+void PanningGraph::rebuildHeatmapMesh()
+{
+    const auto rect = projection_bounds_;
+    const int dispW = rect.getWidth();
+    const int dispH = rect.getHeight();
+    if (dispW <= 0 || dispH <= 0 || grid_dirs_.empty())
+    {
+        vertex_pixels_.clear();
+        heatmap_image_ = Image();
+        return;
+    }
+
+    // Cap the lookup-image resolution to keep resize cheap. The image is
+    // scaled up to projection_bounds_ at draw time. Keep aspect of rect so
+    // triangle rasterization preserves on-screen shapes.
+    constexpr int kMaxDim = 720;
+    int W = dispW, H = dispH;
+    if (W > kMaxDim || H > kMaxDim)
+    {
+        const float s = (float) kMaxDim / (float) jmax (W, H);
+        W = jmax (4, (int) std::round (W * s));
+        H = jmax (4, (int) std::round (H * s));
+    }
+
+    // Compute each grid point's pixel position in image-local coords by
+    // running the IEM HA forward map on its (az, el), then applying the same
+    // uniform-by-half-diagonal scaling we use for the projection.
+    const int N = (int) grid_dirs_.size();
+    vertex_pixels_.resize ((size_t) N);
+
+    if (projection_ == Projection::HammerAitoff)
+    {
+        // Map canonical 2:1 ellipse [-2,2] × [-1,1] onto image. The image is
+        // 2:1 because rebuildHeatmapMesh is sized from projection_bounds_,
+        // which letterboxes to 2:1 in HA mode.
+        //
+        // We deliberately overshoot the vertex positions slightly (radially
+        // outward from the image center) so the outermost triangles cover
+        // beyond the actual chart-boundary pixel positions. The smooth
+        // anti-aliased ellipse clip in paint() then cuts the heatmap with
+        // its own curve, so the chart edge follows the ellipse instead of
+        // exposing the pixel-aligned rasterized boundary.
+        constexpr float kOvershoot = 1.04f;
+        const float halfW = 0.5f * (float) W;
+        const float halfH = 0.5f * (float) H;
+        for (int i = 0; i < N; ++i)
+        {
+            const auto& d = grid_dirs_[(size_t) i];
+            const float az = std::atan2 ((float) d.y(), (float) d.x());
+            const float el = std::asin  (jlimit (-1.f, 1.f, (float) d.z()));
+            float hx, hy;
+            HammerAitov::sphericalToXY (az, el, hx, hy);
+            hx = -hx;                                  // flip so +az → right
+            hx *= 2.f;
+            const float u = (hx + 2.f) * 0.25f;       // 0..1
+            const float v = (1.f - hy) * 0.5f;        // 0..1
+            const float xCentered = (u - 0.5f) * (float) W;
+            const float yCentered = (v - 0.5f) * (float) H;
+            vertex_pixels_[(size_t) i] = { halfW + xCentered * kOvershoot,
+                                           halfH + yCentered * kOvershoot };
+        }
+    }
+    else
+    {
+        // Equirect: linear az/el → pixel.
+        for (int i = 0; i < N; ++i)
+        {
+            const auto& d = grid_dirs_[(size_t) i];
+            const float az = std::atan2 ((float) d.y(), (float) d.x()) * 180.f / MathConstants<float>::pi;
+            const float el = std::asin  (jlimit (-1.f, 1.f, (float) d.z()))
+                             * 180.f / MathConstants<float>::pi;
+            const float u = (az + 180.f) / 360.f;
+            const float v = (-el + 90.f) / 180.f;
+            vertex_pixels_[(size_t) i] = { u * (float) W, v * (float) H };
+        }
+    }
+
+    heatmap_image_ = Image (Image::ARGB, W, H, true);
+
+    if (energy_enabled_) renderHeatmapImage();
+}
+
+namespace
+{
+    // Rasterize one triangle into an ARGB image with linear color
+    // interpolation (Gouraud) across its three vertex colors. Pixels outside
+    // the triangle are left untouched. Edge function is computed
+    // incrementally per scanline for ~3× speedup over recomputing per pixel.
+    inline void rasterizeTriangle (juce::Image::BitmapData& bd,
+                                   juce::Point<float> v0, juce::Point<float> v1, juce::Point<float> v2,
+                                   juce::Colour c0, juce::Colour c1, juce::Colour c2)
+    {
+        const float dx10 = v1.x - v0.x, dy10 = v1.y - v0.y;
+        const float dx20 = v2.x - v0.x, dy20 = v2.y - v0.y;
+        const float area2 = dx10 * dy20 - dy10 * dx20;
+        if (std::abs (area2) < 1e-6f) return;
+        const float invA2 = 1.0f / area2;
+
+        // Bounding box clipped to image.
+        const int W = bd.width, H = bd.height;
+        const int minX = std::max (0,     (int) std::floor (std::min ({ v0.x, v1.x, v2.x })));
+        const int maxX = std::min (W - 1, (int) std::ceil  (std::max ({ v0.x, v1.x, v2.x })));
+        const int minY = std::max (0,     (int) std::floor (std::min ({ v0.y, v1.y, v2.y })));
+        const int maxY = std::min (H - 1, (int) std::ceil  (std::max ({ v0.y, v1.y, v2.y })));
+        if (minX > maxX || minY > maxY) return;
+
+        const float r0 = (float) c0.getRed(),   g0 = (float) c0.getGreen(), b0 = (float) c0.getBlue(),  a0 = (float) c0.getAlpha();
+        const float r1 = (float) c1.getRed(),   g1 = (float) c1.getGreen(), b1 = (float) c1.getBlue(),  a1 = (float) c1.getAlpha();
+        const float r2 = (float) c2.getRed(),   g2 = (float) c2.getGreen(), b2 = (float) c2.getBlue(),  a2 = (float) c2.getAlpha();
+
+        // w0 corresponds to vertex 0; w1 → v1; w2 = 1 - w0 - w1.
+        // Edge function E_ab(p) = (b-a) × (p-a)
+        //   = (b.x-a.x)*(p.y-a.y) - (b.y-a.y)*(p.x-a.x)
+        // ∂E/∂p.x = a.y - b.y     ∂E/∂p.y = b.x - a.x
+        //   E_12: a=v1, b=v2  →  dx = v1.y - v2.y,  dy = v2.x - v1.x
+        //   E_20: a=v2, b=v0  →  dx = v2.y - v0.y,  dy = v0.x - v2.x
+        const float e12_dx = v1.y - v2.y;
+        const float e12_dy = v2.x - v1.x;
+        const float e20_dx = v2.y - v0.y;
+        const float e20_dy = v0.x - v2.x;
+
+        const float pX = (float) minX + 0.5f;
+        const float pY = (float) minY + 0.5f;
+        float e12_row = (v2.x - v1.x) * (pY - v1.y) - (v2.y - v1.y) * (pX - v1.x);
+        float e20_row = (v0.x - v2.x) * (pY - v2.y) - (v0.y - v2.y) * (pX - v2.x);
+
+        for (int y = minY; y <= maxY; ++y)
+        {
+            float e12 = e12_row;
+            float e20 = e20_row;
+            auto* row = bd.getLinePointer (y);
+            for (int x = minX; x <= maxX; ++x)
+            {
+                const float w0 = e12 * invA2;
+                const float w1 = e20 * invA2;
+                const float w2 = 1.0f - w0 - w1;
+                if (w0 >= 0.f && w1 >= 0.f && w2 >= 0.f)
+                {
+                    const float r = w0 * r0 + w1 * r1 + w2 * r2;
+                    const float g = w0 * g0 + w1 * g1 + w2 * g2;
+                    const float b = w0 * b0 + w1 * b1 + w2 * b2;
+                    const float a = w0 * a0 + w1 * a1 + w2 * a2;
+                    auto* pix = row + x * bd.pixelStride;
+                    juce::PixelARGB pa ((juce::uint8) jlimit (0, 255, (int) a),
+                                        (juce::uint8) jlimit (0, 255, (int) r),
+                                        (juce::uint8) jlimit (0, 255, (int) g),
+                                        (juce::uint8) jlimit (0, 255, (int) b));
+                    *reinterpret_cast<juce::PixelARGB*> (pix) = pa;
+                }
+                e12 += e12_dx;
+                e20 += e20_dx;
+            }
+            e12_row += e12_dy;
+            e20_row += e20_dy;
+        }
+    }
+}
+
+void PanningGraph::renderHeatmapImage()
+{
+    if (! heatmap_image_.isValid() || vertex_pixels_.empty() || grid_t_.empty()) return;
+    if (vertex_pixels_.size() != grid_t_.size()) return;
+    if (mesh_indices_.empty() || mesh_indices_.size() % 3 != 0) return;
+
+    // Clear to transparent each frame (rasterizer only writes covered pixels).
+    heatmap_image_.clear (heatmap_image_.getBounds(), Colours::transparentBlack);
+
+    // Pre-sample colormap once per grid point. Per-vertex alpha = 0.65 so the
+    // background gradient remains faintly visible underneath the heatmap.
+    std::vector<juce::Colour> palette (grid_t_.size());
+    for (size_t i = 0; i < grid_t_.size(); ++i)
+        palette[i] = Colormap::sample (colormap_, grid_t_[i]).withAlpha (0.65f);
+
+    Image::BitmapData bd (heatmap_image_, Image::BitmapData::writeOnly);
+
+    // Wrap-detection only matters for equirect, where antimeridian-crossing
+    // triangles end up spanning the full panel width. In HA, after our
+    // uniform-by-half-diagonal scaling the chart extends well beyond the
+    // panel (rMax > halfH for any non-square rect), so plenty of legitimate
+    // mesh triangles cover wide pixel ranges — skipping by width would erase
+    // the heatmap entirely.
+    const float wrapThresh = (projection_ == Projection::Equirect)
+                              ? 0.5f * (float) bd.width
+                              : std::numeric_limits<float>::infinity();
+
+    const int numTri = (int) (mesh_indices_.size() / 3);
+    const int N      = (int) vertex_pixels_.size();
+    const float W_f  = (float) bd.width;
+
+    for (int t = 0; t < numTri; ++t)
+    {
+        const int i0 = mesh_indices_[(size_t) (t * 3 + 0)];
+        const int i1 = mesh_indices_[(size_t) (t * 3 + 1)];
+        const int i2 = mesh_indices_[(size_t) (t * 3 + 2)];
+        if (i0 < 0 || i1 < 0 || i2 < 0 || i0 >= N || i1 >= N || i2 >= N) continue;
+
+        Point<float> v0 = vertex_pixels_[(size_t) i0];
+        Point<float> v1 = vertex_pixels_[(size_t) i1];
+        Point<float> v2 = vertex_pixels_[(size_t) i2];
+
+        const float xMin = std::min ({ v0.x, v1.x, v2.x });
+        const float xMax = std::max ({ v0.x, v1.x, v2.x });
+
+        if (xMax - xMin > wrapThresh)
+        {
+            // Equirect wrap-around: unwrap by shifting outlier vertices and
+            // render at the original AND ±W positions so both seam sides
+            // are filled. (HA mode disables this branch via wrapThresh=∞.)
+            auto unwrap = [W_f] (Point<float>& v, float anchor) {
+                while (v.x - anchor >  W_f * 0.5f) v.x -= W_f;
+                while (anchor - v.x >  W_f * 0.5f) v.x += W_f;
+            };
+            const float anchor = v0.x;
+            unwrap (v1, anchor);
+            unwrap (v2, anchor);
+
+            rasterizeTriangle (bd, v0, v1, v2,
+                               palette[(size_t) i0], palette[(size_t) i1], palette[(size_t) i2]);
+            rasterizeTriangle (bd, { v0.x + W_f, v0.y }, { v1.x + W_f, v1.y }, { v2.x + W_f, v2.y },
+                               palette[(size_t) i0], palette[(size_t) i1], palette[(size_t) i2]);
+            rasterizeTriangle (bd, { v0.x - W_f, v0.y }, { v1.x - W_f, v1.y }, { v2.x - W_f, v2.y },
+                               palette[(size_t) i0], palette[(size_t) i1], palette[(size_t) i2]);
+            continue;
+        }
+
+        rasterizeTriangle (bd, v0, v1, v2,
+                           palette[(size_t) i0],
+                           palette[(size_t) i1],
+                           palette[(size_t) i2]);
+    }
+}
+
+// ============================================================================
+// Mouse / button input
+// ============================================================================
+
 void PanningGraph::buttonClicked (Button* buttonThatWasClicked)
 {
-    float az =  xpostodeg(buttonThatWasClicked->getPosition().getX() + buttonThatWasClicked->getMouseXYRelative().getX());
+    Point<float> mouse ((float) (buttonThatWasClicked->getPosition().getX() + buttonThatWasClicked->getMouseXYRelative().getX()),
+                        (float) (buttonThatWasClicked->getPosition().getY() + buttonThatWasClicked->getMouseXYRelative().getY()));
 
-    az = jlimit(-180.f, 180.f, az);
+    float az = 0.f, el = 0.f;
+    if (! screenToSpherical (mouse, az, el))
+        return; // outside HA ellipse — ignore
 
-    float el = ypostodeg(buttonThatWasClicked->getPosition().getY() + buttonThatWasClicked->getMouseXYRelative().getY());
-
-    el = jlimit(-90.f, 90.f, el);
+    az = jlimit (-180.f, 180.f, az);
+    el = jlimit  (-90.f,  90.f, el);
 
     int i = buttonThatWasClicked->getName().getIntValue();
 
@@ -413,21 +1200,16 @@ void PanningGraph::buttonClicked (Button* buttonThatWasClicked)
         sendChangeMessage();
     }
 
-
-    setParameterNotifyingHost(myprocessor_, PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::AzimuthParam, Deg360ToParam(az) );
-
-    setParameterNotifyingHost(myprocessor_, PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::ElevationParam, Deg360ToParam(el) );
-
+    setParameterNotifyingHost(myprocessor_, PARAMS_PER_FILTER*i + Ambix_directional_loudnessAudioProcessor::AzimuthParam,   Deg360ToParam(az));
+    setParameterNotifyingHost(myprocessor_, PARAMS_PER_FILTER*i + Ambix_directional_loudnessAudioProcessor::ElevationParam, Deg360ToParam(el));
 }
 
 void PanningGraph::mouseDown(const MouseEvent &event)
 {
-    // check if you are near a filter...
-    // now the distance is static... could be more intuitive
-
     int numfilters = btn_drag.size();
 
-    for (int i = 0; i < numfilters; i++) {
+    for (int i = 0; i < numfilters; i++)
+    {
         if (event.getMouseDownPosition().getDistanceFrom(btn_drag.getUnchecked(i)->getPosition()) < 80)
         {
             if (i != mouse_near_filter_id)
@@ -436,17 +1218,16 @@ void PanningGraph::mouseDown(const MouseEvent &event)
                 sendChangeMessage();
             }
 
-            int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_directional_loudnessAudioProcessor::WidthParam;
-            int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_directional_loudnessAudioProcessor::HeightParam;
+            int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id + Ambix_directional_loudnessAudioProcessor::WidthParam;
+            int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id + Ambix_directional_loudnessAudioProcessor::HeightParam;
 
-            mouse_down_width = ParamToDeg360(myprocessor_->getParameter(w_idx));
-            mouse_down_height = ParamToDeg180(myprocessor_->getParameter(h_idx));
+            mouse_down_width  = ParamToDeg360 (myprocessor_->getParameter(w_idx));
+            mouse_down_height = ParamToDeg180 (myprocessor_->getParameter(h_idx));
 
-            mouse_dir_w = btn_drag.getUnchecked(i)->getX() < event.getMouseDownX() ? 1 : -1;
-            mouse_dir_h = btn_drag.getUnchecked(i)->getY() > event.getMouseDownY() ? 1 : -1;
+            mouse_dir_w = btn_drag.getUnchecked(i)->getX() < event.getMouseDownX() ?  1 : -1;
+            mouse_dir_h = btn_drag.getUnchecked(i)->getY() > event.getMouseDownY() ?  1 : -1;
             break;
         }
-
     }
 }
 
@@ -455,42 +1236,31 @@ void PanningGraph::mouseUp(const MouseEvent &event)
     mouse_near_filter_id = -1;
 }
 
-// use drag to change width/height
 void PanningGraph::mouseDrag(const MouseEvent &event)
 {
-    // std::cout << "dragging x: " << event.getDistanceFromDragStartX() << " y: " << event.getDistanceFromDragStartY() << std::endl;
-
     if (mouse_near_filter_id > -1)
     {
-        int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_directional_loudnessAudioProcessor::WidthParam;
+        int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id + Ambix_directional_loudnessAudioProcessor::WidthParam;
+        setParameterNotifyingHost (myprocessor_, w_idx,
+            (float) jlimit (0.f, 1.f, Deg360ToParam (mouse_down_width  + xpostodeg (mouse_dir_w*event.getDistanceFromDragStartX() + degtoxpos (0))) ));
 
-
-        setParameterNotifyingHost(myprocessor_, w_idx, (float)jlimit(0.f, 1.f, Deg360ToParam( mouse_down_width + xpostodeg(mouse_dir_w*event.getDistanceFromDragStartX()+degtoxpos(0))  ) ) );
-
-        int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_directional_loudnessAudioProcessor::HeightParam;
-
-        setParameterNotifyingHost(myprocessor_, h_idx, (float)jlimit(0.f, 1.f, Deg180ToParam( mouse_down_height + ypostodeg(mouse_dir_h*event.getDistanceFromDragStartY()+degtoypos(0))  ) ) );
+        int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id + Ambix_directional_loudnessAudioProcessor::HeightParam;
+        setParameterNotifyingHost (myprocessor_, h_idx,
+            (float) jlimit (0.f, 1.f, Deg180ToParam (mouse_down_height + ypostodeg (mouse_dir_h*event.getDistanceFromDragStartY() + degtoypos (0))) ));
     }
-
 }
 
 void PanningGraph::mouseWheelMove (const MouseEvent &event, const MouseWheelDetails &wheel)
 {
-
     int idx = -1;
-
     for (int i=0; i<btn_drag.size(); i++)
-    {
-        if (btn_drag.getUnchecked(i)->getState() == 1)
-            idx = i;
-
-    }
+        if (btn_drag.getUnchecked(i)->getState() == 1) idx = i;
 
     if (idx > -1)
     {
-        int paridx = PARAMS_PER_FILTER*idx+Ambix_directional_loudnessAudioProcessor::GainParam;
-
-        setParameterNotifyingHost(myprocessor_, paridx, (float)jlimit(0.f, 1.f, myprocessor_->getParameter(paridx) +wheel.deltaY*0.4f) );
+        int paridx = PARAMS_PER_FILTER*idx + Ambix_directional_loudnessAudioProcessor::GainParam;
+        setParameterNotifyingHost (myprocessor_, paridx,
+            (float) jlimit (0.f, 1.f, myprocessor_->getParameter(paridx) + wheel.deltaY * 0.4f));
 
         if (idx != mouse_near_filter_id)
         {
@@ -498,7 +1268,6 @@ void PanningGraph::mouseWheelMove (const MouseEvent &event, const MouseWheelDeta
             sendChangeMessage();
         }
     }
-
 }
 
 int PanningGraph::getCurrentId()
@@ -570,4 +1339,3 @@ static const unsigned char resource_FilterGraph_drag_over_png[] = { 137,80,78,71
 
 const char* PanningGraph::drag_over_png = (const char*) resource_FilterGraph_drag_over_png;
 const int PanningGraph::drag_over_pngSize = 693;
-

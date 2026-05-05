@@ -19,6 +19,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "HammerAitovSample.h"
 
 #include "t_design.h"
 
@@ -369,8 +370,111 @@ void Ambix_directional_loudnessAudioProcessor::changeProgramName (int index, con
 void Ambix_directional_loudnessAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     output_buffer.setSize (getTotalNumOutputChannels(), samplesPerBlock, false, false, false);
+    sample_rate_ = sampleRate > 0.0 ? sampleRate : 48000.0;
+
+    // Visualizer-only filter scratch buffers + per-channel state (4 floats
+    // per channel per filter chain = z1/z2 of two cascaded biquads).
+    filt_pre_buf_ .setSize (AMBI_CHANNELS, samplesPerBlock, false, false, true);
+    filt_post_buf_.setSize (AMBI_CHANNELS, samplesPerBlock, false, false, true);
+    state_hpf_.assign ((size_t) AMBI_CHANNELS * 4, 0.f);
+    state_lpf_.assign ((size_t) AMBI_CHANNELS * 4, 0.f);
+    hpf_fc_cached_ = lpf_fc_cached_ = -1.f;  // force recompute on first block
+
     _initialized = false;
     calcParams();
+}
+
+// ----- Visualizer-only filter design (RBJ cookbook + Butterworth Q split) ---
+
+void Ambix_directional_loudnessAudioProcessor::designVizHighPass (VizFilter4& f, float sr, float fc)
+{
+    constexpr float kQ1 = 1.30656296f;  // pole pair at ±π/8
+    constexpr float kQ2 = 0.54119610f;  // pole pair at ±3π/8
+    auto designSec = [] (VizBiquad& b, float sampleRate, float freq, float Q)
+    {
+        const float w0 = 2.f * juce::MathConstants<float>::pi * freq / sampleRate;
+        const float c  = std::cos (w0);
+        const float s  = std::sin (w0);
+        const float alpha = s / (2.f * Q);
+        const float a0 = 1.f + alpha;
+        b.b0 =  ((1.f + c) * 0.5f) / a0;
+        b.b1 = -(1.f + c)         / a0;
+        b.b2 =  ((1.f + c) * 0.5f) / a0;
+        b.a1 = -2.f * c           / a0;
+        b.a2 = (1.f - alpha)      / a0;
+    };
+    designSec (f.s1, sr, fc, kQ1);
+    designSec (f.s2, sr, fc, kQ2);
+}
+
+void Ambix_directional_loudnessAudioProcessor::designVizLowPass (VizFilter4& f, float sr, float fc)
+{
+    constexpr float kQ1 = 1.30656296f;
+    constexpr float kQ2 = 0.54119610f;
+    auto designSec = [] (VizBiquad& b, float sampleRate, float freq, float Q)
+    {
+        const float w0 = 2.f * juce::MathConstants<float>::pi * freq / sampleRate;
+        const float c  = std::cos (w0);
+        const float s  = std::sin (w0);
+        const float alpha = s / (2.f * Q);
+        const float a0 = 1.f + alpha;
+        b.b0 = ((1.f - c) * 0.5f) / a0;
+        b.b1 =  (1.f - c)         / a0;
+        b.b2 = ((1.f - c) * 0.5f) / a0;
+        b.a1 = -2.f * c           / a0;
+        b.a2 = (1.f - alpha)      / a0;
+    };
+    designSec (f.s1, sr, fc, kQ1);
+    designSec (f.s2, sr, fc, kQ2);
+}
+
+void Ambix_directional_loudnessAudioProcessor::applyVizFilters (const juce::AudioBuffer<float>& src,
+                                                                juce::AudioBuffer<float>& dst,
+                                                                int numCh, int numSamples,
+                                                                bool hpfOn, bool lpfOn)
+{
+    const auto& hpf = hpf_design_;
+    const auto& lpf = lpf_design_;
+
+    for (int c = 0; c < numCh; ++c)
+    {
+        const float* in  = src.getReadPointer  (c);
+        float*       out = dst.getWritePointer (c);
+        const size_t ofs = (size_t) c * 4;
+
+        if (hpfOn && lpfOn)
+        {
+            for (int i = 0; i < numSamples; ++i)
+            {
+                float x = in[i];
+                x = hpf.s1.process (x, state_hpf_[ofs+0], state_hpf_[ofs+1]);
+                x = hpf.s2.process (x, state_hpf_[ofs+2], state_hpf_[ofs+3]);
+                x = lpf.s1.process (x, state_lpf_[ofs+0], state_lpf_[ofs+1]);
+                x = lpf.s2.process (x, state_lpf_[ofs+2], state_lpf_[ofs+3]);
+                out[i] = x;
+            }
+        }
+        else if (hpfOn)
+        {
+            for (int i = 0; i < numSamples; ++i)
+            {
+                float x = in[i];
+                x = hpf.s1.process (x, state_hpf_[ofs+0], state_hpf_[ofs+1]);
+                x = hpf.s2.process (x, state_hpf_[ofs+2], state_hpf_[ofs+3]);
+                out[i] = x;
+            }
+        }
+        else  // lpfOn
+        {
+            for (int i = 0; i < numSamples; ++i)
+            {
+                float x = in[i];
+                x = lpf.s1.process (x, state_lpf_[ofs+0], state_lpf_[ofs+1]);
+                x = lpf.s2.process (x, state_lpf_[ofs+2], state_lpf_[ofs+3]);
+                out[i] = x;
+            }
+        }
+    }
 }
 
 void Ambix_directional_loudnessAudioProcessor::releaseResources()
@@ -465,6 +569,77 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
 
         // std::cout << "Size: " << Sh_matrix_inv.rows() << " x " << Sh_matrix_inv.cols() << std::endl;
         // std::cout << Sh_matrix_inv << std::endl;
+
+        // ----- Visualization-grid decode (independent from the audio path) -----
+        // Use the IEM 426-point Hammer-Aitoff-uniform grid so the heatmap
+        // matches EnergyVisualizer's sampling. Build Sh_matrix_viz (426 × C)
+        // by evaluating the SH basis at each sample direction's (az, el).
+        const int vN = HammerAitovSample::kNumPoints;
+        Sh_matrix_viz_.setZero (vN, AMBI_CHANNELS);
+        grid_dirs_cart_.resize ((size_t) vN);
+        for (int i = 0; i < vN; ++i)
+        {
+            const double cx = (double) HammerAitovSample::kX[i];
+            const double cy = (double) HammerAitovSample::kY[i];
+            const double cz = (double) HammerAitovSample::kZ[i];
+            grid_dirs_cart_[(size_t) i] = Eigen::Vector3d (cx, cy, cz);
+
+            const double az = std::atan2 (cy, cx);
+            const double el = std::atan2 (cz, std::sqrt (cx * cx + cy * cy));
+
+            Eigen::VectorXd Ymn (AMBI_CHANNELS);
+            sph_h.Calc (az, el);
+            sph_h.Get (Ymn);
+            Sh_matrix_viz_.row (i) = Ymn.transpose();
+        }
+
+        // Energy-tap buffers (pre/post-`Sh_transf` decode → smoothed grid energy).
+        {
+            const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
+            grid_energy_smoothed_     .assign ((size_t) vN, 0.f);
+            grid_energy_post_smoothed_.assign ((size_t) vN, 0.f);
+        }
+        grid_energy_block_       .setZero (vN);
+        grid_energy_post_block_  .setZero (vN);
+        grid_decode_scratch_     .setZero (vN);
+        input_scratch_           .setZero (AMBI_CHANNELS);
+
+        // ----- Equirect (regular az/el) grid for the rectangular display.
+        // Uniform sampling in (az, el) → straight rectangular coverage with
+        // no pole-fan / antimeridian artifacts when rendered as a regular
+        // mesh. Triangulation is built editor-side from (Naz, Nel).
+        const int Naz = eq_grid_naz_;
+        const int Nel = eq_grid_nel_;
+        const int eqN = Naz * Nel;
+        Sh_matrix_eq_.setZero (eqN, AMBI_CHANNELS);
+        grid_dirs_eq_.resize ((size_t) eqN);
+        for (int j = 0; j < Nel; ++j)
+        {
+            const double el_deg = -90.0 + (180.0 * j) / (Nel - 1);
+            const double el     = el_deg * M_PI / 180.0;
+            for (int i = 0; i < Naz; ++i)
+            {
+                const double az_deg = -180.0 + (360.0 * i) / Naz;
+                const double az     = az_deg * M_PI / 180.0;
+                const double ce = std::cos (el);
+                const int    k  = j * Naz + i;
+                grid_dirs_eq_[(size_t) k] = Eigen::Vector3d (std::cos (az) * ce,
+                                                              std::sin (az) * ce,
+                                                              std::sin (el));
+                Eigen::VectorXd Ymn (AMBI_CHANNELS);
+                sph_h.Calc (az, el);
+                sph_h.Get (Ymn);
+                Sh_matrix_eq_.row (k) = Ymn.transpose();
+            }
+        }
+        {
+            const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
+            grid_energy_eq_smoothed_     .assign ((size_t) eqN, 0.f);
+            grid_energy_eq_post_smoothed_.assign ((size_t) eqN, 0.f);
+        }
+        grid_energy_eq_block_       .setZero (eqN);
+        grid_energy_eq_post_block_  .setZero (eqN);
+        grid_decode_eq_scratch_     .setZero (eqN);
 
         _initialized = true;
 
@@ -584,6 +759,102 @@ void Ambix_directional_loudnessAudioProcessor::processBlock (AudioSampleBuffer& 
 
     int NumSamples = buffer.getNumSamples();
 
+    // ---------- input-energy tap (pre-Sh_transf) ----------
+    // Decode the input through Sh_matrix at a strided set of samples to get
+    // virtual-LS amplitudes at each t-design grid point, accumulate squared
+    // energy, smooth into grid_energy_smoothed_. Cheap (240 × C × ~16 muladds
+    // per block) and bounded — visualization-only, no audio impact.
+    if (_initialized && grid_energy_block_.size() > 0 && Sh_matrix_viz_.rows() > 0)
+    {
+        const int numCh = std::min ({ (int) AMBI_CHANNELS,
+                                      getTotalNumInputChannels(),
+                                      (int) Sh_matrix_viz_.cols() });
+        const int numGrid = (int) Sh_matrix_viz_.rows();
+        const int targetTaps = 16;
+        const int stride = std::max (1, NumSamples / targetTaps);
+
+        // Optional HP / LP for the visualizer signal only. Coefficients are
+        // shared across all channels (same fc), state is per channel.
+        const bool hpfOn = view_vis_hpf_on.load (std::memory_order_relaxed);
+        const bool lpfOn = view_vis_lpf_on.load (std::memory_order_relaxed);
+        const float hpFc = juce::jlimit (10.f, (float) (sample_rate_ * 0.45),
+                                          view_vis_hpf_fc.load (std::memory_order_relaxed));
+        const float lpFc = juce::jlimit (10.f, (float) (sample_rate_ * 0.45),
+                                          view_vis_lpf_fc.load (std::memory_order_relaxed));
+        // Recompute coefficients on fc change. State is left as-is — at small
+        // fc deltas the existing state is close enough to be valid, and any
+        // residual transient is well below the energy smoothing time
+        // constant so it's invisible in the heatmap.
+        if (hpfOn && hpFc != hpf_fc_cached_)
+        {
+            designVizHighPass (hpf_design_, (float) sample_rate_, hpFc);
+            hpf_fc_cached_ = hpFc;
+        }
+        if (lpfOn && lpFc != lpf_fc_cached_)
+        {
+            designVizLowPass  (lpf_design_, (float) sample_rate_, lpFc);
+            lpf_fc_cached_ = lpFc;
+        }
+
+        const juce::AudioBuffer<float>* preSrc = &buffer;
+        if (hpfOn || lpfOn)
+        {
+            if (filt_pre_buf_.getNumSamples() < NumSamples
+                || filt_pre_buf_.getNumChannels() < numCh)
+                filt_pre_buf_.setSize (juce::jmax (numCh, (int) AMBI_CHANNELS),
+                                       NumSamples, false, false, true);
+            applyVizFilters (buffer, filt_pre_buf_, numCh, NumSamples, hpfOn, lpfOn);
+            preSrc = &filt_pre_buf_;
+        }
+
+        grid_energy_block_   .setZero();
+        grid_energy_eq_block_.setZero();
+        const int numGridEq = (int) Sh_matrix_eq_.rows();
+        int taps = 0;
+        for (int s = 0; s < NumSamples; s += stride)
+        {
+            for (int c = 0; c < numCh; ++c)
+                input_scratch_(c) = (double) preSrc->getSample (c, s);
+            // zero unused channels (in case channel count shrank dynamically)
+            for (int c = numCh; c < input_scratch_.size(); ++c)
+                input_scratch_(c) = 0.0;
+
+            grid_decode_scratch_   .noalias() = Sh_matrix_viz_ * input_scratch_;
+            grid_energy_block_    += grid_decode_scratch_.cwiseAbs2();
+
+            grid_decode_eq_scratch_.noalias() = Sh_matrix_eq_  * input_scratch_;
+            grid_energy_eq_block_ += grid_decode_eq_scratch_.cwiseAbs2();
+            ++taps;
+        }
+        if (taps > 0)
+        {
+            const double inv = 1.0 / (double) taps;
+            // User-controlled smoothing time constant (ms → seconds).
+            const double blockSeconds = (double) NumSamples / sample_rate_;
+            const double tauSeconds   = (double) std::max (1.0f,
+                                            view_smoothing_ms.load (std::memory_order_relaxed)) * 0.001;
+            const double alpha = std::exp (-blockSeconds / tauSeconds);
+            const double oneMinusAlpha = 1.0 - alpha;
+
+            const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
+            if ((int) grid_energy_smoothed_.size() != numGrid)
+                grid_energy_smoothed_.assign ((size_t) numGrid, 0.f);
+            if ((int) grid_energy_eq_smoothed_.size() != numGridEq)
+                grid_energy_eq_smoothed_.assign ((size_t) numGridEq, 0.f);
+            for (int g = 0; g < numGrid; ++g)
+            {
+                const double mean = grid_energy_block_(g) * inv;
+                grid_energy_smoothed_[(size_t) g] = (float) (alpha * grid_energy_smoothed_[(size_t) g] + oneMinusAlpha * mean);
+            }
+            for (int g = 0; g < numGridEq; ++g)
+            {
+                const double mean = grid_energy_eq_block_(g) * inv;
+                grid_energy_eq_smoothed_[(size_t) g] = (float) (alpha * grid_energy_eq_smoothed_[(size_t) g] + oneMinusAlpha * mean);
+            }
+        }
+    }
+    // ---------- end energy tap ----------
+
     output_buffer.clear();
 
 
@@ -607,6 +878,90 @@ void Ambix_directional_loudnessAudioProcessor::processBlock (AudioSampleBuffer& 
 
     for (int ch = 0; ch < std::min(AMBI_CHANNELS, getTotalNumOutputChannels()); ++ch)
         buffer.copyFrom(ch, 0, output_buffer, ch, 0, NumSamples);
+
+    // ---------- post-mod energy tap (output_buffer = post-Sh_transf signal) ----------
+    if (_initialized && grid_energy_post_block_.size() > 0 && Sh_matrix_viz_.rows() > 0)
+    {
+        const int numCh = std::min ({ (int) AMBI_CHANNELS,
+                                      getTotalNumOutputChannels(),
+                                      (int) Sh_matrix_viz_.cols() });
+        const int numGrid   = (int) Sh_matrix_viz_.rows();
+        const int numGridEq = (int) Sh_matrix_eq_.rows();
+        const int targetTaps = 16;
+        const int stride = std::max (1, NumSamples / targetTaps);
+
+        const bool hpfOn = view_vis_hpf_on.load (std::memory_order_relaxed);
+        const bool lpfOn = view_vis_lpf_on.load (std::memory_order_relaxed);
+        // Coefficients were already updated in the pre-mod tap above, so we
+        // reuse them here. Apply with separate (per-signal) state.
+        const juce::AudioBuffer<float>* postSrc = &output_buffer;
+        if (hpfOn || lpfOn)
+        {
+            if (filt_post_buf_.getNumSamples() < NumSamples
+                || filt_post_buf_.getNumChannels() < numCh)
+                filt_post_buf_.setSize (juce::jmax (numCh, (int) AMBI_CHANNELS),
+                                        NumSamples, false, false, true);
+            applyVizFilters (output_buffer, filt_post_buf_, numCh, NumSamples, hpfOn, lpfOn);
+            postSrc = &filt_post_buf_;
+        }
+
+        grid_energy_post_block_   .setZero();
+        grid_energy_eq_post_block_.setZero();
+        int taps = 0;
+        for (int s = 0; s < NumSamples; s += stride)
+        {
+            for (int c = 0; c < numCh; ++c)
+                input_scratch_(c) = (double) postSrc->getSample (c, s);
+            for (int c = numCh; c < input_scratch_.size(); ++c)
+                input_scratch_(c) = 0.0;
+
+            grid_decode_scratch_      .noalias() = Sh_matrix_viz_ * input_scratch_;
+            grid_energy_post_block_   += grid_decode_scratch_.cwiseAbs2();
+
+            grid_decode_eq_scratch_   .noalias() = Sh_matrix_eq_  * input_scratch_;
+            grid_energy_eq_post_block_+= grid_decode_eq_scratch_.cwiseAbs2();
+            ++taps;
+        }
+        if (taps > 0)
+        {
+            const double inv = 1.0 / (double) taps;
+            const double blockSeconds = (double) NumSamples / sample_rate_;
+            const double tauSeconds   = (double) std::max (1.0f,
+                                            view_smoothing_ms.load (std::memory_order_relaxed)) * 0.001;
+            const double alpha = std::exp (-blockSeconds / tauSeconds);
+            const double oneMinusAlpha = 1.0 - alpha;
+
+            const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
+            if ((int) grid_energy_post_smoothed_.size() != numGrid)
+                grid_energy_post_smoothed_.assign ((size_t) numGrid, 0.f);
+            if ((int) grid_energy_eq_post_smoothed_.size() != numGridEq)
+                grid_energy_eq_post_smoothed_.assign ((size_t) numGridEq, 0.f);
+            for (int g = 0; g < numGrid; ++g)
+            {
+                const double mean = grid_energy_post_block_(g) * inv;
+                grid_energy_post_smoothed_[(size_t) g] = (float) (alpha * grid_energy_post_smoothed_[(size_t) g] + oneMinusAlpha * mean);
+            }
+            for (int g = 0; g < numGridEq; ++g)
+            {
+                const double mean = grid_energy_eq_post_block_(g) * inv;
+                grid_energy_eq_post_smoothed_[(size_t) g] = (float) (alpha * grid_energy_eq_post_smoothed_[(size_t) g] + oneMinusAlpha * mean);
+            }
+        }
+    }
+}
+
+int Ambix_directional_loudnessAudioProcessor::getGridEnergySnapshot (std::vector<float>& out, bool postMod) const
+{
+    const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
+    out = postMod ? grid_energy_post_smoothed_ : grid_energy_smoothed_;
+    return (int) out.size();
+}
+
+int Ambix_directional_loudnessAudioProcessor::getGridEnergySnapshotEq (std::vector<float>& out, bool postMod) const
+{
+    const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
+    out = postMod ? grid_energy_eq_post_smoothed_ : grid_energy_eq_smoothed_;
+    return (int) out.size();
 }
 
 //==============================================================================
@@ -639,6 +994,18 @@ void Ambix_directional_loudnessAudioProcessor::getStateInformation (MemoryBlock&
     xml.setAttribute("filter_sel_id_1", filter_sel_id_1);
     xml.setAttribute("filter_sel_id_2", filter_sel_id_2);
 
+    xml.setAttribute("view_proj_ha",   view_proj_ha);
+    xml.setAttribute("view_energy_on", view_energy_on);
+    xml.setAttribute("view_autonorm",  view_autonorm);
+    xml.setAttribute("view_pre_mod",   view_pre_mod);
+    xml.setAttribute("view_range_db",  (double) view_range_db);
+    xml.setAttribute("view_peak_db",   (double) view_peak_db);
+    xml.setAttribute("view_smoothing_ms", (double) view_smoothing_ms.load());
+    xml.setAttribute("view_vis_hpf_on", view_vis_hpf_on.load());
+    xml.setAttribute("view_vis_lpf_on", view_vis_lpf_on.load());
+    xml.setAttribute("view_vis_hpf_fc", (double) view_vis_hpf_fc.load());
+    xml.setAttribute("view_vis_lpf_fc", (double) view_vis_lpf_fc.load());
+    xml.setAttribute("view_colormap",  view_colormap);
 
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
@@ -662,6 +1029,20 @@ void Ambix_directional_loudnessAudioProcessor::setStateInformation (const void* 
             filter_sel_id_1 = xmlState->getIntAttribute("filter_sel_id_1", 0);
             filter_sel_id_2 = xmlState->getIntAttribute("filter_sel_id_2", 0);
 
+            view_proj_ha    = xmlState->getBoolAttribute  ("view_proj_ha",   view_proj_ha);
+            view_energy_on  = xmlState->getBoolAttribute  ("view_energy_on", view_energy_on);
+            view_autonorm   = xmlState->getBoolAttribute  ("view_autonorm",  view_autonorm);
+            view_pre_mod    = xmlState->getBoolAttribute  ("view_pre_mod",   view_pre_mod);
+            view_range_db   = (float) xmlState->getDoubleAttribute ("view_range_db", view_range_db);
+            view_peak_db    = (float) xmlState->getDoubleAttribute ("view_peak_db",  view_peak_db);
+            view_smoothing_ms.store ((float) xmlState->getDoubleAttribute ("view_smoothing_ms", (double) view_smoothing_ms.load()));
+            view_vis_hpf_on.store (xmlState->getBoolAttribute ("view_vis_hpf_on", view_vis_hpf_on.load()));
+            view_vis_lpf_on.store (xmlState->getBoolAttribute ("view_vis_lpf_on", view_vis_lpf_on.load()));
+            view_vis_hpf_fc.store ((float) xmlState->getDoubleAttribute ("view_vis_hpf_fc", (double) view_vis_hpf_fc.load()));
+            view_vis_lpf_fc.store ((float) xmlState->getDoubleAttribute ("view_vis_lpf_fc", (double) view_vis_lpf_fc.load()));
+            view_colormap   = xmlState->getStringAttribute("view_colormap",  view_colormap);
+
+            sendChangeMessage(); // editor refresh
         }
 
     }
