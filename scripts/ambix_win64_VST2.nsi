@@ -1,5 +1,10 @@
 ; Compile script using Nullsoft Scriptable Install System (NSIS) on windows
 
+; Build Unicode installer.
+; Must precede Name/OutFile and any header-changing directive — newer
+; NSIS (3.x via choco on the GH-hosted runner) errors out otherwise.
+Unicode True
+
 ;--------------------------------
 !include x64.nsh
 !include "MUI2.nsh"
@@ -30,9 +35,6 @@ Name ${NAME}
 ; The file to write
 !system 'mkdir "../_WIN_RELEASE" 2> NUL'
 OutFile "../_WIN_RELEASE/${NAME}.exe"
-
-; Build Unicode installer
-Unicode True
 
 ; The default installation directory
 InstallDir "$PROGRAMFILES64\Steinberg\VSTPlugins\ambix"

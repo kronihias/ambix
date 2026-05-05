@@ -124,7 +124,7 @@ namespace PuckRenderer
             g.setColour (juce::Colours::white.withAlpha (isBackHemisphere ? 0.12f : 0.25f));
             g.drawRect (meterBounds, 1.0f);
 
-            auto thresholdDb = [] (int seg) noexcept
+            auto thresholdDb = [=] (int seg) noexcept
             {
                 const float t = static_cast<float> (seg + 1)
                               / static_cast<float> (kNumSegments);

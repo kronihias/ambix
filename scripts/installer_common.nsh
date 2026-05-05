@@ -11,7 +11,12 @@
 ; SWP_NOMOVE | SWP_NOZORDER
 !define SWP_SIZE_ONLY 0x0006
 
-Function .onGUIInit
+; Hook into MUI2's own .onGUIInit instead of declaring our own — MUI_LANGUAGE
+; emits a .onGUIInit and a second top-level definition is a hard error. MUI
+; calls this function at the end of its handler.
+!define MUI_CUSTOMFUNCTION_GUIINIT ambixResizeGUI
+
+Function ambixResizeGUI
     ; --- Resize the outer installer window ---
     System::Call 'user32::GetWindowRect(p $HWNDPARENT, @r0)'
     System::Call '*$0(i.r1, i.r2, i.r3, i.r4)'
