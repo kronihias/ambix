@@ -301,8 +301,12 @@ void Ambix_encoderAudioProcessor::sendOSC()
     }
 
     // Extended OSC: per-source positions + meters under /ambix_encoder/...
-    // Only emitted to the manual sender list when osc_extended_out is on.
-    if (osc_extended_out && osc_out)
+    // Sent to every entry in oscSenders (manual + NSD subscribers) so a
+    // visualizer that auto-subscribed sees the individual sources, not just
+    // the legacy /ambi_enc centre puck. Gated only on the extended-out
+    // toggle; the destination list itself is the on/off switch for the
+    // manual + discovery paths.
+    if (osc_extended_out)
     {
         const int active = getActiveSources();
 
