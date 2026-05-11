@@ -130,6 +130,19 @@ void SphereOpenGL::renderOpenGL()
 void SphereOpenGL::newOpenGLContextCreated() {}
 void SphereOpenGL::openGLContextClosing() {}
 
+namespace
+{
+    // The sphere is drawn at radius 0.9 in unit clip space with the viewport
+    // matching the component size. The visible sphere radius in pixels is
+    // therefore 0.9 × (smaller half-extent). Used by every screen↔angle
+    // mapping below — replaces an old hardcoded `105.f` that only matched
+    // the legacy 240×240 fixed editor.
+    inline float sphereRadiusPx (const juce::Component& c) noexcept
+    {
+        return 0.9f * (float) juce::jmin (c.getWidth(), c.getHeight()) * 0.5f;
+    }
+}
+
 void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
 {
     if (! processor) return;
@@ -138,6 +151,8 @@ void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
     _mPhi   = (processor->getParameter (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * (float)(2.f * M_PI);
     _mTheta = (processor->getParameter (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * (float)(2.f * M_PI);
     _mWidth = processor->getParameter (Ambix_encoderAudioProcessor::WidthParam)              * (float)(2.f * M_PI);
+
+    const float sphereR = sphereRadiusPx (*this);
 
     if (! processor->isLinked())
     {
@@ -150,7 +165,7 @@ void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
             const auto pos = processor->getSourceDisplayPos (i);
             const float az = pos.azDeg * (float) DEG2RAD;
             const float el = pos.elDeg * (float) DEG2RAD;
-            const float r_pixels = 105.f * cosf (el);
+            const float r_pixels = sphereR * cosf (el);
             const float sx = (float)getWidth() / 2.f + r_pixels * sinf (az);
             const float sy = (float)getHeight() / 2.f - r_pixels * cosf (az);
             const float dx = (float)e.getPosition().x - sx;
@@ -168,7 +183,7 @@ void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
     if (e.mods.isAltDown() && processor->isLinked())
     {
         // Compute centre indicator screen position for width drag.
-        const float r_pixels = 105.f * cosf (_mTheta);
+        const float r_pixels = sphereR * cosf (_mTheta);
         const float centerScreenX = (float)getWidth() / 2.f + r_pixels * sinf (_mPhi);
         const float centerScreenY = (float)getHeight() / 2.f - r_pixels * cosf (_mPhi);
         const float dx = (float)e.getPosition().x - centerScreenX;
@@ -183,10 +198,12 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
 {
     if (! processor) return;
 
+    const float sphereR = sphereRadiusPx (*this);
+
     if (e.mods.isAltDown() && processor->isLinked())
     {
         // Width drag
-        const float r_pixels = 105.f * cosf (_mTheta);
+        const float r_pixels = sphereR * cosf (_mTheta);
         const float centerScreenX = (float)getWidth() / 2.f + r_pixels * sinf (_mPhi);
         const float centerScreenY = (float)getHeight() / 2.f - r_pixels * cosf (_mPhi);
         const float dx = (float)e.getPosition().x - centerScreenX;
@@ -194,7 +211,7 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
         const float currentDist = sqrtf (dx*dx + dy*dy);
         const float deltaDist = currentDist - _dragStartDistToCenter;
         const float newWidth = jlimit (0.f, (float)(2 * M_PI),
-                                        _mWidth + deltaDist / 105.f * (float)M_PI);
+                                        _mWidth + deltaDist / sphereR * (float)M_PI);
         setParameterNotifyingHost (processor, Ambix_encoderAudioProcessor::WidthParam,
                                    newWidth / (2.f * (float)M_PI));
         return;
@@ -215,7 +232,7 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
         const float x = (float)e.getPosition().x - (float)this->getWidth() / 2.f;
         const float y = (float)e.getPosition().y - (float)this->getHeight() / 2.f;
 
-        float r = sqrtf (x*x + y*y) / 105.f;
+        float r = sqrtf (x*x + y*y) / sphereR;
         const float phi = atan2f (y, x);
 
         if (!e.mods.isCtrlDown())
