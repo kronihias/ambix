@@ -85,8 +85,12 @@ SourceTableRow::SourceTableRow (Ambix_encoderAudioProcessor& p, int sourceIndex)
 
 void SourceTableRow::refreshFromProcessor()
 {
+    // All angle params are stored in [0,1] mapped to [-180°, +180°]. The
+    // elevation slider visually clamps to ±90° (the physically meaningful
+    // range), but the underlying param uses the same encoding as azimuth so
+    // mouse/OSC paths into both don't need a special case.
     sld_az  .setValue ((processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz))   - 0.5f) * 360.f, juce::dontSendNotification);
-    sld_el  .setValue ((processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl))   - 0.5f) * 180.f, juce::dontSendNotification);
+    sld_el  .setValue ((processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl))   - 0.5f) * 360.f, juce::dontSendNotification);
     sld_size.setValue ( processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcSize)),  juce::dontSendNotification);
     sld_gain.setValue ( processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcGain)),  juce::dontSendNotification);
 }
@@ -136,7 +140,7 @@ void SourceTableRow::sliderValueChanged (juce::Slider* s)
     else if (s == &sld_el)
         setParameterNotifyingHost (&processor,
             Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl),
-            (float)((s->getValue() + 90.) / 180.));
+            (float)((s->getValue() + 180.) / 360.));
     else if (s == &sld_size)
         setParameterNotifyingHost (&processor,
             Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcSize),

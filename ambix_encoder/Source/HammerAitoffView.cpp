@@ -27,9 +27,12 @@ HammerAitoffView::HammerAitoffView()
 
 juce::Point<float> HammerAitoffView::project (float azRad, float elRad)
 {
-    // Wrap azimuth to (-π, π], clamp elevation.
-    while (azRad >  juce::MathConstants<float>::pi) azRad -= juce::MathConstants<float>::twoPi;
-    while (azRad <= -juce::MathConstants<float>::pi) azRad += juce::MathConstants<float>::twoPi;
+    // Wrap azimuth into [-π, π]. The closed lower bound matters: the
+    // polyline meridian/parallel drawers iterate from exactly -π and we
+    // need that endpoint to land on the left edge of the ellipse, not
+    // jump across to the right edge.
+    while (azRad >   juce::MathConstants<float>::pi) azRad -= juce::MathConstants<float>::twoPi;
+    while (azRad <  -juce::MathConstants<float>::pi) azRad += juce::MathConstants<float>::twoPi;
     elRad = juce::jlimit (-juce::MathConstants<float>::halfPi,
                            juce::MathConstants<float>::halfPi, elRad);
 
@@ -204,12 +207,25 @@ void HammerAitoffView::paint (juce::Graphics& g)
     g.setColour (juce::Colour (0xff5b7392));
     g.strokePath (ellipse, juce::PathStrokeType (1.5f));
 
-    // Labels (front/back)
+    // Labels. In a Hammer-Aitoff projection of the sphere with the prime
+    // meridian along front, the CENTRE of the ellipse is the front direction
+    // (az=0, el=0); the top is the zenith and the bottom the nadir. The far
+    // left and right edges both correspond to "back" (azimuth ±180°). So
+    // "front" belongs at the centre, not the top.
     g.setColour (juce::Colour (0x88a0b3c8));
     g.setFont (juce::Font (juce::FontOptions { 10.f, juce::Font::plain }));
-    g.drawText ("front", (int)cx - 30, (int)bounds.getY() - 14, 60, 12, juce::Justification::centred);
-    g.drawText ("L",     (int)bounds.getX() - 12, (int)cy - 6, 12, 12, juce::Justification::centred);
-    g.drawText ("R",     (int)bounds.getRight(),   (int)cy - 6, 12, 12, juce::Justification::centred);
+    g.drawText ("up",    (int)cx - 20, (int)bounds.getY() - 14, 40, 12, juce::Justification::centred);
+    g.drawText ("down",  (int)cx - 20, (int)bounds.getBottom() + 2, 40, 12, juce::Justification::centred);
+    g.drawText ("back",  (int)bounds.getX() - 28, (int)cy - 6, 28, 12, juce::Justification::centred);
+    g.drawText ("back",  (int)bounds.getRight() + 2, (int)cy - 6, 28, 12, juce::Justification::centred);
+    g.drawText ("front", (int)cx - 22, (int)cy + 6,  44, 12, juce::Justification::centred);
+    g.drawText ("left",  (int)cx - (int)(bounds.getWidth() * 0.25f) - 14, (int)cy - 6, 28, 12, juce::Justification::centred);
+    g.drawText ("right", (int)cx + (int)(bounds.getWidth() * 0.25f) - 14, (int)cy - 6, 28, 12, juce::Justification::centred);
+
+    // Crosshair marker at the centre so "front" is unambiguous.
+    g.setColour (juce::Colour (0x60a0b3c8));
+    g.drawLine (cx - 5, cy, cx + 5, cy, 1.0f);
+    g.drawLine (cx, cy - 5, cx, cy + 5, 1.0f);
 
     // Sources
     const int active = processor->getActiveSources();
@@ -292,8 +308,11 @@ void HammerAitoffView::mouseDrag (const juce::MouseEvent& e)
             return;
     }
 
+    // Both azimuth AND elevation are encoded as [0,1] → [-180°, +180°] in
+    // the param model (azimuth uses the full circle; elevation is physically
+    // restricted to ±90° but uses the same normalisation for consistency).
     const float azNorm = (azRad / juce::MathConstants<float>::twoPi) + 0.5f;
-    const float elNorm = (elRad / juce::MathConstants<float>::pi)    + 0.5f;
+    const float elNorm = (elRad / juce::MathConstants<float>::twoPi) + 0.5f;
 
     if (processor->isLinked())
     {

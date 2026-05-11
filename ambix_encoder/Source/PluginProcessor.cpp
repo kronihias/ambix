@@ -476,8 +476,11 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
             setParameterNotifyingHost (this, sourceParamIndex (idx, SrcAz),
                                        jlimit(0.f, 1.f, (v + 180.f) / 360.f));
         else if (sub == "elevation")
+            // Per-source elevation uses the same [0,1] → [-180°, +180°]
+            // encoding as azimuth — the physical range is ±90° but the
+            // param space is symmetric so mouse and OSC paths stay simple.
             setParameterNotifyingHost (this, sourceParamIndex (idx, SrcEl),
-                                       jlimit(0.f, 1.f, (v + 90.f) / 180.f));
+                                       jlimit(0.f, 1.f, (v + 180.f) / 360.f));
         else if (sub == "size")
             setParameterNotifyingHost (this, sourceParamIndex (idx, SrcSize), jlimit(0.f, 1.f, v));
         else if (sub == "gain")
