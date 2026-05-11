@@ -10,10 +10,6 @@
 
  Details of these licenses can be found at: www.gnu.org/licenses
 
- ambix is distributed in the hope that it will be useful, but WITHOUT ANY
- WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
- A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
  ==============================================================================
  */
 
@@ -104,8 +100,6 @@ public:
     SphereOpenGL();
     ~SphereOpenGL();
 
-    //void paint (Graphics& g) override;
-
     void renderOpenGL();
     void newOpenGLContextCreated();
     void openGLContextClosing();
@@ -113,8 +107,6 @@ public:
     void mouseDown (const MouseEvent& e);
     void mouseUp (const MouseEvent& e);
     void mouseDrag (const MouseEvent& e);
-
-    void setSource(float azimuth, float elevation, float width); // pass in degree!
 
     Ambix_encoderAudioProcessor* processor;
 
@@ -126,18 +118,13 @@ private:
     SolidSphere sphere_source;
     SolidSphere sphere_source_small;
 
-    float mPhi;
-    float mTheta;
+    // mouse drag state for relative-mode interaction (linked mode global drag)
+    float _mPhi   = 0.f;
+    float _mTheta = 0.f;
+    float _mWidth = 0.f;
+    float _dragStartDistToCenter = 0.f;
 
-    float _mTheta; // old
-    float _mPhi;
-
-    float mWidth;
-    float _mWidth;
-
-    float _dragStartDistToCenter;
-
-    bool _first_run;
+    int   _draggingSource = -1; // unlinked mode per-source drag
 };
 
 

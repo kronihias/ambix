@@ -35,13 +35,20 @@
 
 #define _2PI 6.2831853071795
 
+// Maximum number of input source channels supported by the unified binary.
+// The plugin allocates this many panners/encoders at construction; the active
+// count is exposed at runtime via NumActiveSourcesParam.
+#ifndef MAX_INPUT_CHANNELS
+ #define MAX_INPUT_CHANNELS 8
+#endif
+
 //==============================================================================
 /**
 */
 class Ambix_encoderAudioProcessor  : public AudioProcessor,
 #if WITH_OSC
                                     public Timer,
-                                    private OSCReceiver::ListenerWithOSCAddress<OSCReceiver::RealtimeCallback>,
+                                    private OSCReceiver::Listener<OSCReceiver::RealtimeCallback>,
                                     private juce::ChangeListener,
 #endif
                                     public ChangeBroadcaster
@@ -90,14 +97,10 @@ public:
     bool silenceInProducesSilenceOut() const override;
     double getTailLengthSeconds() const override;
 
-    void calcAzimuth();
-
     void updateTrackProperties (const TrackProperties& properties) override;
 
     String getTrackName() const;  // thread-safe accessor used by sendOSC()
 
-    // Expose the VST3 extensions object so the JUCE VST3 wrapper can pass
-    // host-side interfaces (e.g. REAPER's IReaperHostApplication) to it.
     juce::VST3ClientExtensions* getVST3ClientExtensions() override
     {
         return &reaperIntegration;
@@ -107,22 +110,51 @@ public:
     void calcNewParameters(double SampleRate, int BufferLength);
 #endif
 
+    //==============================================================================
+    // Parameter layout. Indices are stable so DAW automation survives revisions.
+    // Per-source params start at SourceParamsBase and pack 4 floats per source
+    // in (az, el, size, gain) order. They are always exposed to the host so
+    // automation works regardless of the linked toggle, but only consulted when
+    // unlinked.
+    static constexpr int kMaxSources         = MAX_INPUT_CHANNELS;
+    static constexpr int kPerSourceParams    = 4;  // az, el, size, gain
+    static constexpr int kBaseParams         = 13;
+    static constexpr int kTotalParams        = kBaseParams + kMaxSources * kPerSourceParams;
+
     enum Parameters
-	{
-		AzimuthParam,
+    {
+        AzimuthParam = 0,
         ElevationParam,
         SizeParam,
-#if INPUT_CHANNELS > 1
-        WidthParam, // if multiple sources
-#endif
-        AzimuthSetParam, // for advanced control...
+        WidthParam,
+        AzimuthSetParam,    // advanced control
         AzimuthSetRelParam,
         AzimuthMvParam,
         ElevationSetParam,
         ElevationSetRelParam,
         ElevationMvParam,
-        SpeedParam
-	};
+        SpeedParam,
+        LinkedParam,            // 0 = unlinked, 1 = linked
+        NumActiveSourcesParam,  // 0..1 mapped to 1..kMaxSources (round)
+        SourceParamsBase = 13   // per-source params follow
+    };
+
+    enum SourceSubParam { SrcAz = 0, SrcEl, SrcSize, SrcGain };
+
+    static constexpr int sourceParamIndex (int srcIdx, int sub)
+    {
+        return SourceParamsBase + srcIdx * kPerSourceParams + sub;
+    }
+
+    // Decode the active source count from NumActiveSourcesParam (0..1 → 1..kMaxSources).
+    int getActiveSources() const;
+
+    bool isLinked() const { return linked_param >= 0.5f; }
+
+    // Snapshot of per-source positions for the editor / Hammer-Aitoff view.
+    // Returns degrees in (-180..180, -90..90) for convenience.
+    struct SourcePos { float azDeg, elDeg, size, gain, meter; };
+    SourcePos getSourceDisplayPos (int idx) const;
 
     //==============================================================================
     int getNumPrograms() override;
@@ -137,76 +169,53 @@ public:
 
 
     int m_id; // id of this instance
-
     static int s_ID; // global instance counter
 
 #if WITH_OSC
     void timerCallback() override; // call osc send in timer callback
 
-    // JUCE OSC
     void oscMessageReceived (const OSCMessage& message) override;
 
     void sendOSC(); // send osc data
 
-    // UI toggles. Semantics (decoupled now):
-    //   osc_out       — enable sending to the manual ip:port list.
-    //   osc_in        — honour /ambi_enc_set for remote parameter control.
-    //   discoverable  — advertise on the LAN + accept /ambi_enc_subscribe and
-    //                   stream /ambi_enc to every subscriber, regardless of
-    //                   osc_out. Subscriber traffic is independent of the
-    //                   manual send/receive toggles.
     void oscOut(bool arg);
     void oscIn (bool arg);
     void setDiscoverable (bool arg);
+    void setExtendedOscOut (bool arg);
 
     void changeTimer(int time);
 
-    // osc stuff
     bool osc_in;
-	bool osc_out;
+    bool osc_out;
+    bool osc_extended_out; // emit per-source /ambix_encoder/... (incl. meters)
     int osc_interval;
 
-	String osc_in_port, osc_out_ip, osc_out_port;
+    String osc_in_port, osc_out_ip, osc_out_port;
 
-    // zeroconf discovery
     bool discoverable;
     std::unique_ptr<NetworkAdvertiser> networkAdvertiser;
     void refreshAdvertiser();
-    void rebuildOscSenders(); // combines manual + subscribers
-
-    // Decides whether the UDP receive socket should be bound, and whether the
-    // send timer should be running, based on the current flags + subscriber
-    // count. Called from every setter that affects those conditions.
+    void rebuildOscSenders();
     void refreshOscReceiverBinding();
     void refreshOscOutput();
 
     void dispatchSubscribe   (const juce::OSCMessage& m);
     void dispatchUnsubscribe (const juce::OSCMessage& m);
 
-    // Rebuilds sender list when NSD expires subscribers.
     void changeListenerCallback (juce::ChangeBroadcaster* source) override;
-
 #endif
 
-    // Fully constructed by the member-initializer list so the VST3 wrapper
-    // can call setIHostApplication on it even before our ctor body runs.
     ReaperVST3Integration reaperIntegration;
 
-    // Stable per-plugin-load identifier broadcast in the NSD description as
-    // `euid=...`. The visualizer keys its subscription list on this — it is
-    // invariant across Advertiser rebuilds, unlike juce's `Service::instanceID`
-    // which mints a fresh random value every time the Advertiser is recreated
-    // (e.g. when the description changes after a project-name poll).
     const juce::String instanceUuid { juce::Uuid().toDashedString() };
 
+    //==========================================================================
+    // Per-source per-block RMS (W-channel encoded contribution magnitude is too
+    // entangled across sources, so we measure each input pre-encoding instead).
+    // Read by the editor for VU display + sent over OSC.
+    float getSourceMeter (int idx) const;
+
 private:
-    // Lightweight timer that polls REAPER's project name for this plugin
-    // instance. Runs regardless of whether the OSC-send timer is active —
-    // without it, the project name would only resolve AFTER the first
-    // subscriber arrived, which triggered a description change and (before we
-    // added the stable `euid`) would have invalidated that very subscription.
-    // Decoupling project-poll from OSC-send keeps the first-ever broadcast
-    // carrying the right `proj=` value.
     struct ReaperPollTimer : public juce::Timer
     {
         explicit ReaperPollTimer (Ambix_encoderAudioProcessor& p) : owner (p) {}
@@ -217,25 +226,38 @@ private:
     void pollReaperProject();
 
     CriticalSection track_name_lock;
-    String          track_name;   // updated by the host via updateTrackProperties()
+    String          track_name;
 
-    // Cached "last seen" REAPER project name; compared each poll tick so we
-    // only rebuild the NSD advertiser when the project is saved/renamed/changed.
     String          currentReaperProject;
 
     OwnedArray<AmbixEncoder> AmbiEnc;
 
+    // Recompute per-source target azimuth/elevation/size from the active
+    // parameter model (linked vs unlinked). Called whenever a relevant param
+    // changes, and once per processBlock() before the gain ramp.
+    void applyParamsToEncoders();
+
+    // Migrate global → per-source positions when switching modes so the user
+    // doesn't lose context between linked and unlinked.
+    void linkedToUnlinkedSnapshot();
+    void unlinkedToLinkedSnapshot();
+
     double SampleRate;
 
-    unsigned int NumParameters;
-
-    float azimuth_param; // for multiple inputs this is the center
+    // global (linked-mode) params
+    float azimuth_param;
     float elevation_param;
     float size_param;
-    float width_param;  // arrange sources with equal angular distance
+    float width_param;
+    float linked_param;
+    float num_active_sources_param;
 
-    // last osc value sent...
-    float _azimuth_param; // for multiple inputs this is the center
+    // per-source params (azimuth, elevation, size, gain), 0..1 normalised
+    struct SourceParams { float az, el, size, gain; };
+    std::array<SourceParams, kMaxSources> source_params;
+
+    // last osc value sent (deltas only)
+    float _azimuth_param;
     float _elevation_param;
     float _size_param;
     float _rms;
@@ -248,30 +270,23 @@ private:
 
     AudioSampleBuffer InputBuffer;
 
-    MyMeterDsp _my_meter_dsp;
+    MyMeterDsp _my_meter_dsp; // overall W-channel meter (legacy /ambi_enc)
+    OwnedArray<MyMeterDsp> sourceMeterDsp;
 
-    float rms; // rms of W channel
-    float dpk; // peak value of W channel
+    float rms;
+    float dpk;
+
+    // per-source meter snapshot (lock-free single-writer)
+    std::array<std::atomic<float>, kMaxSources> source_meter {};
 
 #if WITH_OSC
     OSCReceiver oscReceiver;
-    bool receiverBound { false }; // tracks whether oscReceiver is connected so
-                                  // refreshOscReceiverBinding() can idempotently
-                                  // bind/unbind.
+    bool receiverBound { false };
 
-    CriticalSection oscSenders_lock; // protects oscSenders against concurrent
-                                     // access from Timer thread (sendOSC) and
-                                     // OSC receiver / NSD threads.
+    CriticalSection oscSenders_lock;
     OwnedArray<OSCSender> oscSenders;
-
 #endif
-    /*
-    void calcParams();
 
-    Array<float> ambi_gain;
-    Array<float> _ambi_gain; // buffer for gain ramp
-    */
-    //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_encoderAudioProcessor)
 };
 

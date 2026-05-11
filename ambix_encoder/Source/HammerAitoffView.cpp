@@ -1,0 +1,318 @@
+/*
+ ==============================================================================
+ ==============================================================================
+ */
+
+#include "HammerAitoffView.h"
+#include "../../common/JuceCompat.h"
+#include <cmath>
+
+namespace
+{
+    constexpr float kSqrt2     = 1.41421356237f;
+    constexpr float kTwoSqrt2  = 2.82842712475f;
+
+    // Ellipse half-axes for the *normalised* projection (x ∈ [-2√2, 2√2],
+    // y ∈ [-√2, √2]). We normalise them to [-1, 1] for screen mapping.
+    inline float normX (float xRaw) { return xRaw / kTwoSqrt2; }
+    inline float normY (float yRaw) { return yRaw / kSqrt2;    }
+}
+
+HammerAitoffView::HammerAitoffView()
+{
+    setOpaque (true);
+    setMouseCursor (juce::MouseCursor::CrosshairCursor);
+    startTimerHz (30);
+}
+
+juce::Point<float> HammerAitoffView::project (float azRad, float elRad)
+{
+    // Wrap azimuth to (-π, π], clamp elevation.
+    while (azRad >  juce::MathConstants<float>::pi) azRad -= juce::MathConstants<float>::twoPi;
+    while (azRad <= -juce::MathConstants<float>::pi) azRad += juce::MathConstants<float>::twoPi;
+    elRad = juce::jlimit (-juce::MathConstants<float>::halfPi,
+                           juce::MathConstants<float>::halfPi, elRad);
+
+    const float cosE = std::cos (elRad);
+    const float halfA = azRad * 0.5f;
+    const float denom = std::sqrt (1.f + cosE * std::cos (halfA));
+    const float xRaw = (2.f * kSqrt2 * cosE * std::sin (halfA)) / denom;
+    const float yRaw = (kSqrt2 * std::sin (elRad))              / denom;
+    return { normX (xRaw), normY (yRaw) };
+}
+
+bool HammerAitoffView::unproject (float x, float y, float& azRad, float& elRad)
+{
+    // Convert back to raw Hammer-Aitoff coordinates.
+    const float xRaw = x * kTwoSqrt2;
+    const float yRaw = y * kSqrt2;
+
+    // Auxiliary z = √(1 - (x/4)² - (y/2)²)  (Wikipedia, Hammer projection inverse)
+    const float a = (xRaw * 0.25f);
+    const float b = (yRaw * 0.5f);
+    const float zSq = 1.f - a * a - b * b;
+    if (zSq <= 0.f) return false;
+
+    const float z = std::sqrt (zSq);
+    elRad = std::asin (juce::jlimit (-1.f, 1.f, z * yRaw));
+    const float arg = z * xRaw / (2.f * (2.f * z * z - 1.f));
+    azRad = 2.f * std::atan (arg);
+    return true;
+}
+
+juce::Rectangle<float> HammerAitoffView::getProjectionBounds() const
+{
+    // Inset so dots don't run off the edge.
+    const float pad = 12.f;
+    auto r = getLocalBounds().toFloat().reduced (pad);
+    // Maintain 2:1 aspect (Hammer ellipse is 2× as wide as tall).
+    const float ar = 2.f;
+    if (r.getWidth() / r.getHeight() > ar)
+        r = r.withSizeKeepingCentre (r.getHeight() * ar, r.getHeight());
+    else
+        r = r.withSizeKeepingCentre (r.getWidth(), r.getWidth() / ar);
+    return r;
+}
+
+juce::Point<float> HammerAitoffView::sourceScreenPos (int idx) const
+{
+    if (! processor) return {};
+    const auto pos = processor->getSourceDisplayPos (idx);
+    const float azRad = pos.azDeg * juce::MathConstants<float>::pi / 180.f;
+    const float elRad = pos.elDeg * juce::MathConstants<float>::pi / 180.f;
+    const auto p = project (azRad, elRad);
+    const auto bounds = getProjectionBounds();
+    return { bounds.getCentreX() + p.x * bounds.getWidth() * 0.5f,
+             bounds.getCentreY() - p.y * bounds.getHeight() * 0.5f };
+}
+
+int HammerAitoffView::findSourceUnder (juce::Point<float> screenPt) const
+{
+    if (! processor) return -1;
+    const int active = processor->getActiveSources();
+    int best = -1;
+    float bestDistSq = 18.f * 18.f; // hit radius
+    for (int i = 0; i < active; ++i)
+    {
+        const auto sp = sourceScreenPos (i);
+        const float dSq = sp.getDistanceSquaredFrom (screenPt);
+        if (dSq < bestDistSq)
+        {
+            bestDistSq = dSq;
+            best = i;
+        }
+    }
+    return best;
+}
+
+void HammerAitoffView::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colour (0xff101418));
+
+    if (! processor) return;
+    const auto bounds = getProjectionBounds();
+    const float cx = bounds.getCentreX();
+    const float cy = bounds.getCentreY();
+    const float halfW = bounds.getWidth()  * 0.5f;
+    const float halfH = bounds.getHeight() * 0.5f;
+
+    auto toScreen = [&] (float xN, float yN)
+    {
+        return juce::Point<float> { cx + xN * halfW, cy - yN * halfH };
+    };
+
+    // Filled ellipse background
+    juce::Path ellipse;
+    ellipse.addEllipse (bounds);
+    g.setColour (juce::Colour (0xff1c2632));
+    g.fillPath (ellipse);
+
+    // Grid: meridians (constant azimuth) — every 30°, polylines for smooth curves
+    g.setColour (juce::Colour (0x554d6378));
+    constexpr int meridianStep = 30;
+    constexpr int parallelStep = 30;
+    constexpr int meridianSegments = 64;
+
+    for (int azDeg = -180; azDeg <= 180; azDeg += meridianStep)
+    {
+        if (azDeg == 0) continue; // drawn separately, highlighted
+        juce::Path m;
+        const float azRad = (float) azDeg * juce::MathConstants<float>::pi / 180.f;
+        for (int i = 0; i <= meridianSegments; ++i)
+        {
+            const float t = (float)i / (float)meridianSegments;
+            const float elRad = -juce::MathConstants<float>::halfPi
+                              + t * juce::MathConstants<float>::pi;
+            const auto p = project (azRad, elRad);
+            const auto sp = toScreen (p.x, p.y);
+            if (i == 0) m.startNewSubPath (sp);
+            else        m.lineTo (sp);
+        }
+        g.strokePath (m, juce::PathStrokeType (0.7f));
+    }
+
+    // Parallels (constant elevation)
+    for (int elDeg = -60; elDeg <= 60; elDeg += parallelStep)
+    {
+        if (elDeg == 0) continue;
+        juce::Path p;
+        const float elRad = (float) elDeg * juce::MathConstants<float>::pi / 180.f;
+        for (int i = 0; i <= meridianSegments; ++i)
+        {
+            const float t = (float)i / (float)meridianSegments;
+            const float azRad = -juce::MathConstants<float>::pi
+                              + t * 2.f * juce::MathConstants<float>::pi;
+            const auto pp = project (azRad, elRad);
+            const auto sp = toScreen (pp.x, pp.y);
+            if (i == 0) p.startNewSubPath (sp);
+            else        p.lineTo (sp);
+        }
+        g.strokePath (p, juce::PathStrokeType (0.7f));
+    }
+
+    // Equator + prime meridian highlighted
+    g.setColour (juce::Colour (0xaa9fb4cc));
+    {
+        juce::Path eq;
+        for (int i = 0; i <= meridianSegments; ++i)
+        {
+            const float t = (float)i / (float)meridianSegments;
+            const float azRad = -juce::MathConstants<float>::pi
+                              + t * 2.f * juce::MathConstants<float>::pi;
+            const auto p = project (azRad, 0.f);
+            const auto sp = toScreen (p.x, p.y);
+            if (i == 0) eq.startNewSubPath (sp);
+            else        eq.lineTo (sp);
+        }
+        g.strokePath (eq, juce::PathStrokeType (1.2f));
+
+        juce::Path pm;
+        for (int i = 0; i <= meridianSegments; ++i)
+        {
+            const float t = (float)i / (float)meridianSegments;
+            const float elRad = -juce::MathConstants<float>::halfPi
+                              + t * juce::MathConstants<float>::pi;
+            const auto p = project (0.f, elRad);
+            const auto sp = toScreen (p.x, p.y);
+            if (i == 0) pm.startNewSubPath (sp);
+            else        pm.lineTo (sp);
+        }
+        g.strokePath (pm, juce::PathStrokeType (1.2f));
+    }
+
+    // Ellipse outline
+    g.setColour (juce::Colour (0xff5b7392));
+    g.strokePath (ellipse, juce::PathStrokeType (1.5f));
+
+    // Labels (front/back)
+    g.setColour (juce::Colour (0x88a0b3c8));
+    g.setFont (juce::Font (juce::FontOptions { 10.f, juce::Font::plain }));
+    g.drawText ("front", (int)cx - 30, (int)bounds.getY() - 14, 60, 12, juce::Justification::centred);
+    g.drawText ("L",     (int)bounds.getX() - 12, (int)cy - 6, 12, 12, juce::Justification::centred);
+    g.drawText ("R",     (int)bounds.getRight(),   (int)cy - 6, 12, 12, juce::Justification::centred);
+
+    // Sources
+    const int active = processor->getActiveSources();
+    for (int i = 0; i < active; ++i)
+    {
+        const auto sp = sourceScreenPos (i);
+        const auto pos = processor->getSourceDisplayPos (i);
+
+        // Size halo (visualises the size param as a translucent disc).
+        if (pos.size > 0.f)
+        {
+            const float radius = 6.f + pos.size * 26.f;
+            g.setColour (juce::Colours::yellow.withAlpha (0.18f));
+            g.fillEllipse (sp.x - radius, sp.y - radius, radius * 2.f, radius * 2.f);
+        }
+
+        // Meter ring (thickness scaled by RMS).
+        if (pos.meter > 0.005f)
+        {
+            const float ringR = 14.f;
+            const float thickness = juce::jmin (4.f, pos.meter * 12.f + 1.f);
+            g.setColour (juce::Colours::limegreen.withAlpha (0.7f));
+            g.drawEllipse (sp.x - ringR, sp.y - ringR, ringR * 2.f, ringR * 2.f, thickness);
+        }
+
+        // Dot
+        const float r = 7.f;
+        g.setColour (draggingSource == i ? juce::Colours::orange : juce::Colours::yellow);
+        g.fillEllipse (sp.x - r, sp.y - r, r * 2.f, r * 2.f);
+        g.setColour (juce::Colours::black);
+        g.drawEllipse (sp.x - r, sp.y - r, r * 2.f, r * 2.f, 1.f);
+
+        // Label
+        g.setColour (juce::Colours::black);
+        g.setFont (juce::Font (juce::FontOptions { 11.f, juce::Font::bold }));
+        g.drawText (juce::String (i + 1),
+                    (int)(sp.x - 10), (int)(sp.y - 7), 20, 14,
+                    juce::Justification::centred);
+    }
+}
+
+void HammerAitoffView::resized() {}
+
+void HammerAitoffView::mouseDown (const juce::MouseEvent& e)
+{
+    if (! processor) return;
+    draggingSource = findSourceUnder (e.getPosition().toFloat());
+    if (draggingSource < 0)
+    {
+        // Click in empty space: drag the nearest source there (simpler than
+        // creating new sources). Fall through to mouseDrag for the position
+        // update.
+        draggingSource = 0;
+    }
+    mouseDrag (e);
+}
+
+void HammerAitoffView::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! processor || draggingSource < 0) return;
+
+    const auto bounds = getProjectionBounds();
+    const float cx = bounds.getCentreX();
+    const float cy = bounds.getCentreY();
+    const float halfW = bounds.getWidth()  * 0.5f;
+    const float halfH = bounds.getHeight() * 0.5f;
+
+    const float xN = (e.getPosition().x - cx) / halfW;
+    const float yN = (cy - e.getPosition().y) / halfH;
+
+    float azRad = 0.f, elRad = 0.f;
+    if (! unproject (xN, yN, azRad, elRad))
+    {
+        // Outside the ellipse: clamp to the nearest valid point on the
+        // boundary by scaling (xN, yN) inward until inside.
+        const float r = std::hypot (xN, yN);
+        if (r <= 0.f) return;
+        const float scale = 0.999f / r;
+        if (! unproject (xN * scale, yN * scale, azRad, elRad))
+            return;
+    }
+
+    const float azNorm = (azRad / juce::MathConstants<float>::twoPi) + 0.5f;
+    const float elNorm = (elRad / juce::MathConstants<float>::pi)    + 0.5f;
+
+    if (processor->isLinked())
+    {
+        // In linked mode the dot drives the global azimuth/elevation.
+        setParameterNotifyingHost (processor,
+                                   Ambix_encoderAudioProcessor::AzimuthParam,
+                                   juce::jlimit (0.f, 1.f, azNorm));
+        setParameterNotifyingHost (processor,
+                                   Ambix_encoderAudioProcessor::ElevationParam,
+                                   juce::jlimit (0.f, 1.f, elNorm));
+    }
+    else
+    {
+        const int idx = draggingSource;
+        setParameterNotifyingHost (processor,
+                                   Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz),
+                                   juce::jlimit (0.f, 1.f, azNorm));
+        setParameterNotifyingHost (processor,
+                                   Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl),
+                                   juce::jlimit (0.f, 1.f, elNorm));
+    }
+}

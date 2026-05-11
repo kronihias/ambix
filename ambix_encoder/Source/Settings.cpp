@@ -116,7 +116,16 @@ Settings::Settings (Ambix_encoderAudioProcessor& Processor)
     if (_processor.networkAdvertiser != nullptr)
         _processor.networkAdvertiser->addChangeListener (this);
 
-    setSize (240, 400);
+    addAndMakeVisible (tgl_extended);
+    tgl_extended.setButtonText (TRANS ("send /ambix_encoder/source/<n>/* (incl. meters)"));
+    tgl_extended.setTooltip (TRANS ("emit per-source positions, gain and RMS meters using the new "
+                                    "/ambix_encoder/... address space, in addition to the legacy "
+                                    "/ambi_enc message."));
+    tgl_extended.addListener (this);
+    tgl_extended.setToggleState (_processor.osc_extended_out, dontSendNotification);
+    tgl_extended.setColour (ToggleButton::textColourId, Colours::black);
+
+    setSize (300, 440);
 
     updateSettings();
 
@@ -278,6 +287,8 @@ void Settings::resized()
 
     tgl_discoverable.setBounds (24, 310, 140, 22);
     lbl_subscribers.setBounds  (24, 336, W - 48, 54);
+
+    tgl_extended.setBounds (24, 400, W - 48, 22);
     //[UserResized] Add your own custom resize handling here..
     //[/UserResized]
 }
@@ -311,6 +322,10 @@ void Settings::buttonClicked (Button* buttonThatWasClicked)
     {
         _processor.setDiscoverable (tgl_discoverable.getToggleState());
         refreshSubscribersLabel();
+    }
+    else if (buttonThatWasClicked == &tgl_extended)
+    {
+        _processor.setExtendedOscOut (tgl_extended.getToggleState());
     }
 }
 
