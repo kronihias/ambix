@@ -36,43 +36,54 @@ namespace {
             sld.setValue(v);
         return v;
     }
+
+    // Column-width ratios for the source table (sum = 1.0 nominal).
+    constexpr float kColW_Num  = 0.10f;
+    constexpr float kColW_Az   = 0.25f;
+    constexpr float kColW_El   = 0.22f;
+    constexpr float kColW_Size = 0.22f;
+    constexpr float kColW_Gain = 0.21f;
+    constexpr int   kRowHeight  = 22;
+    constexpr int   kHeaderHeight = 18;
 }
 
 #include "Graphics.h"
 
 //==============================================================================
-SourceInspectorRow::SourceInspectorRow (Ambix_encoderAudioProcessor& p, int sourceIndex)
+SourceTableRow::SourceTableRow (Ambix_encoderAudioProcessor& p, int sourceIndex)
     : processor (p), idx (sourceIndex)
 {
     addAndMakeVisible (lbl);
-    lbl.setText ("Src " + juce::String (idx + 1),
-                 juce::dontSendNotification);
+    lbl.setText (juce::String (idx + 1), juce::dontSendNotification);
     lbl.setColour (juce::Label::textColourId, juce::Colours::white);
     lbl.setFont (juce::Font (juce::FontOptions { 12.f, juce::Font::bold }));
+    lbl.setJustificationType (juce::Justification::centred);
 
     auto setup = [this] (juce::Slider& s, double mn, double mx, double step,
                           const juce::String& tip)
     {
         addAndMakeVisible (s);
         s.setSliderStyle (juce::Slider::LinearHorizontal);
-        s.setTextBoxStyle (juce::Slider::TextBoxRight, false, 50, 16);
+        s.setTextBoxStyle (juce::Slider::TextBoxRight, false, 38, 16);
         s.setRange (mn, mx, step);
         s.setColour (juce::Slider::thumbColourId, juce::Colours::grey);
-        s.setColour (juce::Slider::textBoxTextColourId, juce::Colours::black);
-        s.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colours::white);
+        s.setColour (juce::Slider::textBoxTextColourId, juce::Colours::white);
+        s.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colour (0x00000000));
+        s.setColour (juce::Slider::textBoxOutlineColourId, juce::Colour (0x00000000));
+        s.setColour (juce::Slider::trackColourId, juce::Colour (0x802b1d69));
         s.setTooltip (tip);
         s.addListener (this);
     };
 
     setup (sld_az,   -180., 180., 1.,    "azimuth (deg)");
     setup (sld_el,    -90.,  90., 1.,    "elevation (deg)");
-    setup (sld_size,    0.,   1., 0.01,  "size");
-    setup (sld_gain,    0.,   1., 0.01,  "gain");
+    setup (sld_size,    0.,   1., 0.01,  "size (0 = sharp, 1 = wide)");
+    setup (sld_gain,    0.,   1., 0.01,  "linear gain");
 
     refreshFromProcessor();
 }
 
-void SourceInspectorRow::refreshFromProcessor()
+void SourceTableRow::refreshFromProcessor()
 {
     sld_az  .setValue ((processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz))   - 0.5f) * 360.f, juce::dontSendNotification);
     sld_el  .setValue ((processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl))   - 0.5f) * 180.f, juce::dontSendNotification);
@@ -80,25 +91,44 @@ void SourceInspectorRow::refreshFromProcessor()
     sld_gain.setValue ( processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcGain)),  juce::dontSendNotification);
 }
 
-void SourceInspectorRow::resized()
+void SourceTableRow::setEditable (bool canEdit)
+{
+    if (editable == canEdit) return;
+    editable = canEdit;
+    const float alpha = canEdit ? 1.f : 0.45f;
+    sld_az  .setEnabled (canEdit); sld_az  .setAlpha (alpha);
+    sld_el  .setEnabled (canEdit); sld_el  .setAlpha (alpha);
+    sld_size.setEnabled (canEdit); sld_size.setAlpha (alpha);
+    sld_gain.setEnabled (canEdit); sld_gain.setAlpha (alpha);
+}
+
+void SourceTableRow::resized()
 {
     auto r = getLocalBounds();
-    lbl.setBounds (r.removeFromLeft (50));
-    const int sliderH = (r.getHeight() - 4) / 4;
-    sld_az  .setBounds (r.removeFromTop (sliderH));
-    sld_el  .setBounds (r.removeFromTop (sliderH));
-    sld_size.setBounds (r.removeFromTop (sliderH));
-    sld_gain.setBounds (r.removeFromTop (sliderH));
+    const int total = r.getWidth();
+    const int wNum  = (int) (total * kColW_Num);
+    const int wAz   = (int) (total * kColW_Az);
+    const int wEl   = (int) (total * kColW_El);
+    const int wSize = (int) (total * kColW_Size);
+
+    lbl    .setBounds (r.removeFromLeft (wNum));
+    sld_az .setBounds (r.removeFromLeft (wAz)  .reduced (2, 1));
+    sld_el .setBounds (r.removeFromLeft (wEl)  .reduced (2, 1));
+    sld_size.setBounds (r.removeFromLeft (wSize).reduced (2, 1));
+    sld_gain.setBounds (r                       .reduced (2, 1));
 }
 
-void SourceInspectorRow::paint (juce::Graphics& g)
+void SourceTableRow::paint (juce::Graphics& g)
 {
-    g.setColour (juce::Colour (0x40ffffff));
-    g.drawRect (getLocalBounds(), 1);
+    // alternating row background
+    g.setColour ((idx % 2 == 0) ? juce::Colour (0x222b1d69) : juce::Colour (0x402b1d69));
+    g.fillRect (getLocalBounds());
 }
 
-void SourceInspectorRow::sliderValueChanged (juce::Slider* s)
+void SourceTableRow::sliderValueChanged (juce::Slider* s)
 {
+    if (! editable) return; // suppress callbacks while disabled (defensive)
+
     if (s == &sld_az)
         setParameterNotifyingHost (&processor,
             Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz),
@@ -115,6 +145,29 @@ void SourceInspectorRow::sliderValueChanged (juce::Slider* s)
         setParameterNotifyingHost (&processor,
             Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcGain),
             (float) s->getValue());
+}
+
+//==============================================================================
+void SourceTableHeader::paint (juce::Graphics& g)
+{
+    g.setColour (juce::Colour (0xff2b1d69));
+    g.fillRect (getLocalBounds());
+
+    g.setColour (juce::Colours::white);
+    g.setFont (juce::Font (juce::FontOptions { 11.f, juce::Font::bold }));
+
+    auto r = getLocalBounds();
+    const int total = r.getWidth();
+    const int wNum  = (int) (total * kColW_Num);
+    const int wAz   = (int) (total * kColW_Az);
+    const int wEl   = (int) (total * kColW_El);
+    const int wSize = (int) (total * kColW_Size);
+
+    g.drawText ("#",         r.removeFromLeft (wNum),  juce::Justification::centred);
+    g.drawText ("Azimuth",   r.removeFromLeft (wAz),   juce::Justification::centred);
+    g.drawText ("Elevation", r.removeFromLeft (wEl),   juce::Justification::centred);
+    g.drawText ("Size",      r.removeFromLeft (wSize), juce::Justification::centred);
+    g.drawText ("Gain",      r,                        juce::Justification::centred);
 }
 
 //==============================================================================
@@ -236,12 +289,10 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
 
     addAndMakeVisible (lbl_id);
     lbl_id.setText ("ID:", juce::dontSendNotification);
-    lbl_id.setFont (juce::Font (juce::FontOptions { 15.00f, juce::Font::plain }));
+    lbl_id.setFont (juce::Font (juce::FontOptions { 13.f, juce::Font::plain }));
     lbl_id.setJustificationType (juce::Justification::centredRight);
     lbl_id.setEditable (false, false, false);
     lbl_id.setColour (juce::Label::textColourId, juce::Colour (0xff888888));
-    lbl_id.setColour (juce::TextEditor::textColourId, juce::Colours::black);
-    lbl_id.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0x00000000));
 
     addAndMakeVisible (sld_width);
     sld_width.setTooltip ("multiple input sources are equally spread along this range");
@@ -299,14 +350,19 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     cmb_active_sources.setSelectedId (ownerFilter->getActiveSources(), juce::dontSendNotification);
     cmb_active_sources.addListener (this);
 
-    // Inspector
-    addChildComponent (inspector_viewport);
-    inspector_viewport.setViewedComponent (&inspector_holder, false);
-    inspector_viewport.setScrollBarsShown (true, false);
-    rebuildInspector();
+    // Source table
+    addAndMakeVisible (table_header);
+    addAndMakeVisible (table_viewport);
+    table_viewport.setViewedComponent (&table_holder, false);
+    table_viewport.setScrollBarsShown (true, false);
 
-    // Make the editor a bit bigger to accomodate the new controls.
-    setSize (480, 460);
+    // Resize: the encoder editor scales the panner + table proportionally.
+    // Minimum size keeps all controls legible; maximum is generous so a user
+    // who wants a giant panner gets one.
+    resizeLimits.setSizeLimits (520, 420, 1400, 1200);
+    addAndMakeVisible (resizer);
+    setResizable (true, true);
+    setSize (640, 520);
 
     ownerFilter->addChangeListener (this);
     ownerFilter->sendChangeMessage();
@@ -315,6 +371,7 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     str_id << ownerFilter->m_id;
     txt_id.setText (str_id, juce::dontSendNotification);
 
+    rebuildTable();
     updateActivePanner();
     timerCallback();
     startTimer (45);
@@ -322,32 +379,39 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
 
 Ambix_encoderAudioProcessorEditor::~Ambix_encoderAudioProcessorEditor()
 {
-    Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
-    ourProcessor->removeChangeListener (this);
+    if (auto* p = getProcessor())
+        p->removeChangeListener (this);
     setLookAndFeel (nullptr);
 }
 
-void Ambix_encoderAudioProcessorEditor::rebuildInspector()
+void Ambix_encoderAudioProcessorEditor::rebuildTable()
 {
-    inspector_rows.clear();
+    table_rows.clear();
     Ambix_encoderAudioProcessor* p = getProcessor();
     const int active = p ? p->getActiveSources() : 1;
+    const bool linked = p ? p->isLinked() : true;
 
-    constexpr int rowH = 92;
     for (int i = 0; i < active; ++i)
     {
-        auto* row = new SourceInspectorRow (*p, i);
-        inspector_rows.add (row);
-        inspector_holder.addAndMakeVisible (row);
+        auto* row = new SourceTableRow (*p, i);
+        row->setEditable (! linked);
+        table_rows.add (row);
+        table_holder.addAndMakeVisible (row);
     }
-    inspector_holder.setSize (inspector_viewport.getWidth() - 12,
-                              juce::jmax (1, active * (rowH + 4)));
+    layoutTableRows (table_viewport.getWidth());
+}
 
-    auto y = 0;
-    for (auto* row : inspector_rows)
+void Ambix_encoderAudioProcessorEditor::layoutTableRows (int viewportWidth)
+{
+    const int width = juce::jmax (50, viewportWidth - 12); // leave room for scrollbar
+    const int active = (int) table_rows.size();
+    table_holder.setSize (width, juce::jmax (1, active * kRowHeight));
+
+    int y = 0;
+    for (auto* row : table_rows)
     {
-        row->setBounds (0, y, inspector_holder.getWidth(), rowH);
-        y += rowH + 4;
+        row->setBounds (0, y, width, kRowHeight);
+        y += kRowHeight;
     }
 }
 
@@ -370,37 +434,30 @@ void Ambix_encoderAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour (juce::Colours::black);
     g.drawRect (0, 0, getWidth(), getHeight(), 1);
 
-    // Title
+    // Title strip — centered along the top, sized to fit between left controls
+    // (settings + view toggle) and right controls (linked + ID).
     g.setColour (juce::Colours::white);
     g.setFont (juce::Font (juce::FontOptions { 17.2f, juce::Font::bold }));
     {
         int order = ambiOrderFromChannels (getProcessor()->getTotalNumOutputChannels());
         juce::String title = "AMBIX-ENCODER";
         if (order > 0) title << " O" << order;
-        g.drawText (title, 35, 2, getWidth() - 70, 30, juce::Justification::centred, true);
+        g.drawText (title, 200, 4, getWidth() - 400, 22,
+                    juce::Justification::centred, true);
     }
 
-    // Group box behind movement controls (bottom area)
+    // Movement controls backdrop (bottom strip)
+    const int bottomY = getHeight() - 90;
     g.setColour (juce::Colour (0xff2b1d69));
-    g.fillRoundedRectangle (165.0f, 310.0f, 154.0f, 77.0f, 4.0000f);
-    g.fillRoundedRectangle (24.0f, 310.0f, 226.0f, 43.0f, 4.0000f);
+    g.fillRoundedRectangle (24.f, (float) bottomY, (float) getWidth() - 48.f, 80.f, 4.f);
 
-    // Labels around the panner
     g.setColour (juce::Colours::white);
     g.setFont (juce::Font (juce::FontOptions { 10.f, juce::Font::plain }));
-    g.drawText ("elevation",   266, 29, 48, 16, juce::Justification::centred, true);
-    g.drawText ("azimuth",     216, 272, 48, 16, juce::Justification::centredRight, true);
-    g.drawText ("size",        31, 382, 23, 16, juce::Justification::centredRight, true);
-    g.drawText ("max speed",   206, 372, 57, 16, juce::Justification::centredRight, true);
-    g.drawText ("width",       61, 382, 95, 16, juce::Justification::centredRight, true);
-    g.drawText ("elevation move", 219, 338, 81, 16, juce::Justification::centredRight, true);
-    g.drawText ("azimuth move",   59, 338, 81, 16, juce::Justification::centredRight, true);
-
-    // Inspector panel header
-    g.setColour (juce::Colours::white);
-    g.setFont (juce::Font (juce::FontOptions { 11.f, juce::Font::bold }));
-    g.drawText (getProcessor()->isLinked() ? "Sources (linked)" : "Sources (unlinked)",
-                330, 36, 140, 16, juce::Justification::centredLeft, true);
+    g.drawText ("size",           34, bottomY + 64, 36, 14, juce::Justification::centred, true);
+    g.drawText ("width",          80, bottomY + 64, 40, 14, juce::Justification::centred, true);
+    g.drawText ("azimuth move",   135, bottomY + 4,  100, 14, juce::Justification::centredLeft, true);
+    g.drawText ("elevation move", 135, bottomY + 38, 100, 14, juce::Justification::centredLeft, true);
+    g.drawText ("max speed",      getWidth() - 230, bottomY + 64, 100, 14, juce::Justification::centred, true);
 
     // Version
     g.setColour (juce::Colours::white);
@@ -414,38 +471,70 @@ void Ambix_encoderAudioProcessorEditor::paint (juce::Graphics& g)
 
 void Ambix_encoderAudioProcessorEditor::resized()
 {
-    sphere_opengl.setBounds (23, 32, 240, 240);
-    hammer_view  .setBounds (23, 32, 240, 240);
+    const int W = getWidth();
+    const int H = getHeight();
 
-    sld_el.setBounds (270, 38, 40, 232);
-    sld_az.setBounds (27, 270, 282, 40);
-    sld_size.setBounds (32, 355, 29, 29);
+    // --- Header strip ---------------------------------------------------------
+    btn_settings.setBounds (4, 4, 24, 24);
+    btn_view_sphere.setBounds (32, 6, 60, 22);
+    btn_view_hammer.setBounds (92, 6, 90, 22);
 
-    sld_speed.setBounds (169, 347, 140, 40);
-    sld_el_move.setBounds (275, 312, 29, 29);
-    sld_az_move.setBounds (118, 312, 29, 29);
-    txt_az_move.setBounds (37, 316, 78, 22);
-    txt_el_move.setBounds (191, 316, 78, 22);
+    // ID at the far right
+    lbl_id.setBounds (W - 76, 6, 24, 22);
+    txt_id.setBounds (W - 50, 7, 42, 20);
 
-    lbl_id.setBounds (250, 2, 39, 24);
-    txt_id.setBounds (289, 5, 33, 19);
+    // Linked + Sources below the title strip, left of ID
+    btn_linked_toggle.setBounds (W - 220, 32, 80, 22);
+    lbl_sources.setBounds       (W - 138, 32, 56, 22);
+    cmb_active_sources.setBounds (W -  80, 32, 60, 22);
 
-    btn_settings.setBounds (3, 3, 26, 25);
+    // --- Bottom controls (fixed height) --------------------------------------
+    const int bottomY = H - 90;
+    sld_size.setBounds  (34, bottomY + 30, 30, 30);
+    sld_width.setBounds (80, bottomY + 30, 30, 30);
 
-    sld_width.setBounds (93, 355, 29, 29);
+    txt_az_move.setBounds (135, bottomY + 18, 100, 18);
+    sld_az_move.setBounds (238, bottomY + 14, 26, 26);
 
-    // View toggle (top of editor, near settings)
-    btn_view_sphere.setBounds (32, 8, 64, 18);
-    btn_view_hammer.setBounds (96, 8, 90, 18);
+    txt_el_move.setBounds (135, bottomY + 52, 100, 18);
+    sld_el_move.setBounds (238, bottomY + 48, 26, 26);
 
-    // Linked toggle + sources count (right of inspector header)
-    btn_linked_toggle.setBounds (330, 6, 70, 22);
-    lbl_sources       .setBounds (330, 30, 60, 16);
-    cmb_active_sources.setBounds (390, 30, 50, 18);
+    sld_speed.setBounds  (W - 235, bottomY + 30, 110, 30);
 
-    // Inspector viewport
-    inspector_viewport.setBounds (330, 56, 145, 340);
-    rebuildInspector();
+    // --- Main work area: panner | table -------------------------------------
+    const int contentTop    = 60;
+    const int contentBottom = bottomY - 8;
+    const int contentHeight = contentBottom - contentTop;
+
+    // Reserve right column for the table — 240 px wide on small windows, up
+    // to ~38% of width on larger ones.
+    const int tableW = juce::jlimit (220, 360, (int) (W * 0.40f));
+    const int panelW = W - tableW - 8;            // gap between panner+table
+
+    // Vertical elevation slider lives to the right of the panner
+    const int sliderW = 36;
+    const int pannerLeft = 12;
+    const int pannerRight = pannerLeft + panelW - sliderW - 8;
+    const int pannerSize  = juce::jmin (pannerRight - pannerLeft, contentHeight - 50);
+    const int pannerY     = contentTop + (contentHeight - 50 - pannerSize) / 2;
+
+    sphere_opengl.setBounds (pannerLeft, pannerY, pannerSize, pannerSize);
+    hammer_view  .setBounds (pannerLeft, pannerY, pannerSize, (int)(pannerSize * 0.55f));
+
+    sld_el.setBounds (pannerLeft + pannerSize + 6, pannerY, sliderW, pannerSize);
+
+    // Horizontal azimuth slider below the panner
+    sld_az.setBounds (pannerLeft, pannerY + pannerSize + 4,
+                      pannerSize + sliderW + 6, 28);
+
+    // Table on the right
+    const int tableX = W - tableW - 8;
+    table_header  .setBounds (tableX, contentTop, tableW, kHeaderHeight);
+    table_viewport.setBounds (tableX, contentTop + kHeaderHeight, tableW, contentHeight - kHeaderHeight);
+    layoutTableRows (table_viewport.getWidth());
+
+    // Resizer in the bottom-right corner
+    resizer.setBounds (W - 16, H - 16, 16, 16);
 }
 
 void Ambix_encoderAudioProcessorEditor::sliderValueChanged (juce::Slider* sliderThatWasMoved)
@@ -476,7 +565,7 @@ void Ambix_encoderAudioProcessorEditor::comboBoxChanged (juce::ComboBox* box)
         const float norm = (float)(n - 1) / (float)(Ambix_encoderAudioProcessor::kMaxSources - 1);
         setParameterNotifyingHost (getProcessor(),
                                    Ambix_encoderAudioProcessor::NumActiveSourcesParam, norm);
-        rebuildInspector();
+        rebuildTable();
     }
 }
 
@@ -523,23 +612,28 @@ void Ambix_encoderAudioProcessorEditor::timerCallback()
                 el_mv << "0 deg/s";
             txt_el_move.setText (el_mv);
 
-            // Linked button label + state mirror
+            // Linked button mirror
             const bool linked = ourProcessor->isLinked();
             if (btn_linked_toggle.getToggleState() != linked)
                 btn_linked_toggle.setToggleState (linked, juce::dontSendNotification);
             btn_linked_toggle.setButtonText (linked ? "Linked" : "Unlinked");
 
-            // Active sources combo mirror
+            // Active sources combo + table rebuild on change
             const int active = ourProcessor->getActiveSources();
-            if (cmb_active_sources.getSelectedId() != active)
+            if (cmb_active_sources.getSelectedId() != active
+                || (int) table_rows.size() != active)
             {
                 cmb_active_sources.setSelectedId (active, juce::dontSendNotification);
-                rebuildInspector();
+                rebuildTable();
             }
+
+            // Mode (editable vs read-only) for every row
+            for (auto* row : table_rows)
+                row->setEditable (! linked);
         }
 
-        // Inspector rows always tick so meter halo / values stay live.
-        for (auto* row : inspector_rows)
+        // Table values always tick (linked mode pushes computed positions).
+        for (auto* row : table_rows)
             row->refreshFromProcessor();
     }
 }
@@ -611,6 +705,8 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
                                    Ambix_encoderAudioProcessor::LinkedParam,
                                    nowLinked ? 1.f : 0.f);
         btn_linked_toggle.setButtonText (nowLinked ? "Linked" : "Unlinked");
+        for (auto* row : table_rows)
+            row->setEditable (! nowLinked);
         repaint();
     }
 }

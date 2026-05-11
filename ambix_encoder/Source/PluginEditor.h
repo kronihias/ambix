@@ -24,25 +24,35 @@
 
 class Ambix_encoderAudioProcessorEditor;
 
-// Per-source row in the inspector list (unlinked mode).
-class SourceInspectorRow : public juce::Component,
-                           public juce::Slider::Listener
+// One row in the per-source table. Layout is a single horizontal strip:
+//   [#]  [Az slider...]  [El slider...]  [Size slider...]  [Gain slider...]
+// Sliders show values as text in their right text-box. In linked mode they
+// reflect the auto-spread values but are disabled.
+class SourceTableRow : public juce::Component,
+                      public juce::Slider::Listener
 {
 public:
-    SourceInspectorRow (Ambix_encoderAudioProcessor& p, int sourceIndex);
+    SourceTableRow (Ambix_encoderAudioProcessor& p, int sourceIndex);
     void resized() override;
     void paint   (juce::Graphics& g) override;
     void sliderValueChanged (juce::Slider* s) override;
 
-    // Pull current param values into the slider widgets without firing
-    // notification callbacks. Called from the editor's timer.
     void refreshFromProcessor();
+    void setEditable (bool canEdit);
 
 private:
     Ambix_encoderAudioProcessor& processor;
     int idx;
     juce::Slider sld_az, sld_el, sld_size, sld_gain;
     juce::Label  lbl;
+    bool editable { true };
+};
+
+// Column header for the source table. Painted statically.
+class SourceTableHeader : public juce::Component
+{
+public:
+    void paint (juce::Graphics& g) override;
 };
 
 
@@ -83,8 +93,9 @@ public:
     static const int settings_white_pngSize;
 
 private:
-    void rebuildInspector();
+    void rebuildTable();
     void updateActivePanner();
+    void layoutTableRows (int viewportWidth);
 
     juce::LookAndFeel_V3 globalLaF;
 
@@ -111,10 +122,14 @@ private:
     SphereOpenGL      sphere_opengl;
     HammerAitoffView  hammer_view;
 
-    // Per-source inspector — a viewport with rows, scrollable when many sources.
-    juce::Viewport       inspector_viewport;
-    juce::Component      inspector_holder;
-    juce::OwnedArray<SourceInspectorRow> inspector_rows;
+    // Source table — header + scrollable list of rows.
+    SourceTableHeader     table_header;
+    juce::Viewport        table_viewport;
+    juce::Component       table_holder;
+    juce::OwnedArray<SourceTableRow> table_rows;
+
+    juce::ResizableCornerComponent resizer { this, &resizeLimits };
+    juce::ComponentBoundsConstrainer resizeLimits;
 
     bool changed_;
     bool _hammerView = false;
