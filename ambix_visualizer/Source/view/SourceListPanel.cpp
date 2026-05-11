@@ -27,7 +27,10 @@ public:
         key = src.key();
         origin = src.origin;
 
-        const bool readOnly = (origin == EncoderOrigin::Ambix);
+        // ambix_encoder advertises its reply port itself (via /ambi_enc) so
+        // the user shouldn't edit it. Same for the new per-source pucks.
+        const bool readOnly = (origin == EncoderOrigin::Ambix
+                             || origin == EncoderOrigin::AmbixSource);
         editor.setReadOnly (readOnly);
         editor.setInterceptsMouseClicks (! readOnly, ! readOnly);
         editor.setColour (juce::TextEditor::textColourId,
@@ -475,8 +478,9 @@ void SourceListPanel::timerCallback()
 juce::String SourceListPanel::lookupProjectFor (const EncoderSource& s) const
 {
     // Only ambix_encoder sources carry a project name via NSD; MultiEncoder
-    // doesn't advertise at all.
-    if (s.origin != EncoderOrigin::Ambix)
+    // doesn't advertise at all. Both Ambix variants share NSD records, so
+    // include AmbixSource too.
+    if (s.origin != EncoderOrigin::Ambix && s.origin != EncoderOrigin::AmbixSource)
         return {};
 
     // Match on (senderIp, encoder's advertised listen port). The NSD record
@@ -560,7 +564,8 @@ void SourceListPanel::paintCell (juce::Graphics& g, int rowNumber, int columnId,
             g.drawText (s.senderIp, area, juce::Justification::centredLeft, true);
             break;
         case ColLevel:
-            if (s.origin == EncoderOrigin::Ambix)
+            if (s.origin == EncoderOrigin::Ambix
+                || s.origin == EncoderOrigin::AmbixSource)
                 drawLevelMeter (g, s, area);
             break;
         case ColIcon:

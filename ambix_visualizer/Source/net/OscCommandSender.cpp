@@ -40,6 +40,35 @@ bool OscCommandSender::sendAmbiEncSet (const juce::String& ip,
     return sender->send (msg);
 }
 
+bool OscCommandSender::sendAmbixSourceParam (const juce::String& ip,
+                                             int port,
+                                             int sourceIndex,
+                                             AmbixSourceParam param,
+                                             float value)
+{
+    if (ip.isEmpty() || port <= 0 || sourceIndex < 1)
+        return false;
+
+    const juce::ScopedLock sl (lock);
+    auto* sender = getOrConnect ({ ip, port });
+    if (sender == nullptr)
+        return false;
+
+    const char* leaf = "azimuth";
+    switch (param)
+    {
+        case AmbixSourceParam::Azimuth:   leaf = "azimuth";   break;
+        case AmbixSourceParam::Elevation: leaf = "elevation"; break;
+        case AmbixSourceParam::Size:      leaf = "size";      break;
+        case AmbixSourceParam::Gain:      leaf = "gain";      break;
+    }
+    const juce::String addr = juce::String ("/ambix_encoder/source/")
+                            + juce::String (sourceIndex) + "/" + leaf;
+    juce::OSCMessage msg (addr);
+    msg.addFloat32 (value);
+    return sender->send (msg);
+}
+
 bool OscCommandSender::sendMultiEncoderParam (const juce::String& ip,
                                               int port,
                                               const juce::String& prefix,

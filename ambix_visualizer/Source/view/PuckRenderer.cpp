@@ -19,14 +19,16 @@ namespace PuckRenderer
         // it lit). MultiEncoder's "rms" is really a gain setting that only
         // updates on user interaction, so leave it frozen there.
         const auto nowMsRms = juce::Time::getMillisecondCounter();
-        const float effectiveRms = (source.origin == EncoderOrigin::Ambix)
+        const bool isAmbix = (source.origin == EncoderOrigin::Ambix
+                              || source.origin == EncoderOrigin::AmbixSource);
+        const float effectiveRms = isAmbix
             ? LevelMapping::rmsEffective (source.rmsLinear, source.lastLevelUpdateMs, nowMsRms)
             : source.rmsLinear;
         const float rmsT   = LevelMapping::linearToLevelT (effectiveRms, settings.minDb);
         const auto  fill   = LevelMapping::sampleColorMap (settings.colorMap, rmsT)
                                  .withMultipliedAlpha (isBackHemisphere ? 0.4f : 1.0f);
 
-        const bool showPeakRing = (source.origin == EncoderOrigin::Ambix);
+        const bool showPeakRing = isAmbix;
         juce::Colour ring = juce::Colours::transparentWhite;
         if (showPeakRing)
         {
@@ -104,7 +106,7 @@ namespace PuckRenderer
         // ramp, Max/spat-style. Height = puck diameter so the meter scales
         // with the user's puck-size preference; width ~30% of the puck radius
         // with a 4 px minimum so it stays legible on small pucks.
-        if (settings.showPuckLevelMeter && source.origin == EncoderOrigin::Ambix)
+        if (settings.showPuckLevelMeter && isAmbix)
         {
             constexpr int   kNumSegments = 10;
             constexpr float kFloorDb     = -48.0f;

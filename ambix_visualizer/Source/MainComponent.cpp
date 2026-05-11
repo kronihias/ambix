@@ -248,9 +248,39 @@ void MainComponent::handleIncoming (const OscListenerThread::IncomingMessage& ms
         up.rmsLinear    = msg.ambix.rmsLinear;
         up.peakLinear   = msg.ambix.peakLinear;
         up.senderIp     = msg.senderIp;
+        up.senderPort   = msg.senderPort;
         up.replyPort    = msg.ambix.hasReplyPort ? msg.ambix.replyPort
                                                  : (7200 + msg.ambix.id);
         registry.applyAmbixUpdate (up);
+    }
+    else if (msg.kind == OscListenerThread::Kind::AmbixSource)
+    {
+        using P = AmbixSourcePayload::Param;
+        const auto& src = msg.ambixSource;
+        // Ignore the global linked / azimuth / elevation / width / size /
+        // active_sources messages — those describe plugin-wide state and
+        // don't map onto a per-source puck. The visualizer reflects the
+        // per-source positions directly via the AmbixSource path.
+        if (src.sourceIndex < 1)
+            return;
+
+        SourceRegistry::AmbixSourceUpdate up;
+        up.sourceIndex = src.sourceIndex;
+        up.value       = src.value;
+        up.senderIp    = msg.senderIp;
+        up.senderPort  = msg.senderPort;
+
+        using SrcParam = SourceRegistry::AmbixSourceUpdate::Param;
+        switch (src.param)
+        {
+            case P::Azimuth:   up.param = SrcParam::Azimuth;   break;
+            case P::Elevation: up.param = SrcParam::Elevation; break;
+            case P::Size:      up.param = SrcParam::Size;      break;
+            case P::Gain:      up.param = SrcParam::Gain;      break;
+            case P::Meter:     up.param = SrcParam::Meter;     break;
+            default: return; // global params: ignore
+        }
+        registry.applyAmbixSourceUpdate (up);
     }
     else
     {
