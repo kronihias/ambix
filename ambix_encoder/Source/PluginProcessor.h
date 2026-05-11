@@ -117,7 +117,7 @@ public:
     // automation works regardless of the linked toggle, but only consulted when
     // unlinked.
     static constexpr int kMaxSources         = MAX_INPUT_CHANNELS;
-    static constexpr int kPerSourceParams    = 4;  // az, el, size, gain
+    static constexpr int kPerSourceParams    = 3;  // az, el, size
     static constexpr int kBaseParams         = 13;
     static constexpr int kTotalParams        = kBaseParams + kMaxSources * kPerSourceParams;
 
@@ -139,7 +139,7 @@ public:
         SourceParamsBase = 13   // per-source params follow
     };
 
-    enum SourceSubParam { SrcAz = 0, SrcEl, SrcSize, SrcGain };
+    enum SourceSubParam { SrcAz = 0, SrcEl, SrcSize };
 
     static constexpr int sourceParamIndex (int srcIdx, int sub)
     {
@@ -153,7 +153,7 @@ public:
 
     // Snapshot of per-source positions for the editor / Hammer-Aitoff view.
     // Returns degrees in (-180..180, -90..90) for convenience.
-    struct SourcePos { float azDeg, elDeg, size, gain, meter; };
+    struct SourcePos { float azDeg, elDeg, size, meter; };
     SourcePos getSourceDisplayPos (int idx) const;
 
     //==============================================================================
@@ -252,8 +252,10 @@ private:
     float linked_param;
     float num_active_sources_param;
 
-    // per-source params (azimuth, elevation, size, gain), 0..1 normalised
-    struct SourceParams { float az, el, size, gain; };
+    // per-source params (azimuth, elevation, size), all stored in [0,1].
+    // Azimuth and elevation share the [0,1] → [-180°, +180°] encoding so
+    // mouse/OSC paths into both don't need a special case.
+    struct SourceParams { float az, el, size; };
     std::array<SourceParams, kMaxSources> source_params;
 
     // last osc value sent (deltas only)

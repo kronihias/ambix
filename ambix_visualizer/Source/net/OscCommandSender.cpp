@@ -60,7 +60,6 @@ bool OscCommandSender::sendAmbixSourceParam (const juce::String& ip,
         case AmbixSourceParam::Azimuth:   leaf = "azimuth";   break;
         case AmbixSourceParam::Elevation: leaf = "elevation"; break;
         case AmbixSourceParam::Size:      leaf = "size";      break;
-        case AmbixSourceParam::Gain:      leaf = "gain";      break;
     }
     const juce::String addr = juce::String ("/ambix_encoder/source/")
                             + juce::String (sourceIndex) + "/" + leaf;

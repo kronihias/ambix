@@ -53,7 +53,6 @@ namespace
         if (leaf == "azimuth")   { outParam = Param::Azimuth;   return true; }
         if (leaf == "elevation") { outParam = Param::Elevation; return true; }
         if (leaf == "size")      { outParam = Param::Size;      return true; }
-        if (leaf == "gain")      { outParam = Param::Gain;      return true; }
         if (leaf == "meter")     { outParam = Param::Meter;     return true; }
         return false;
     }

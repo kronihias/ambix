@@ -25,9 +25,12 @@
 class Ambix_encoderAudioProcessorEditor;
 
 // One row in the per-source table. Layout is a single horizontal strip:
-//   [#]  [Az slider...]  [El slider...]  [Size slider...]  [Gain slider...]
-// Sliders show values as text in their right text-box. In linked mode they
-// reflect the auto-spread values but are disabled.
+//   [#]  [Az number]  [El number]  [Size number]
+// Each value is a number box (Slider::IncDecButtons-less, TextBoxOnly style)
+// so drag-up / drag-down or double-click adjusts it without the slider bar.
+// Values mirror the *effective* per-source positions — that is, in linked
+// mode they show the auto-spread positions, not the (unused) per-source
+// params behind them. Editing is disabled in linked mode (greyed out).
 class SourceTableRow : public juce::Component,
                       public juce::Slider::Listener
 {
@@ -43,7 +46,7 @@ public:
 private:
     Ambix_encoderAudioProcessor& processor;
     int idx;
-    juce::Slider sld_az, sld_el, sld_size, sld_gain;
+    juce::Slider num_az, num_el, num_size;
     juce::Label  lbl;
     bool editable { true };
 };

@@ -89,13 +89,12 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
         source_meter[i].store (0.f);
     }
 
-    // initial per-source positions: equally spread on equator
+    // initial per-source positions: at front, on the equator, full sharpness.
     for (int i = 0; i < kMaxSources; ++i)
     {
         source_params[i].az   = 0.5f;
         source_params[i].el   = 0.5f;
         source_params[i].size = 0.f;
-        source_params[i].gain = 1.f;
     }
 
     Ambix_encoderAudioProcessor::s_ID++;
@@ -161,7 +160,7 @@ float Ambix_encoderAudioProcessor::getSourceMeter (int idx) const
 Ambix_encoderAudioProcessor::SourcePos
 Ambix_encoderAudioProcessor::getSourceDisplayPos (int idx) const
 {
-    SourcePos p { 0.f, 0.f, 0.f, 1.f, 0.f };
+    SourcePos p { 0.f, 0.f, 0.f, 0.f };
     if (idx < 0 || idx >= kMaxSources) return p;
 
     // What the audio thread actually uses is AmbiEnc[i].azimuth/elevation —
@@ -171,7 +170,6 @@ Ambix_encoderAudioProcessor::getSourceDisplayPos (int idx) const
     p.azDeg = (AmbiEnc.getUnchecked(idx)->azimuth   - 0.5f) * 360.f;
     p.elDeg = (AmbiEnc.getUnchecked(idx)->elevation - 0.5f) * 360.f;
     p.size  = AmbiEnc.getUnchecked(idx)->size;
-    p.gain  = isLinked() ? 1.f : source_params[idx].gain;
     p.meter = source_meter[idx].load();
     return p;
 }
@@ -352,8 +350,6 @@ void Ambix_encoderAudioProcessor::sendOSC()
                 el.addFloat32 (pos.elDeg);
                 OSCMessage sz  (OSCAddressPattern (base + "/size"));
                 sz.addFloat32 (pos.size);
-                OSCMessage gn  (OSCAddressPattern (base + "/gain"));
-                gn.addFloat32 (pos.gain);
                 OSCMessage mt  (OSCAddressPattern (base + "/meter"));
                 mt.addFloat32 (pos.meter);
 
@@ -361,7 +357,7 @@ void Ambix_encoderAudioProcessor::sendOSC()
                 {
                     auto* snd = oscSenders.getUnchecked(i);
                     snd->send (az); snd->send (el); snd->send (sz);
-                    snd->send (gn); snd->send (mt);
+                    snd->send (mt);
                 }
             }
         }
@@ -483,8 +479,6 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
                                        jlimit(0.f, 1.f, (v + 180.f) / 360.f));
         else if (sub == "size")
             setParameterNotifyingHost (this, sourceParamIndex (idx, SrcSize), jlimit(0.f, 1.f, v));
-        else if (sub == "gain")
-            setParameterNotifyingHost (this, sourceParamIndex (idx, SrcGain), jlimit(0.f, 1.f, v));
         return;
     }
 }
@@ -807,16 +801,14 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     for (int i = 0; i < kMaxSources; ++i)
         AmbiEnc.getUnchecked(i)->calcParams();
 
-    const bool linked = isLinked();
     for (int in_ch = 0; in_ch < active; ++in_ch)
     {
-        const float gain = linked ? 1.f : source_params[in_ch].gain;
         const float* in_channel_data = InputBuffer.getReadPointer (in_ch);
 
         for (int out_ch = 0; out_ch < numOut; ++out_ch)
         {
-            const float ngain  = (float) AmbiEnc.getUnchecked(in_ch)->ambi_gain[out_ch]  * gain;
-            const float pgain  = (float) AmbiEnc.getUnchecked(in_ch)->_ambi_gain[out_ch] * gain;
+            const float ngain  = (float) AmbiEnc.getUnchecked(in_ch)->ambi_gain[out_ch];
+            const float pgain  = (float) AmbiEnc.getUnchecked(in_ch)->_ambi_gain[out_ch];
             if (pgain == ngain)
                 buffer.addFrom (out_ch, 0, InputBuffer, in_ch, 0, NumSamples, ngain);
             else

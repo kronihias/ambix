@@ -7,7 +7,6 @@
 //   /ambix_encoder/source/<n>/azimuth   <float deg>
 //   /ambix_encoder/source/<n>/elevation <float deg>
 //   /ambix_encoder/source/<n>/size      <float 0..1>
-//   /ambix_encoder/source/<n>/gain      <float 0..1 linear>
 //   /ambix_encoder/source/<n>/meter     <float 0..1 RMS>
 // And the global counterparts:
 //   /ambix_encoder/linked         <int>
@@ -24,7 +23,6 @@ struct AmbixSourcePayload
         Azimuth,
         Elevation,
         Size,
-        Gain,
         Meter,
         // Global (per-plugin) scalars. sourceIndex is unused for these.
         Linked,

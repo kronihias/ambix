@@ -170,16 +170,6 @@ void SourceRegistry::applyAmbixSourceUpdate (const AmbixSourceUpdate& update)
             case P::Size:
                 if (! isDragged) src.size = update.value;
                 break;
-            case P::Gain:
-            {
-                src.gainDb = (update.value <= 0.f)
-                              ? -120.f
-                              : 20.f * std::log10 (update.value);
-                if (! src.muted)
-                    src.rmsLinear = update.value;
-                src.lastLevelUpdateMs = now;
-                break;
-            }
             case P::Meter:
             {
                 constexpr float kLevelChangeThreshold = 0.002f;

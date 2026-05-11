@@ -38,12 +38,11 @@ namespace {
     }
 
     // Column-width ratios for the source table (sum = 1.0 nominal).
-    constexpr float kColW_Num  = 0.10f;
-    constexpr float kColW_Az   = 0.25f;
-    constexpr float kColW_El   = 0.22f;
-    constexpr float kColW_Size = 0.22f;
-    constexpr float kColW_Gain = 0.21f;
-    constexpr int   kRowHeight  = 22;
+    constexpr float kColW_Num  = 0.12f;
+    constexpr float kColW_Az   = 0.32f;
+    constexpr float kColW_El   = 0.28f;
+    constexpr float kColW_Size = 0.28f;
+    constexpr int   kRowHeight    = 22;
     constexpr int   kHeaderHeight = 18;
 }
 
@@ -59,40 +58,43 @@ SourceTableRow::SourceTableRow (Ambix_encoderAudioProcessor& p, int sourceIndex)
     lbl.setFont (juce::Font (juce::FontOptions { 12.f, juce::Font::bold }));
     lbl.setJustificationType (juce::Justification::centred);
 
+    // Number-box style: Slider::LinearBar draws the value directly on the
+    // bar with no separate text box. With the bar/track colours set to
+    // transparent only the text shows, giving a "number-only" widget that
+    // still supports drag-to-nudge and double-click-to-type.
     auto setup = [this] (juce::Slider& s, double mn, double mx, double step,
+                          const juce::String& suffix,
                           const juce::String& tip)
     {
         addAndMakeVisible (s);
-        s.setSliderStyle (juce::Slider::LinearHorizontal);
-        s.setTextBoxStyle (juce::Slider::TextBoxRight, false, 38, 16);
-        s.setRange (mn, mx, step);
-        s.setColour (juce::Slider::thumbColourId, juce::Colours::grey);
-        s.setColour (juce::Slider::textBoxTextColourId, juce::Colours::white);
+        s.setSliderStyle (juce::Slider::LinearBar);
+        s.setColour (juce::Slider::trackColourId,             juce::Colour (0x00000000));
+        s.setColour (juce::Slider::backgroundColourId,        juce::Colour (0x00000000));
+        s.setColour (juce::Slider::textBoxTextColourId,       juce::Colours::white);
         s.setColour (juce::Slider::textBoxBackgroundColourId, juce::Colour (0x00000000));
-        s.setColour (juce::Slider::textBoxOutlineColourId, juce::Colour (0x00000000));
-        s.setColour (juce::Slider::trackColourId, juce::Colour (0x802b1d69));
+        s.setColour (juce::Slider::textBoxOutlineColourId,    juce::Colour (0x00000000));
+        s.setRange (mn, mx, step);
+        s.setTextValueSuffix (suffix);
         s.setTooltip (tip);
         s.addListener (this);
     };
 
-    setup (sld_az,   -180., 180., 1.,    "azimuth (deg)");
-    setup (sld_el,    -90.,  90., 1.,    "elevation (deg)");
-    setup (sld_size,    0.,   1., 0.01,  "size (0 = sharp, 1 = wide)");
-    setup (sld_gain,    0.,   1., 0.01,  "linear gain");
+    setup (num_az,   -180., 180., 1.,   juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")), "azimuth (deg)");
+    setup (num_el,    -90.,  90., 1.,   juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")), "elevation (deg)");
+    setup (num_size,    0.,   1., 0.01, juce::String(),                                     "size (0 = sharp, 1 = wide)");
 
     refreshFromProcessor();
 }
 
 void SourceTableRow::refreshFromProcessor()
 {
-    // All angle params are stored in [0,1] mapped to [-180°, +180°]. The
-    // elevation slider visually clamps to ±90° (the physically meaningful
-    // range), but the underlying param uses the same encoding as azimuth so
-    // mouse/OSC paths into both don't need a special case.
-    sld_az  .setValue ((processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz))   - 0.5f) * 360.f, juce::dontSendNotification);
-    sld_el  .setValue ((processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl))   - 0.5f) * 360.f, juce::dontSendNotification);
-    sld_size.setValue ( processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcSize)),  juce::dontSendNotification);
-    sld_gain.setValue ( processor.getParameter (Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcGain)),  juce::dontSendNotification);
+    // Mirror the *effective* per-source position so the table also reflects
+    // the auto-spread positions in linked mode. getSourceDisplayPos reads
+    // from AmbiEnc[i] which is recomputed every block by applyParamsToEncoders.
+    const auto pos = processor.getSourceDisplayPos (idx);
+    num_az  .setValue (pos.azDeg, juce::dontSendNotification);
+    num_el  .setValue (pos.elDeg, juce::dontSendNotification);
+    num_size.setValue (pos.size,  juce::dontSendNotification);
 }
 
 void SourceTableRow::setEditable (bool canEdit)
@@ -100,10 +102,9 @@ void SourceTableRow::setEditable (bool canEdit)
     if (editable == canEdit) return;
     editable = canEdit;
     const float alpha = canEdit ? 1.f : 0.45f;
-    sld_az  .setEnabled (canEdit); sld_az  .setAlpha (alpha);
-    sld_el  .setEnabled (canEdit); sld_el  .setAlpha (alpha);
-    sld_size.setEnabled (canEdit); sld_size.setAlpha (alpha);
-    sld_gain.setEnabled (canEdit); sld_gain.setAlpha (alpha);
+    num_az  .setEnabled (canEdit); num_az  .setAlpha (alpha);
+    num_el  .setEnabled (canEdit); num_el  .setAlpha (alpha);
+    num_size.setEnabled (canEdit); num_size.setAlpha (alpha);
 }
 
 void SourceTableRow::resized()
@@ -113,41 +114,35 @@ void SourceTableRow::resized()
     const int wNum  = (int) (total * kColW_Num);
     const int wAz   = (int) (total * kColW_Az);
     const int wEl   = (int) (total * kColW_El);
-    const int wSize = (int) (total * kColW_Size);
 
-    lbl    .setBounds (r.removeFromLeft (wNum));
-    sld_az .setBounds (r.removeFromLeft (wAz)  .reduced (2, 1));
-    sld_el .setBounds (r.removeFromLeft (wEl)  .reduced (2, 1));
-    sld_size.setBounds (r.removeFromLeft (wSize).reduced (2, 1));
-    sld_gain.setBounds (r                       .reduced (2, 1));
+    lbl     .setBounds (r.removeFromLeft (wNum));
+    num_az  .setBounds (r.removeFromLeft (wAz) .reduced (2, 2));
+    num_el  .setBounds (r.removeFromLeft (wEl) .reduced (2, 2));
+    num_size.setBounds (r                      .reduced (2, 2));
 }
 
 void SourceTableRow::paint (juce::Graphics& g)
 {
-    // alternating row background
+    // alternating row background for readability
     g.setColour ((idx % 2 == 0) ? juce::Colour (0x222b1d69) : juce::Colour (0x402b1d69));
     g.fillRect (getLocalBounds());
 }
 
 void SourceTableRow::sliderValueChanged (juce::Slider* s)
 {
-    if (! editable) return; // suppress callbacks while disabled (defensive)
+    if (! editable) return; // table is read-only in linked mode
 
-    if (s == &sld_az)
+    if (s == &num_az)
         setParameterNotifyingHost (&processor,
             Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz),
             (float)((s->getValue() + 180.) / 360.));
-    else if (s == &sld_el)
+    else if (s == &num_el)
         setParameterNotifyingHost (&processor,
             Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl),
             (float)((s->getValue() + 180.) / 360.));
-    else if (s == &sld_size)
+    else if (s == &num_size)
         setParameterNotifyingHost (&processor,
             Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcSize),
-            (float) s->getValue());
-    else if (s == &sld_gain)
-        setParameterNotifyingHost (&processor,
-            Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcGain),
             (float) s->getValue());
 }
 
@@ -165,13 +160,11 @@ void SourceTableHeader::paint (juce::Graphics& g)
     const int wNum  = (int) (total * kColW_Num);
     const int wAz   = (int) (total * kColW_Az);
     const int wEl   = (int) (total * kColW_El);
-    const int wSize = (int) (total * kColW_Size);
 
     g.drawText ("#",         r.removeFromLeft (wNum),  juce::Justification::centred);
     g.drawText ("Azimuth",   r.removeFromLeft (wAz),   juce::Justification::centred);
     g.drawText ("Elevation", r.removeFromLeft (wEl),   juce::Justification::centred);
-    g.drawText ("Size",      r.removeFromLeft (wSize), juce::Justification::centred);
-    g.drawText ("Gain",      r,                        juce::Justification::centred);
+    g.drawText ("Size",      r,                        juce::Justification::centred);
 }
 
 //==============================================================================

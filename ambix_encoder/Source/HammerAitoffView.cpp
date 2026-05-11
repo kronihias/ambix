@@ -293,20 +293,24 @@ void HammerAitoffView::mouseDrag (const juce::MouseEvent& e)
     const float halfW = bounds.getWidth()  * 0.5f;
     const float halfH = bounds.getHeight() * 0.5f;
 
-    const float xN = (e.getPosition().x - cx) / halfW;
-    const float yN = (cy - e.getPosition().y) / halfH;
+    float xN = (e.getPosition().x - cx) / halfW;
+    float yN = (cy - e.getPosition().y) / halfH;
+
+    // The Hammer-Aitoff ellipse in normalised (xN, yN) space is the unit
+    // circle xN² + yN² = 1. If the cursor is outside, clamp per-axis so a
+    // vertical drag past the top stays at the same horizontal position
+    // (preserving the dragged azimuth direction) and clamps elevation to
+    // the boundary, rather than rotating around the centre.
+    constexpr float kBoundary = 0.999f;
+    xN = juce::jlimit (-kBoundary, kBoundary, xN);
+    const float maxYn = std::sqrt (std::max (0.f, 1.f - xN * xN)) * kBoundary;
+    yN = juce::jlimit (-maxYn, maxYn, yN);
+    const float maxXn = std::sqrt (std::max (0.f, 1.f - yN * yN)) * kBoundary;
+    xN = juce::jlimit (-maxXn, maxXn, xN);
 
     float azRad = 0.f, elRad = 0.f;
     if (! unproject (xN, yN, azRad, elRad))
-    {
-        // Outside the ellipse: clamp to the nearest valid point on the
-        // boundary by scaling (xN, yN) inward until inside.
-        const float r = std::hypot (xN, yN);
-        if (r <= 0.f) return;
-        const float scale = 0.999f / r;
-        if (! unproject (xN * scale, yN * scale, azRad, elRad))
-            return;
-    }
+        return;
 
     // Both azimuth AND elevation are encoded as [0,1] → [-180°, +180°] in
     // the param model (azimuth uses the full circle; elevation is physically

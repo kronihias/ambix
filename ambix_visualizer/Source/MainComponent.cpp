@@ -276,7 +276,6 @@ void MainComponent::handleIncoming (const OscListenerThread::IncomingMessage& ms
             case P::Azimuth:   up.param = SrcParam::Azimuth;   break;
             case P::Elevation: up.param = SrcParam::Elevation; break;
             case P::Size:      up.param = SrcParam::Size;      break;
-            case P::Gain:      up.param = SrcParam::Gain;      break;
             case P::Meter:     up.param = SrcParam::Meter;     break;
             default: return; // global params: ignore
         }

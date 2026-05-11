@@ -18,10 +18,10 @@ public:
                          float elevationDeg,
                          float size);
 
-    // Send /ambix_encoder/source/<n>/{azimuth,elevation,size,gain} <float> to
-    // an ambix_encoder instance using the new per-source vocabulary. One call
+    // Send /ambix_encoder/source/<n>/{azimuth,elevation,size} <float> to an
+    // ambix_encoder instance using the new per-source vocabulary. One call
     // per parameter — callers can issue az + el back-to-back for a drag.
-    enum class AmbixSourceParam { Azimuth, Elevation, Size, Gain };
+    enum class AmbixSourceParam { Azimuth, Elevation, Size };
     bool sendAmbixSourceParam (const juce::String& ip,
                                int port,
                                int sourceIndex,    // 1-based

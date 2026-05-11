@@ -17,7 +17,6 @@ float Ambix_encoderAudioProcessor::getParameter (int index)
             case SrcAz:   return source_params[srcIdx].az;
             case SrcEl:   return source_params[srcIdx].el;
             case SrcSize: return source_params[srcIdx].size;
-            case SrcGain: return source_params[srcIdx].gain;
         }
         return 0.f;
     }
@@ -50,7 +49,6 @@ void Ambix_encoderAudioProcessor::setParameter (int index, float newValue)
             case SrcAz:   source_params[srcIdx].az   = newValue; break;
             case SrcEl:   source_params[srcIdx].el   = newValue; break;
             case SrcSize: source_params[srcIdx].size = newValue; break;
-            case SrcGain: source_params[srcIdx].gain = newValue; break;
         }
         sendChangeMessage();
         return;
@@ -149,7 +147,7 @@ const String Ambix_encoderAudioProcessor::getParameterName (int index)
     {
         const int srcIdx = (index - SourceParamsBase) / kPerSourceParams + 1;
         const int sub    = (index - SourceParamsBase) % kPerSourceParams;
-        const char* subNames[] = { "Az", "El", "Size", "Gain" };
+        const char* subNames[] = { "Az", "El", "Size" };
         return String("Src") + String(srcIdx) + subNames[sub];
     }
 
@@ -183,7 +181,6 @@ const String Ambix_encoderAudioProcessor::getParameterText (int index)
             case SrcAz:   text << String((source_params[srcIdx].az  - 0.5f) * 360).substring(0, 5) << " deg"; break;
             case SrcEl:   text << String((source_params[srcIdx].el  - 0.5f) * 360).substring(0, 5) << " deg"; break;
             case SrcSize: text << String(source_params[srcIdx].size).substring(0, 5);                         break;
-            case SrcGain: text << String(source_params[srcIdx].gain).substring(0, 5);                         break;
         }
         return text;
     }
