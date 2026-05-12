@@ -297,12 +297,18 @@ void HammerAitoffView::mouseDrag (const juce::MouseEvent& e)
     float yN = (cy - e.getPosition().y) / halfH;
 
     // The Hammer-Aitoff ellipse in normalised (xN, yN) space is the unit
-    // circle xN² + yN² = 1. If the cursor is outside, clamp per-axis so a
-    // vertical drag past the top stays at the same horizontal position
-    // (preserving the dragged azimuth direction) and clamps elevation to
-    // the boundary, rather than rotating around the centre.
+    // circle xN² + yN² = 1. Handle out-of-ellipse drags two ways:
+    //   * Horizontal: the left and right edges both correspond to azimuth
+    //     ±180° (the back of the sphere), so dragging past one edge wraps
+    //     around to the other — the puck disappears off the right, reappears
+    //     on the left, and the drag continues seamlessly around the back.
+    //   * Vertical: top/bottom edges are the poles. Going "over" the pole
+    //     isn't a natural 2D action (it would require an azimuth flip with
+    //     a discontinuous jump), so clamp elevation to the boundary at the
+    //     current xN, preserving the dragged azimuth direction.
+    while (xN >  1.f) xN -= 2.f;
+    while (xN < -1.f) xN += 2.f;
     constexpr float kBoundary = 0.999f;
-    xN = juce::jlimit (-kBoundary, kBoundary, xN);
     const float maxYn = std::sqrt (std::max (0.f, 1.f - xN * xN)) * kBoundary;
     yN = juce::jlimit (-maxYn, maxYn, yN);
     const float maxXn = std::sqrt (std::max (0.f, 1.f - yN * yN)) * kBoundary;
