@@ -298,21 +298,27 @@ void HammerAitoffView::mouseDrag (const juce::MouseEvent& e)
 
     // The Hammer-Aitoff ellipse in normalised (xN, yN) space is the unit
     // circle xN² + yN² = 1. Handle out-of-ellipse drags two ways:
-    //   * Horizontal: the left and right edges both correspond to azimuth
-    //     ±180° (the back of the sphere), so dragging past one edge wraps
-    //     around to the other — the puck disappears off the right, reappears
-    //     on the left, and the drag continues seamlessly around the back.
+    //   * Horizontal: at any given latitude, the ellipse spans
+    //     xN ∈ [-maxXn, +maxXn] where maxXn = √(1 - yN²). Both edges
+    //     correspond to azimuth ±180° (the back of the sphere), so dragging
+    //     past one edge wraps to the other AT THE SAME LATITUDE. This must
+    //     wrap modulo 2·maxXn, not modulo 2 — at high elevations the ellipse
+    //     is narrower than the bounding box, and a "modulo 2" wrap would
+    //     leave the cursor outside the ellipse even after wrapping.
     //   * Vertical: top/bottom edges are the poles. Going "over" the pole
     //     isn't a natural 2D action (it would require an azimuth flip with
-    //     a discontinuous jump), so clamp elevation to the boundary at the
-    //     current xN, preserving the dragged azimuth direction.
-    while (xN >  1.f) xN -= 2.f;
-    while (xN < -1.f) xN += 2.f;
+    //     a discontinuous jump), so just clamp.
     constexpr float kBoundary = 0.999f;
-    const float maxYn = std::sqrt (std::max (0.f, 1.f - xN * xN)) * kBoundary;
-    yN = juce::jlimit (-maxYn, maxYn, yN);
-    const float maxXn = std::sqrt (std::max (0.f, 1.f - yN * yN)) * kBoundary;
-    xN = juce::jlimit (-maxXn, maxXn, xN);
+    yN = juce::jlimit (-kBoundary, kBoundary, yN);
+
+    const float maxXn = std::sqrt (std::max (1e-6f, 1.f - yN * yN));
+    const float widthAtY = 2.f * maxXn;
+    while (xN >  maxXn) xN -= widthAtY;
+    while (xN < -maxXn) xN += widthAtY;
+
+    // Stay just inside the boundary so the inverse formula's 2z²-1
+    // denominator doesn't approach zero (where azimuth pops to ±180°).
+    xN = juce::jlimit (-maxXn * kBoundary, maxXn * kBoundary, xN);
 
     float azRad = 0.f, elRad = 0.f;
     if (! unproject (xN, yN, azRad, elRad))
