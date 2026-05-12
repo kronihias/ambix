@@ -44,6 +44,22 @@ namespace
         if (maxN <= 1) return 0.f;
         return (float)(n - 1) / (float)(maxN - 1);
     }
+
+    // Wrap (az, el) — both in degrees — so that elevation stays in
+    // [-90°, +90°]. Going past a pole is equivalent to flipping the
+    // azimuth by 180° and reflecting the elevation about ±90°. Azimuth
+    // is then normalised to (-180°, +180°].
+    inline void wrapAzEl (float& azDeg, float& elDeg) noexcept
+    {
+        // First fold elevation into [-180°, +180°].
+        while (elDeg >  180.f) elDeg -= 360.f;
+        while (elDeg < -180.f) elDeg += 360.f;
+        // Past the poles → flip to the other side of the sphere.
+        if (elDeg > 90.f)       { elDeg =  180.f - elDeg; azDeg += 180.f; }
+        else if (elDeg < -90.f) { elDeg = -180.f - elDeg; azDeg += 180.f; }
+        while (azDeg >  180.f) azDeg -= 360.f;
+        while (azDeg < -180.f) azDeg += 360.f;
+    }
 }
 
 Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
@@ -179,38 +195,49 @@ void Ambix_encoderAudioProcessor::applyParamsToEncoders()
     const int active = getActiveSources();
     const bool linked = isLinked();
 
+    // Per-source state passed to AmbiEnc[] always has elevation in the
+    // physical range [-90°, +90°]. The param store itself may carry
+    // out-of-range values (the user's slider goes past ±90, or DAW
+    // automation curves do); we wrap on the boundary so the GUI/OSC/visual
+    // path sees the equivalent in-range (az + 180°, 180° - el) position.
+    // AmbixEncoder::calcParams' SH math is invariant to this wrap so the
+    // rendered ambisonic signal is the same either way.
+    auto assignWrapped = [this] (int i, float azDeg, float elDeg, float sizeVal)
+    {
+        wrapAzEl (azDeg, elDeg);
+        AmbiEnc.getUnchecked(i)->azimuth   = azDeg / 360.f + 0.5f;
+        AmbiEnc.getUnchecked(i)->elevation = elDeg / 360.f + 0.5f;
+        AmbiEnc.getUnchecked(i)->size      = sizeVal;
+    };
+
     if (linked)
     {
-        // Distribute equally across width centred on azimuth_param.
+        const float centreAzDeg = (azimuth_param  - 0.5f) * 360.f;
+        const float elDegRaw    = (elevation_param - 0.5f) * 360.f;
+        const float widthDeg    = width_param * 360.f;
+
         if (active == 1)
         {
-            AmbiEnc.getUnchecked(0)->azimuth   = azimuth_param;
-            AmbiEnc.getUnchecked(0)->elevation = elevation_param;
-            AmbiEnc.getUnchecked(0)->size      = size_param;
+            assignWrapped (0, centreAzDeg, elDegRaw, size_param);
         }
         else
         {
             for (int i = 0; i < active; ++i)
             {
-                float angle = azimuth_param - width_param / 2.f
-                            + (float)i * width_param / (float)(active - 1);
-                if (angle < 0.f)  angle += 1.f;
-                if (angle > 1.f)  angle -= 1.f;
-
-                AmbiEnc.getUnchecked(i)->azimuth   = angle;
-                AmbiEnc.getUnchecked(i)->elevation = elevation_param;
-                AmbiEnc.getUnchecked(i)->size      = size_param;
+                const float azDeg = centreAzDeg - widthDeg / 2.f
+                                  + (float)i * widthDeg / (float)(active - 1);
+                assignWrapped (i, azDeg, elDegRaw, size_param);
             }
         }
-        // Inactive encoders: keep last positions, gain handled in processBlock.
+        // Inactive encoders: keep last positions.
     }
     else
     {
         for (int i = 0; i < active; ++i)
         {
-            AmbiEnc.getUnchecked(i)->azimuth   = source_params[i].az;
-            AmbiEnc.getUnchecked(i)->elevation = source_params[i].el;
-            AmbiEnc.getUnchecked(i)->size      = source_params[i].size;
+            const float azDeg = (source_params[i].az - 0.5f) * 360.f;
+            const float elDeg = (source_params[i].el - 0.5f) * 360.f;
+            assignWrapped (i, azDeg, elDeg, source_params[i].size);
         }
     }
 }
