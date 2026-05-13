@@ -93,7 +93,8 @@ public:
 
 
 class SphereOpenGL : public Component,
-                    public OpenGLRenderer
+                    public OpenGLRenderer,
+                    private juce::Timer
 {
 
 public:
@@ -109,6 +110,16 @@ public:
     void mouseDown (const MouseEvent& e);
     void mouseUp (const MouseEvent& e);
     void mouseDrag (const MouseEvent& e);
+
+private:
+    // Periodically invalidates the JUCE component-painting cache so the
+    // source-number overlay tracks the live source positions. With
+    // setComponentPaintingEnabled(true), JUCE only re-runs paint() when
+    // the component itself requests a repaint — continuous GL frames
+    // don't trigger that on their own.
+    void timerCallback() override { repaint(); }
+
+public:
 
     Ambix_encoderAudioProcessor* processor;
 

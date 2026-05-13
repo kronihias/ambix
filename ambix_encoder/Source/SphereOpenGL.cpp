@@ -34,11 +34,16 @@ SphereOpenGL::SphereOpenGL() :
 {
     openGLContext.setRenderer (this);
     // Enable JUCE component painting on top of the GL framebuffer so paint()
-    // can overlay source-number labels on each puck. With continuous
-    // repainting the overlay refreshes every frame at no extra book-keeping.
+    // can overlay source-number labels on each puck.
     openGLContext.setComponentPaintingEnabled (true);
     openGLContext.setContinuousRepainting(true);
     openGLContext.attachTo (*this);
+
+    // setContinuousRepainting drives the GL renderer continuously but the
+    // component-paint cache only refreshes when JUCE thinks something
+    // changed. Drive it ourselves so the source-number labels track the
+    // live source positions.
+    startTimerHz (30);
 
     setSize(240,240);
 }
