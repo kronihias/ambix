@@ -179,13 +179,37 @@ Ambix_encoderAudioProcessor::getSourceDisplayPos (int idx) const
     SourcePos p { 0.f, 0.f, 0.f, 0.f };
     if (idx < 0 || idx >= kMaxSources) return p;
 
-    // What the audio thread actually uses is AmbiEnc[i].azimuth/elevation —
-    // those are derived from the param model in applyParamsToEncoders().
-    // Read them so the GUI reflects the *effective* positions, including
-    // the linked-mode auto-spread.
-    p.azDeg = (AmbiEnc.getUnchecked(idx)->azimuth   - 0.5f) * 360.f;
-    p.elDeg = (AmbiEnc.getUnchecked(idx)->elevation - 0.5f) * 360.f;
-    p.size  = AmbiEnc.getUnchecked(idx)->size;
+    // Compute the *logical* per-source position from the param store using
+    // the same math `applyParamsToEncoders` runs on the audio thread. We
+    // deliberately do NOT read AmbiEnc[i].azimuth/elevation here — those are
+    // populated only when the audio thread actually processes a block, so a
+    // freshly-loaded plugin with playback stopped, or a paint() call before
+    // the first processBlock(), would otherwise see uninitialised positions.
+    const int active = getActiveSources();
+    const bool linked = isLinked();
+    float azDeg = 0.f, elDeg = 0.f;
+
+    if (linked)
+    {
+        const float centreAzDeg = (azimuth_param  - 0.5f) * 360.f;
+        const float widthDeg    = width_param * 360.f;
+        elDeg = (elevation_param - 0.5f) * 360.f;
+        if (active <= 1)
+            azDeg = centreAzDeg;
+        else
+            azDeg = centreAzDeg - widthDeg / 2.f
+                  + (float) idx * widthDeg / (float)(active - 1);
+    }
+    else
+    {
+        azDeg = (source_params[idx].az - 0.5f) * 360.f;
+        elDeg = (source_params[idx].el - 0.5f) * 360.f;
+    }
+    wrapAzEl (azDeg, elDeg);
+
+    p.azDeg = azDeg;
+    p.elDeg = elDeg;
+    p.size  = linked ? size_param : source_params[idx].size;
     p.meter = source_meter[idx].load();
     return p;
 }
