@@ -78,16 +78,18 @@ void SourceRegistry::applyAmbixUpdate (const AmbixUpdate& update)
             src.size         = update.size;
         }
 
-        // Mirror the plugin's own kMeterThreshold. The encoder sends OSC on
-        // position OR meter change, so a frozen meter (paused DAW) paired
-        // with any position movement produces packets with unchanged rms/dpk.
-        // Only advance lastLevelUpdateMs when the level actually moved,
-        // otherwise the meter fade would read those position-driven packets
-        // as "still playing".
-        constexpr float kLevelChangeThreshold = 0.002f;
-        const bool levelMoved = (std::abs (src.rmsLinear  - update.rmsLinear)  > kLevelChangeThreshold
-                              || std::abs (src.peakLinear - update.peakLinear) > kLevelChangeThreshold);
-        if (levelMoved || src.lastLevelUpdateMs == 0)
+        // "Audio is currently audible" gate: bump lastLevelUpdateMs whenever
+        // a non-silent value arrives. The previous version of this code
+        // gated on *delta* (level changed by > threshold), which worked
+        // when the encoder emitted block-RMS (always jittery, always
+        // changing) but breaks now that the encoder smooths to a steady
+        // RMS — the visualizer's stale-fade would kick in on perfectly
+        // steady audio. Compare absolute value instead: anything > -60 dBFS
+        // counts as "playing".
+        constexpr float kSilenceThreshold = 0.001f; // ≈ -60 dBFS
+        const bool audible = (update.rmsLinear  > kSilenceThreshold
+                           || update.peakLinear > kSilenceThreshold);
+        if (audible || src.lastLevelUpdateMs == 0)
             src.lastLevelUpdateMs = now;
 
         src.rmsLinear      = update.rmsLinear;
@@ -172,9 +174,12 @@ void SourceRegistry::applyAmbixSourceUpdate (const AmbixSourceUpdate& update)
                 break;
             case P::Meter:
             {
-                constexpr float kLevelChangeThreshold = 0.002f;
-                const bool levelMoved = std::abs (src.rmsLinear - update.value) > kLevelChangeThreshold;
-                if (levelMoved || src.lastLevelUpdateMs == 0)
+                // Same audible-gate semantics as the legacy /ambi_enc path —
+                // see the comment there. Anything above -60 dBFS counts as
+                // "playing"; below that we let the stale-fade decay kick in.
+                constexpr float kSilenceThreshold = 0.001f;
+                const bool audible = update.value > kSilenceThreshold;
+                if (audible || src.lastLevelUpdateMs == 0)
                     src.lastLevelUpdateMs = now;
                 src.rmsLinear  = update.value;
                 src.peakLinear = juce::jmax (src.peakLinear, update.value);
