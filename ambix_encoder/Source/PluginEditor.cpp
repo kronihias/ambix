@@ -550,15 +550,10 @@ void Ambix_encoderAudioProcessorEditor::resized()
                           pannerW + sliderW + sliderGap, 28);
     }
 
-    // Table on the right. Cap the viewport at ~14 visible rows so scrolling
-    // engages beyond that — otherwise on a tall editor window with many
-    // sources the table just grows and grows without ever scrolling.
-    constexpr int kMaxVisibleRows = 14;
+    // Table on the right
     const int tableX = W - tableW - 8;
-    const int maxTableViewportH = kMaxVisibleRows * kRowHeight + 8;
-    const int tableViewportH = juce::jmin (contentHeight - kHeaderHeight, maxTableViewportH);
     table_header  .setBounds (tableX, contentTop, tableW, kHeaderHeight);
-    table_viewport.setBounds (tableX, contentTop + kHeaderHeight, tableW, tableViewportH);
+    table_viewport.setBounds (tableX, contentTop + kHeaderHeight, tableW, contentHeight - kHeaderHeight);
     layoutTableRows (table_viewport.getWidth());
 
     // Resizer in the bottom-right corner
