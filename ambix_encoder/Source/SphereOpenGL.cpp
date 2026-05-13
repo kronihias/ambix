@@ -159,14 +159,15 @@ void SphereOpenGL::renderOpenGL()
             const float z = 0.9f * sinf (el) + 0.05f;
 
             labelTextures.getUnchecked (i)->bind();
-            // JUCE's OpenGLTexture::loadImage uploads with its own Y-flip
-            // convention, so a "natural" texcoord mapping comes out
-            // rotated 180°. Invert both s and t to compensate.
+            // JUCE's OpenGLTexture::loadImage flips Y on upload (OpenGL's
+            // standard texture origin is bottom-left while JUCE Image's is
+            // top-left). Match by putting the image's top row at the top
+            // of the quad — t increases upward in clip space too.
             glBegin (GL_QUADS);
-                glTexCoord2f (1.f, 0.f); glVertex3f (x - kLabelHalf, y - kLabelHalf, z);
-                glTexCoord2f (0.f, 0.f); glVertex3f (x + kLabelHalf, y - kLabelHalf, z);
-                glTexCoord2f (0.f, 1.f); glVertex3f (x + kLabelHalf, y + kLabelHalf, z);
-                glTexCoord2f (1.f, 1.f); glVertex3f (x - kLabelHalf, y + kLabelHalf, z);
+                glTexCoord2f (0.f, 0.f); glVertex3f (x - kLabelHalf, y - kLabelHalf, z);
+                glTexCoord2f (1.f, 0.f); glVertex3f (x + kLabelHalf, y - kLabelHalf, z);
+                glTexCoord2f (1.f, 1.f); glVertex3f (x + kLabelHalf, y + kLabelHalf, z);
+                glTexCoord2f (0.f, 1.f); glVertex3f (x - kLabelHalf, y + kLabelHalf, z);
             glEnd();
         }
 
