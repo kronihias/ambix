@@ -181,8 +181,15 @@ void SourceRegistry::applyAmbixSourceUpdate (const AmbixSourceUpdate& update)
                 const bool audible = update.value > kSilenceThreshold;
                 if (audible || src.lastLevelUpdateMs == 0)
                     src.lastLevelUpdateMs = now;
+
+                // Per-source OSC carries one combined RMS value. Drive both
+                // peakLinear and rmsLinear off it so they track together —
+                // the previous max() form made peakLinear monotonically
+                // grow and only fall via the stale-fade after full silence.
+                // The peak-hold ballistic below (1.5 s hold + 1.2 s release)
+                // is what produces the "peak indicator" visual decay.
                 src.rmsLinear  = update.value;
-                src.peakLinear = juce::jmax (src.peakLinear, update.value);
+                src.peakLinear = update.value;
                 const float effectiveHeld = LevelMapping::peakHoldEffective (
                     src.peakHoldLinear, src.peakHoldTimeMs, now);
                 if (src.peakLinear >= effectiveHeld)
