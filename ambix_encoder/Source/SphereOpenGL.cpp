@@ -159,11 +159,14 @@ void SphereOpenGL::renderOpenGL()
             const float z = 0.9f * sinf (el) + 0.05f;
 
             labelTextures.getUnchecked (i)->bind();
+            // JUCE's OpenGLTexture::loadImage uploads with its own Y-flip
+            // convention, so a "natural" texcoord mapping comes out
+            // rotated 180°. Invert both s and t to compensate.
             glBegin (GL_QUADS);
-                glTexCoord2f (0.f, 1.f); glVertex3f (x - kLabelHalf, y - kLabelHalf, z);
-                glTexCoord2f (1.f, 1.f); glVertex3f (x + kLabelHalf, y - kLabelHalf, z);
-                glTexCoord2f (1.f, 0.f); glVertex3f (x + kLabelHalf, y + kLabelHalf, z);
-                glTexCoord2f (0.f, 0.f); glVertex3f (x - kLabelHalf, y + kLabelHalf, z);
+                glTexCoord2f (1.f, 0.f); glVertex3f (x - kLabelHalf, y - kLabelHalf, z);
+                glTexCoord2f (0.f, 0.f); glVertex3f (x + kLabelHalf, y - kLabelHalf, z);
+                glTexCoord2f (0.f, 1.f); glVertex3f (x + kLabelHalf, y + kLabelHalf, z);
+                glTexCoord2f (1.f, 1.f); glVertex3f (x - kLabelHalf, y + kLabelHalf, z);
             glEnd();
         }
 
