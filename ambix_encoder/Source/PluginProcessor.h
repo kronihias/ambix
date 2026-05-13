@@ -281,6 +281,11 @@ private:
     float rms;
     float dpk;
 
+    // EMA accumulator (mean-square) for the W-channel RMS, mirroring the
+    // per-source meter smoothing so every RMS value the encoder emits
+    // settles to a steady reading on steady signals.
+    float overall_rms_ema { 0.f };
+
     // per-source meter snapshot (lock-free single-writer). Updated each
     // audio block from a ~300 ms-time-constant EMA of the source input's
     // mean-square — block-RMS alone visibly flickers for pink noise / music

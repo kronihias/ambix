@@ -978,9 +978,21 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
 #if WITH_OSC
     if (numOut > 0)
     {
+        // Peak still comes from MyMeterDsp (fast-attack + peak-hold suits
+        // a clip indicator). RMS uses the same 300 ms EMA the per-source
+        // meters use so every meter the encoder emits has matching
+        // ballistics — steady signal → steady reading on both legacy
+        // /ambi_enc and /ambix_encoder/source/<n>/meter.
         _my_meter_dsp.calc ((float*) buffer.getReadPointer(0), NumSamples);
         dpk = _my_meter_dsp.getPeak();
-        rms = _my_meter_dsp.getRMS();
+
+        const float* p = buffer.getReadPointer (0);
+        double sumSq = 0.0;
+        for (int i = 0; i < NumSamples; ++i)
+            sumSq += (double) p[i] * (double) p[i];
+        const float blockMs = (float) (sumSq / juce::jmax (1, NumSamples));
+        overall_rms_ema = emaAlpha * overall_rms_ema + (1.f - emaAlpha) * blockMs;
+        rms = std::sqrt (overall_rms_ema);
     }
 #endif
 }
