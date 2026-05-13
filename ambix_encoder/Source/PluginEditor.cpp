@@ -508,21 +508,32 @@ void Ambix_encoderAudioProcessorEditor::resized()
     const int tableW = juce::jlimit (220, 360, (int) (W * 0.40f));
     const int panelW = W - tableW - 8;            // gap between panner+table
 
-    // Vertical elevation slider lives to the right of the panner
-    const int sliderW = 36;
-    const int pannerLeft = 12;
-    const int pannerRight = pannerLeft + panelW - sliderW - 8;
-    const int pannerSize  = juce::jmin (pannerRight - pannerLeft, contentHeight - 50);
-    const int pannerY     = contentTop + (contentHeight - 50 - pannerSize) / 2;
+    // In unlinked mode the global az/el sliders are inert (each source has
+    // its own position via the table), so hide them and expand the panner
+    // into the freed space.
+    const bool linked = getProcessor()->isLinked();
+    sld_az.setVisible (linked);
+    sld_el.setVisible (linked);
+
+    const int sliderW   = linked ? 36 : 0;
+    const int sliderGap = linked ?  6 : 0;
+    const int azSliderH = linked ? 32 : 0;  // horizontal slider + padding
+
+    const int pannerLeft  = 12;
+    const int pannerRight = pannerLeft + panelW - sliderW - (linked ? 8 : 0);
+    const int pannerSize  = juce::jmin (pannerRight - pannerLeft,
+                                         contentHeight - azSliderH);
+    const int pannerY     = contentTop + (contentHeight - azSliderH - pannerSize) / 2;
 
     sphere_opengl.setBounds (pannerLeft, pannerY, pannerSize, pannerSize);
     hammer_view  .setBounds (pannerLeft, pannerY, pannerSize, (int)(pannerSize * 0.55f));
 
-    sld_el.setBounds (pannerLeft + pannerSize + 6, pannerY, sliderW, pannerSize);
-
-    // Horizontal azimuth slider below the panner
-    sld_az.setBounds (pannerLeft, pannerY + pannerSize + 4,
-                      pannerSize + sliderW + 6, 28);
+    if (linked)
+    {
+        sld_el.setBounds (pannerLeft + pannerSize + sliderGap, pannerY, sliderW, pannerSize);
+        sld_az.setBounds (pannerLeft, pannerY + pannerSize + 4,
+                          pannerSize + sliderW + sliderGap, 28);
+    }
 
     // Table on the right
     const int tableX = W - tableW - 8;
@@ -609,11 +620,16 @@ void Ambix_encoderAudioProcessorEditor::timerCallback()
                 el_mv << "0 deg/s";
             txt_el_move.setText (el_mv);
 
-            // Linked button mirror
+            // Linked button mirror. If the mode changed via automation /
+            // OSC (not the button itself), trigger a relayout too so the
+            // global az/el sliders appear / disappear.
             const bool linked = ourProcessor->isLinked();
-            if (btn_linked_toggle.getToggleState() != linked)
+            const bool linkedWasMirrored = (btn_linked_toggle.getToggleState() == linked);
+            if (! linkedWasMirrored)
                 btn_linked_toggle.setToggleState (linked, juce::dontSendNotification);
             btn_linked_toggle.setButtonText (linked ? "Linked" : "Unlinked");
+            if (! linkedWasMirrored)
+                resized();
 
             // Active sources combo + table rebuild on change
             const int active = ourProcessor->getActiveSources();
@@ -704,6 +720,7 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
         btn_linked_toggle.setButtonText (nowLinked ? "Linked" : "Unlinked");
         for (auto* row : table_rows)
             row->setEditable (! nowLinked);
+        resized();   // global az/el sliders appear / disappear with the mode
         repaint();
     }
 }
