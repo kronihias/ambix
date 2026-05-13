@@ -243,10 +243,10 @@ void HammerAitoffView::paint (juce::Graphics& g)
         }
 
         // Meter ring (thickness scaled by RMS).
-        if (pos.meter > 0.005f)
+        if (pos.rms > 0.005f)
         {
             const float ringR = 14.f;
-            const float thickness = juce::jmin (4.f, pos.meter * 12.f + 1.f);
+            const float thickness = juce::jmin (4.f, pos.rms * 12.f + 1.f);
             g.setColour (juce::Colours::limegreen.withAlpha (0.7f));
             g.drawEllipse (sp.x - ringR, sp.y - ringR, ringR * 2.f, ringR * 2.f, thickness);
         }

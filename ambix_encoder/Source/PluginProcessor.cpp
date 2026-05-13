@@ -102,7 +102,8 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
         AmbiEnc.getLast()->calcParams();
         AmbiEnc.getLast()->calcParams();
         sourceMeterDsp.add (new MyMeterDsp());
-        source_meter[i].store (0.f);
+        source_rms[i].store (0.f);
+        source_peak[i].store (0.f);
     }
 
     // initial per-source positions: at front, on the equator, full sharpness.
@@ -169,13 +170,13 @@ int Ambix_encoderAudioProcessor::getActiveSources() const
 float Ambix_encoderAudioProcessor::getSourceMeter (int idx) const
 {
     if (idx < 0 || idx >= kMaxSources) return 0.f;
-    return source_meter[idx].load();
+    return source_rms[idx].load();
 }
 
 Ambix_encoderAudioProcessor::SourcePos
 Ambix_encoderAudioProcessor::getSourceDisplayPos (int idx) const
 {
-    SourcePos p { 0.f, 0.f, 0.f, 0.f };
+    SourcePos p { 0.f, 0.f, 0.f, 0.f, 0.f };
     if (idx < 0 || idx >= kMaxSources) return p;
 
     // Compute the *logical* per-source position from the param store using
@@ -209,7 +210,8 @@ Ambix_encoderAudioProcessor::getSourceDisplayPos (int idx) const
     p.azDeg = azDeg;
     p.elDeg = elDeg;
     p.size  = linked ? size_param : source_params[idx].size;
-    p.meter = source_meter[idx].load();
+    p.rms   = source_rms[idx].load();
+    p.peak  = source_peak[idx].load();
     return p;
 }
 
@@ -397,20 +399,22 @@ void Ambix_encoderAudioProcessor::sendOSC()
             {
                 const auto pos = getSourceDisplayPos (s);
                 const String base = String("/ambix_encoder/source/") + String(s + 1);
-                OSCMessage az  (OSCAddressPattern (base + "/azimuth"));
+                OSCMessage az (OSCAddressPattern (base + "/azimuth"));
                 az.addFloat32 (pos.azDeg);
-                OSCMessage el  (OSCAddressPattern (base + "/elevation"));
+                OSCMessage el (OSCAddressPattern (base + "/elevation"));
                 el.addFloat32 (pos.elDeg);
-                OSCMessage sz  (OSCAddressPattern (base + "/size"));
+                OSCMessage sz (OSCAddressPattern (base + "/size"));
                 sz.addFloat32 (pos.size);
-                OSCMessage mt  (OSCAddressPattern (base + "/meter"));
-                mt.addFloat32 (pos.meter);
+                OSCMessage rm (OSCAddressPattern (base + "/rms"));
+                rm.addFloat32 (pos.rms);
+                OSCMessage pk (OSCAddressPattern (base + "/peak"));
+                pk.addFloat32 (pos.peak);
 
                 for (int i = 0; i < oscSenders.size(); i++)
                 {
                     auto* snd = oscSenders.getUnchecked(i)->sender.get();
                     snd->send (az); snd->send (el); snd->send (sz);
-                    snd->send (mt);
+                    snd->send (rm); snd->send (pk);
                 }
             }
         }
@@ -951,27 +955,31 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     {
         if (s < active)
         {
-            // Keep the legacy MyMeterDsp running too — its peak-hold + fast-
-            // attack ballistics still drive the legacy /ambi_enc meter. The
-            // smoothed-RMS value below is what feeds the per-source meter.
+            // Run MyMeterDsp for the peak: it does fast-attack + 500 ms
+            // hold + 20 dB/s release — exactly what a peak meter wants.
             sourceMeterDsp.getUnchecked(s)
                 ->calc ((float*) InputBuffer.getReadPointer(s), NumSamples);
+            source_peak[s].store (sourceMeterDsp.getUnchecked(s)->getPeak());
 
+            // RMS goes through our own 300 ms EMA on mean-square so steady
+            // signals show steady levels (MyMeterDsp's RMS has the same
+            // block-jitter problem we wanted to avoid in the first place).
             const float* p = InputBuffer.getReadPointer (s);
             double sumSq = 0.0;
             for (int i = 0; i < NumSamples; ++i)
                 sumSq += (double) p[i] * (double) p[i];
             const float blockMs = (float) (sumSq / juce::jmax (1, NumSamples));
 
-            float ms = source_meter_ema[s];
+            float ms = source_rms_ema[s];
             ms = emaAlpha * ms + (1.f - emaAlpha) * blockMs;
-            source_meter_ema[s] = ms;
-            source_meter[s].store (std::sqrt (ms));
+            source_rms_ema[s] = ms;
+            source_rms[s].store (std::sqrt (ms));
         }
         else
         {
-            source_meter_ema[s] = 0.f;
-            source_meter[s].store (0.f);
+            source_rms_ema[s] = 0.f;
+            source_rms[s].store (0.f);
+            source_peak[s].store (0.f);
         }
     }
 

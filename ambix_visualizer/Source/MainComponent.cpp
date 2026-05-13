@@ -276,7 +276,8 @@ void MainComponent::handleIncoming (const OscListenerThread::IncomingMessage& ms
             case P::Azimuth:   up.param = SrcParam::Azimuth;   break;
             case P::Elevation: up.param = SrcParam::Elevation; break;
             case P::Size:      up.param = SrcParam::Size;      break;
-            case P::Meter:     up.param = SrcParam::Meter;     break;
+            case P::Rms:       up.param = SrcParam::Rms;       break;
+            case P::Peak:      up.param = SrcParam::Peak;      break;
             default: return; // global params: ignore
         }
         registry.applyAmbixSourceUpdate (up);

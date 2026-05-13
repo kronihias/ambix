@@ -158,7 +158,7 @@ public:
 
     // Snapshot of per-source positions for the editor / Hammer-Aitoff view.
     // Returns degrees in (-180..180, -90..90) for convenience.
-    struct SourcePos { float azDeg, elDeg, size, meter; };
+    struct SourcePos { float azDeg, elDeg, size, rms, peak; };
     SourcePos getSourceDisplayPos (int idx) const;
 
     //==============================================================================
@@ -286,13 +286,13 @@ private:
     // settles to a steady reading on steady signals.
     float overall_rms_ema { 0.f };
 
-    // per-source meter snapshot (lock-free single-writer). Updated each
-    // audio block from a ~300 ms-time-constant EMA of the source input's
-    // mean-square — block-RMS alone visibly flickers for pink noise / music
-    // because block boundaries (typically 64–512 samples) are well below
-    // the signal's macroscopic energy time constant.
-    std::array<std::atomic<float>, kMaxSources> source_meter {};
-    std::array<float,              kMaxSources> source_meter_ema {};
+    // Per-source meter snapshot (lock-free single-writer). RMS goes through
+    // a ~300 ms EMA so steady signals show steady levels; peak comes from
+    // MyMeterDsp's fast-attack + peak-hold ballistic so transients still
+    // show up promptly and decay naturally on their own.
+    std::array<std::atomic<float>, kMaxSources> source_rms {};
+    std::array<std::atomic<float>, kMaxSources> source_peak {};
+    std::array<float,              kMaxSources> source_rms_ema {};
 
 #if WITH_OSC
     OSCReceiver oscReceiver;

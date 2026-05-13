@@ -40,7 +40,7 @@ public:
     // (/ambix_encoder/source/<n>/<param>). One parameter per OSC message.
     struct AmbixSourceUpdate
     {
-        enum class Param { Azimuth, Elevation, Size, Meter };
+        enum class Param { Azimuth, Elevation, Size, Rms, Peak };
 
         int sourceIndex { 0 };           // 1-based
         Param param { Param::Azimuth };

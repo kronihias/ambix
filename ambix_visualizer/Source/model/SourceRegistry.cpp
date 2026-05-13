@@ -172,23 +172,26 @@ void SourceRegistry::applyAmbixSourceUpdate (const AmbixSourceUpdate& update)
             case P::Size:
                 if (! isDragged) src.size = update.value;
                 break;
-            case P::Meter:
+            case P::Rms:
             {
-                // Same audible-gate semantics as the legacy /ambi_enc path —
-                // see the comment there. Anything above -60 dBFS counts as
-                // "playing"; below that we let the stale-fade decay kick in.
+                // "Audio is audible" gate — see the legacy /ambi_enc path
+                // for the rationale. Compare absolute value, not delta,
+                // because the encoder smooths RMS so steady audio gives
+                // steady values.
                 constexpr float kSilenceThreshold = 0.001f;
                 const bool audible = update.value > kSilenceThreshold;
                 if (audible || src.lastLevelUpdateMs == 0)
                     src.lastLevelUpdateMs = now;
-
-                // Per-source OSC carries one combined RMS value. Drive both
-                // peakLinear and rmsLinear off it so they track together —
-                // the previous max() form made peakLinear monotonically
-                // grow and only fall via the stale-fade after full silence.
-                // The peak-hold ballistic below (1.5 s hold + 1.2 s release)
-                // is what produces the "peak indicator" visual decay.
-                src.rmsLinear  = update.value;
+                src.rmsLinear = update.value;
+                break;
+            }
+            case P::Peak:
+            {
+                // Peak drives the peak indicator on the puck and feeds the
+                // 1.5 s-hold / 1.2 s-release ballistic for the held value.
+                // We don't bump lastLevelUpdateMs here — that signal is
+                // owned by the RMS path so the audible-gate hysteresis is
+                // single-sourced.
                 src.peakLinear = update.value;
                 const float effectiveHeld = LevelMapping::peakHoldEffective (
                     src.peakHoldLinear, src.peakHoldTimeMs, now);
