@@ -151,13 +151,22 @@ void Settings::refreshSubscribersLabel()
         }
         else
         {
+            // The visualizer heartbeats /ambi_enc_subscribe every ~3 s, which
+            // bumps `lastActivity`. NSD's `stillAdvertising` flag also tracks
+            // visibility but flickers on multi-interface hosts where broadcast
+            // packets arrive intermittently. Treat a subscriber as "stale"
+            // only when both channels are quiet: NSD lost it AND no subscribe
+            // heartbeat in 10 s (~3 missed beats).
+            const auto now = juce::Time::getCurrentTime();
             for (const auto& s : subs)
             {
                 if (text.isNotEmpty()) text << "\n";
                 const juce::String ipText = s.ip.isEmpty() ? juce::String ("pending") : s.ip;
+                const double silentFor = (now - s.lastActivity).inSeconds();
+                const bool isStale = ! s.stillAdvertising && silentFor > 10.0;
                 text << (s.friendlyName.isEmpty() ? ipText : s.friendlyName)
                      << "  " << ipText << ":" << s.port
-                     << (s.stillAdvertising ? "" : "  (stale)");
+                     << (isStale ? "  (stale)" : "");
             }
         }
     }
