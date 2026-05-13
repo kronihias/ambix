@@ -450,8 +450,11 @@ void Ambix_encoderAudioProcessorEditor::paint (juce::Graphics& g)
 
     g.setColour (juce::Colours::white);
     g.setFont (juce::Font (juce::FontOptions { 10.f, juce::Font::plain }));
-    g.drawText ("size",           34, bottomY + 64, 36, 14, juce::Justification::centred, true);
-    g.drawText ("width",          80, bottomY + 64, 40, 14, juce::Justification::centred, true);
+    const bool linked = getProcessor()->isLinked();
+    if (linked) {
+        g.drawText ("size",       34, bottomY + 64, 36, 14, juce::Justification::centred, true);
+        g.drawText ("width",      80, bottomY + 64, 40, 14, juce::Justification::centred, true);
+    }
     g.drawText ("azimuth move",   135, bottomY + 4,  100, 14, juce::Justification::centredLeft, true);
     g.drawText ("elevation move", 135, bottomY + 38, 100, 14, juce::Justification::centredLeft, true);
     g.drawText ("max speed",      getWidth() - 230, bottomY + 64, 100, 14, juce::Justification::centred, true);
@@ -487,6 +490,13 @@ void Ambix_encoderAudioProcessorEditor::resized()
 
     // --- Bottom controls (fixed height) --------------------------------------
     const int bottomY = H - 90;
+    // Global size + width only apply in linked mode (where they drive the
+    // auto-spread for all sources). Hide them in unlinked mode — each
+    // source has its own size column in the table, and width is meaningless
+    // when sources are independently positioned.
+    const bool linkedMode = getProcessor()->isLinked();
+    sld_size .setVisible (linkedMode);
+    sld_width.setVisible (linkedMode);
     sld_size.setBounds  (34, bottomY + 30, 30, 30);
     sld_width.setBounds (80, bottomY + 30, 30, 30);
 
