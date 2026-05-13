@@ -2,15 +2,14 @@ SET ( WITH_EIGEN TRUE )
 SET ( WITH_SphericalHarmonic TRUE )
 SET ( WITH_MyMeterDsp TRUE )
 
-# Maximum number of input source channels supported by the unified binary.
-# Active count is selectable at runtime via NumActiveSourcesParam.
-SET ( MAX_INPUT_CHANNELS 8 CACHE STRING "Max input channels for ambix_encoder" )
-ADD_DEFINITIONS(-DMAX_INPUT_CHANNELS=${MAX_INPUT_CHANNELS})
-
-# INPUT_CHANNELS retained for any legacy compile-time guards in shared headers
-# but no longer drives the bus-layout — the encoder now allocates max sources
-# at construction and the active count is a runtime parameter.
-ADD_DEFINITIONS(-DINPUT_CHANNELS=${MAX_INPUT_CHANNELS})
+# MAX_INPUT_CHANNELS defaults to AMBI_CHANNELS (the SH coefficient count on
+# the output bus) inside PluginProcessor.h — 36 for fixed 5th-order, 64 for
+# the universal build. Override here only if you want to cap source count
+# independently of the ambisonic order.
+SET ( MAX_INPUT_CHANNELS_OVERRIDE "" CACHE STRING "Cap ambix_encoder max input channels (default = AMBI_CHANNELS)" )
+IF (NOT MAX_INPUT_CHANNELS_OVERRIDE STREQUAL "")
+    ADD_DEFINITIONS(-DMAX_INPUT_CHANNELS=${MAX_INPUT_CHANNELS_OVERRIDE})
+ENDIF()
 
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_encoder )
 

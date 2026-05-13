@@ -104,6 +104,8 @@ public:
     void newOpenGLContextCreated();
     void openGLContextClosing();
 
+    void paint (juce::Graphics& g) override;
+
     void mouseDown (const MouseEvent& e);
     void mouseUp (const MouseEvent& e);
     void mouseDrag (const MouseEvent& e);

@@ -38,8 +38,13 @@
 // Maximum number of input source channels supported by the unified binary.
 // The plugin allocates this many panners/encoders at construction; the active
 // count is exposed at runtime via NumActiveSourcesParam.
+//
+// Defaults to AMBI_CHANNELS — the number of SH coefficients on the output
+// bus — so a 5th-order build has 36 source slots, a 7th-order (universal)
+// build has 64. Override via -DMAX_INPUT_CHANNELS=N if you need fewer or
+// more independent of the ambisonic order.
 #ifndef MAX_INPUT_CHANNELS
- #define MAX_INPUT_CHANNELS 8
+ #define MAX_INPUT_CHANNELS AMBI_CHANNELS
 #endif
 
 //==============================================================================

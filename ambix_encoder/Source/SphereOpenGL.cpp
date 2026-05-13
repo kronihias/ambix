@@ -33,7 +33,10 @@ SphereOpenGL::SphereOpenGL() :
     sphere_source_small(0.05f, 12, 12)
 {
     openGLContext.setRenderer (this);
-    openGLContext.setComponentPaintingEnabled (false);
+    // Enable JUCE component painting on top of the GL framebuffer so paint()
+    // can overlay source-number labels on each puck. With continuous
+    // repainting the overlay refreshes every frame at no extra book-keeping.
+    openGLContext.setComponentPaintingEnabled (true);
     openGLContext.setContinuousRepainting(true);
     openGLContext.attachTo (*this);
 
@@ -140,6 +143,34 @@ namespace
     inline float sphereRadiusPx (const juce::Component& c) noexcept
     {
         return 0.9f * (float) juce::jmin (c.getWidth(), c.getHeight()) * 0.5f;
+    }
+}
+
+void SphereOpenGL::paint (juce::Graphics& g)
+{
+    // Overlay source numbers on top of the GL-rendered yellow dots so the
+    // user can tell sources apart at a glance — same convention as the
+    // Hammer-Aitoff view's per-puck label.
+    if (! processor) return;
+
+    const float sphereR = sphereRadiusPx (*this);
+    const int active = processor->getActiveSources();
+
+    g.setFont (juce::Font (juce::FontOptions { 11.f, juce::Font::bold }));
+
+    for (int i = 0; i < active; ++i)
+    {
+        const auto pos = processor->getSourceDisplayPos (i);
+        const float az = pos.azDeg * (float) DEG2RAD;
+        const float el = pos.elDeg * (float) DEG2RAD;
+        const float r_pixels = sphereR * cosf (el);
+        const float sx = (float) getWidth()  / 2.f + r_pixels * sinf (az);
+        const float sy = (float) getHeight() / 2.f - r_pixels * cosf (az);
+
+        g.setColour (juce::Colours::black);
+        g.drawText (juce::String (i + 1),
+                    (int)(sx - 10), (int)(sy - 7), 20, 14,
+                    juce::Justification::centred);
     }
 }
 
