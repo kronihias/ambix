@@ -15,6 +15,7 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "DiscoveryHub.h"
 
 class NetworkAdvertiser : public juce::ChangeBroadcaster,
                           private juce::Timer
@@ -78,8 +79,15 @@ private:
     void timerCallback() override;
     void rebuildAdvertiser();
 
-    std::unique_ptr<juce::NetworkServiceDiscovery::Advertiser>           advertiser;
-    std::unique_ptr<juce::NetworkServiceDiscovery::AvailableServiceList> visualizerList;
+    std::unique_ptr<juce::NetworkServiceDiscovery::Advertiser> advertiser;
+
+    // Subscribe to the process-wide DiscoveryHub instead of binding our own
+    // AvailableServiceList. Multiple encoder instances in one DAW process
+    // would otherwise each try to bind UDP 35514: SO_REUSEADDR lets them
+    // all succeed but macOS only delivers each incoming broadcast packet
+    // to ONE of them, so every other plugin instance would falsely conclude
+    // the visualizer is gone and flicker between "subscribed" and "stale".
+    ambix::net::DiscoveryHub::Subscription visualizerSub;
 
     mutable juce::CriticalSection lock;
     std::map<juce::String, Subscriber> subscribers;

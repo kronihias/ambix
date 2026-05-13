@@ -53,13 +53,12 @@ NetworkAdvertiser::NetworkAdvertiser()
     // never hits the wire. Real user sessions always outlive this window.
     advertiseAfter = juce::Time::getCurrentTime() + juce::RelativeTime::seconds (2.0);
 
-    visualizerList = std::make_unique<juce::NetworkServiceDiscovery::AvailableServiceList> (
-        kVisualizerUID, kBroadcastPort);
-    visualizerList->onChange = [this]()
-    {
-        if (reconcileWithVisualizers())
-            sendChangeMessage();
-    };
+    visualizerSub = ambix::net::DiscoveryHub::instance().subscribe (
+        kVisualizerUID, kBroadcastPort,
+        [this]() {
+            if (reconcileWithVisualizers())
+                sendChangeMessage();
+        });
 
     startTimerHz (2); // drives reconcile + lastSeen refresh in UI
 }
@@ -67,9 +66,7 @@ NetworkAdvertiser::NetworkAdvertiser()
 NetworkAdvertiser::~NetworkAdvertiser()
 {
     stopTimer();
-    if (visualizerList != nullptr)
-        visualizerList->onChange = nullptr;
-    visualizerList.reset();
+    visualizerSub.reset();
     advertiser.reset();
 }
 
@@ -167,9 +164,8 @@ bool NetworkAdvertiser::addSubscriber (const juce::String& uuid,
 
 juce::String NetworkAdvertiser::lookupVisualizerIpByUuid (const juce::String& uuid) const
 {
-    if (visualizerList == nullptr)
-        return {};
-    const auto services = visualizerList->getServices();
+    const auto services = ambix::net::DiscoveryHub::instance()
+                                .getServices (kVisualizerUID, kBroadcastPort);
     for (const auto& svc : services)
     {
         const auto fields = parseDescription (svc.description);
@@ -202,10 +198,8 @@ std::vector<NetworkAdvertiser::Subscriber> NetworkAdvertiser::getSubscribers() c
 
 bool NetworkAdvertiser::reconcileWithVisualizers()
 {
-    if (visualizerList == nullptr)
-        return false;
-
-    const auto services = visualizerList->getServices();
+    const auto services = ambix::net::DiscoveryHub::instance()
+                                .getServices (kVisualizerUID, kBroadcastPort);
 
     // Build (uuid → ip) for currently advertised visualizers.
     std::map<juce::String, juce::String> uuidToIp;

@@ -105,6 +105,15 @@ IF(WITH_LegendreU)
 	LIST ( APPEND HEADER ${SRC_DIR}/common/LegendreU/LegendreU.h)
 ENDIF(WITH_LegendreU)
 
+# DiscoveryHub: process-wide NSD AvailableServiceList singleton so multiple
+# plugin instances in the same DAW share one broadcast listener. Required
+# for reliable peer discovery on macOS, where SO_REUSEADDR doesn't actually
+# split inbound broadcasts across all bound sockets in the same process.
+IF(WITH_DISCOVERY_HUB)
+	LIST ( APPEND SOURCE ${SRC_DIR}/common/DiscoveryHub.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/DiscoveryHub.h)
+ENDIF(WITH_DISCOVERY_HUB)
+
 
 #SORT IT
 LIST ( SORT SOURCE )
