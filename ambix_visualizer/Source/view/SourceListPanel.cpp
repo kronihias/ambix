@@ -483,19 +483,34 @@ juce::String SourceListPanel::lookupProjectFor (const EncoderSource& s) const
     if (s.origin != EncoderOrigin::Ambix && s.origin != EncoderOrigin::AmbixSource)
         return {};
 
-    // Match on (senderIp, encoder's advertised listen port). The NSD record
-    // carries the encoder's OSC listen port as `enc.port`, which matches the
-    // visualizer's `replyPort` for the same plugin instance. Matching on
-    // encoderId alone would fail whenever two DAWs each assign id=1 to their
-    // first encoder on the same host — port is genuinely unique per instance.
-    // Fall back to id-matching for rows with replyPort==0 (legacy 8-arg
-    // /ambi_enc broadcasters that never advertise a port).
+    // Primary: match on (senderIp, encoder's listen port). Robust against
+    // multi-instance hosts where port disambiguates plugins on the same IP.
     for (const auto& enc : encoderCache)
     {
-        if (enc.ip.toString() != s.senderIp)
-            continue;
-        if (s.replyPort > 0 ? (enc.port == s.replyPort)
-                            : (enc.encoderId == s.id))
+        if (enc.ip.toString() == s.senderIp
+            && s.replyPort > 0
+            && enc.port == s.replyPort)
+            return enc.project;
+    }
+
+    // Fallback for multi-interface same-host setups: the encoder may
+    // broadcast NSD from one local interface (e.g. a VM bridge at
+    // 192.168.64.1) but send OSC unicast from another (192.168.1.14, the
+    // user's actual LAN). senderIp won't match enc.ip then. The listen
+    // port is still unique per plugin instance, so port-only match is the
+    // next-best signal — match on it for any encoder with the same port.
+    if (s.replyPort > 0)
+    {
+        for (const auto& enc : encoderCache)
+            if (enc.port == s.replyPort)
+                return enc.project;
+    }
+
+    // Final fallback for legacy 8-arg /ambi_enc broadcasters that never
+    // advertise a port: match by (senderIp, encoder id).
+    for (const auto& enc : encoderCache)
+    {
+        if (enc.ip.toString() == s.senderIp && enc.encoderId == s.id)
             return enc.project;
     }
     return {};
