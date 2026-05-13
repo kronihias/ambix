@@ -521,6 +521,16 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
         const String sub = tail.substring (slashPos + 1);
         const float v = firstFloat (0.f);
 
+        // Azimuth wraps modulo 360° at any boundary — clamping would freeze
+        // the constellation as soon as the centre crosses ±180°. Elevation
+        // doesn't wrap (it's bounded by the poles), so we just clamp it.
+        auto wrapAz = [] (float deg)
+        {
+            while (deg >   180.f) deg -= 360.f;
+            while (deg <= -180.f) deg += 360.f;
+            return deg;
+        };
+
         if (isLinked())
         {
             // The visualizer sends per-source OSC for every puck it draws,
@@ -537,7 +547,7 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
 
             if (sub == "azimuth")
             {
-                const float newCentreAz = v - offsetDeg;
+                const float newCentreAz = wrapAz (v - offsetDeg);
                 setParameterNotifyingHost (this, AzimuthParam,
                                            jlimit (0.f, 1.f, (newCentreAz + 180.f) / 360.f));
             }
@@ -558,7 +568,7 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
         // Unlinked: each source has its own params.
         if (sub == "azimuth")
             setParameterNotifyingHost (this, sourceParamIndex (idx, SrcAz),
-                                       jlimit(0.f, 1.f, (v + 180.f) / 360.f));
+                                       jlimit(0.f, 1.f, (wrapAz (v) + 180.f) / 360.f));
         else if (sub == "elevation")
             // Per-source elevation uses the same [0,1] → [-180°, +180°]
             // encoding as azimuth — the physical range is ±90° but the
