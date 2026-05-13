@@ -82,9 +82,6 @@ private:
     Label        lbl_subscribers;
     void refreshSubscribersLabel();
 
-    // Extended OSC (per-source addresses + meters)
-    ToggleButton tgl_extended;
-
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Settings)

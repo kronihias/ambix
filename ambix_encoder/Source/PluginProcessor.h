@@ -186,13 +186,11 @@ public:
     void oscOut(bool arg);
     void oscIn (bool arg);
     void setDiscoverable (bool arg);
-    void setExtendedOscOut (bool arg);
 
     void changeTimer(int time);
 
     bool osc_in;
     bool osc_out;
-    bool osc_extended_out; // emit per-source /ambix_encoder/... (incl. meters)
     int osc_interval;
 
     String osc_in_port, osc_out_ip, osc_out_port;

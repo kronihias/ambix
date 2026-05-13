@@ -121,7 +121,6 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
 #if WITH_OSC
     osc_in        = false;
     osc_out       = false;
-    osc_extended_out = true;          // on by default — gated by osc_out anyway
     osc_in_port   = "0";
     osc_out_ip    = "localhost";
     osc_out_port  = "7130";
@@ -312,9 +311,10 @@ void Ambix_encoderAudioProcessor::timerCallback()
     const bool meterChanged = (std::abs (_rms - rms) > kMeterThreshold ||
                                 std::abs (_dpk - dpk) > kMeterThreshold);
 
-    // For extended OSC we always tick — per-source meters fluctuate.
-    if (posChanged || meterChanged || osc_extended_out)
-        sendOSC();
+    // Always tick — per-source meters fluctuate and the extended OSC path
+    // streams them continuously to subscribed visualizers.
+    (void) posChanged; (void) meterChanged;
+    sendOSC();
 }
 
 void Ambix_encoderAudioProcessor::pollReaperProject()
@@ -354,10 +354,8 @@ void Ambix_encoderAudioProcessor::sendOSC()
     // Extended OSC: per-source positions + meters under /ambix_encoder/...
     // Sent to every entry in oscSenders (manual + NSD subscribers) so a
     // visualizer that auto-subscribed sees the individual sources, not just
-    // the legacy /ambi_enc centre puck. Gated only on the extended-out
-    // toggle; the destination list itself is the on/off switch for the
-    // manual + discovery paths.
-    if (osc_extended_out)
+    // the legacy /ambi_enc centre puck. The destination list itself is the
+    // on/off switch.
     {
         const int active = getActiveSources();
 
@@ -627,12 +625,6 @@ void Ambix_encoderAudioProcessor::setDiscoverable (bool arg)
     refreshAdvertiser();
     refreshOscReceiverBinding();
     refreshOscOutput();
-}
-
-void Ambix_encoderAudioProcessor::setExtendedOscOut (bool arg)
-{
-    osc_extended_out = arg;
-    sendChangeMessage();
 }
 
 void Ambix_encoderAudioProcessor::refreshOscReceiverBinding()
@@ -948,7 +940,6 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
 #if WITH_OSC
     xml.setAttribute ("osc_out",          osc_out);
     xml.setAttribute ("osc_in",           osc_in);
-    xml.setAttribute ("osc_extended_out", osc_extended_out);
     xml.setAttribute ("osc_out_ip",       osc_out_ip);
     xml.setAttribute ("osc_out_port",     osc_out_port);
     xml.setAttribute ("osc_out_interval", osc_interval);
@@ -975,7 +966,6 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
 #if WITH_OSC
         const bool new_osc_out      = xmlState->getBoolAttribute   ("osc_out",          osc_out);
         const bool new_osc_in       = xmlState->getBoolAttribute   ("osc_in",           osc_in);
-        const bool new_ext          = xmlState->getBoolAttribute   ("osc_extended_out", osc_extended_out);
         const String new_ip         = xmlState->getStringAttribute ("osc_out_ip",       osc_out_ip);
         const String new_port       = xmlState->getStringAttribute ("osc_out_port",     osc_out_port);
         const int  new_interval     = xmlState->getIntAttribute    ("osc_out_interval", osc_interval);
@@ -983,7 +973,6 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
 
         osc_out_ip   = new_ip;
         osc_out_port = new_port;
-        osc_extended_out = new_ext;
         if (new_interval > 0)
             changeTimer (new_interval);
 
