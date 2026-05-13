@@ -515,24 +515,39 @@ void Ambix_encoderAudioProcessorEditor::resized()
     sld_az.setVisible (linked);
     sld_el.setVisible (linked);
 
-    const int sliderW   = linked ? 36 : 0;
-    const int sliderGap = linked ?  6 : 0;
-    const int azSliderH = linked ? 32 : 0;  // horizontal slider + padding
+    const int sliderW    = linked ? 36 : 0;
+    const int sliderGap  = linked ?  6 : 0;
+    const int sliderPad  = linked ?  8 : 0;
+    const int azSliderH  = linked ? 32 : 0;  // horizontal slider + padding
 
-    const int pannerLeft  = 12;
-    const int pannerRight = pannerLeft + panelW - sliderW - (linked ? 8 : 0);
-    const int pannerSize  = juce::jmin (pannerRight - pannerLeft,
-                                         contentHeight - azSliderH);
-    const int pannerY     = contentTop + (contentHeight - azSliderH - pannerSize) / 2;
+    const int pannerLeft = 12;
+    const int availW = panelW - sliderW - sliderGap - sliderPad;
+    const int availH = contentHeight - azSliderH;
 
-    sphere_opengl.setBounds (pannerLeft, pannerY, pannerSize, pannerSize);
-    hammer_view  .setBounds (pannerLeft, pannerY, pannerSize, (int)(pannerSize * 0.55f));
+    // Sphere is square; Hammer-Aitoff is 2:1 (wider than tall). Pick the
+    // largest rectangle of the appropriate aspect ratio that fits in the
+    // available area so neither view leaves a chunk of empty space.
+    int pannerW, pannerH;
+    if (_hammerView)
+    {
+        pannerW = juce::jmin (availW, 2 * availH);
+        pannerH = pannerW / 2;
+    }
+    else
+    {
+        pannerW = pannerH = juce::jmin (availW, availH);
+    }
+
+    const int pannerY = contentTop + (availH - pannerH) / 2;
+
+    sphere_opengl.setBounds (pannerLeft, pannerY, pannerW, pannerH);
+    hammer_view  .setBounds (pannerLeft, pannerY, pannerW, pannerH);
 
     if (linked)
     {
-        sld_el.setBounds (pannerLeft + pannerSize + sliderGap, pannerY, sliderW, pannerSize);
-        sld_az.setBounds (pannerLeft, pannerY + pannerSize + 4,
-                          pannerSize + sliderW + sliderGap, 28);
+        sld_el.setBounds (pannerLeft + pannerW + sliderGap, pannerY, sliderW, pannerH);
+        sld_az.setBounds (pannerLeft, pannerY + pannerH + 4,
+                          pannerW + sliderW + sliderGap, 28);
     }
 
     // Table on the right
@@ -705,11 +720,13 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
     {
         _hammerView = false;
         updateActivePanner();
+        resized();   // panner aspect ratio differs between Sphere (1:1) and H-A (2:1)
     }
     else if (buttonThatWasClicked == &btn_view_hammer)
     {
         _hammerView = true;
         updateActivePanner();
+        resized();
     }
     else if (buttonThatWasClicked == &btn_linked_toggle)
     {
