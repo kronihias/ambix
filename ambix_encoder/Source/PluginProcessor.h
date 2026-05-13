@@ -289,7 +289,21 @@ private:
     bool receiverBound { false };
 
     CriticalSection oscSenders_lock;
-    OwnedArray<OSCSender> oscSenders;
+
+    // Wraps an OSCSender alongside its destination so rebuildOscSenders can
+    // reconcile the desired list against the existing senders by (ip, port)
+    // and KEEP the existing OSCSender object (and its ephemeral source UDP
+    // port) when a destination is still wanted. Recreating an OSCSender
+    // every rebuild would shift the OS-assigned source port each time —
+    // visualizer side keys per-source pucks on senderIp:senderPort, so a
+    // shifting port spawns a new puck on every rebuild.
+    struct OscDest
+    {
+        juce::String ip;
+        int port { 0 };
+        std::unique_ptr<juce::OSCSender> sender;
+    };
+    OwnedArray<OscDest> oscSenders;
 #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_encoderAudioProcessor)

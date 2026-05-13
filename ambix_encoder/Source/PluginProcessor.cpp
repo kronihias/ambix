@@ -348,7 +348,7 @@ void Ambix_encoderAudioProcessor::sendOSC()
 
         const ScopedLock sl (oscSenders_lock);
         for (int i = 0; i < oscSenders.size(); i++)
-            oscSenders.getUnchecked(i)->send (mymsg);
+            oscSenders.getUnchecked(i)->sender->send (mymsg);
     }
 
     // Extended OSC: per-source positions + meters under /ambix_encoder/...
@@ -367,13 +367,13 @@ void Ambix_encoderAudioProcessor::sendOSC()
                 OSCMessage m ("/ambix_encoder/linked");
                 m.addInt32 (isLinked() ? 1 : 0);
                 for (int i = 0; i < oscSenders.size(); i++)
-                    oscSenders.getUnchecked(i)->send (m);
+                    oscSenders.getUnchecked(i)->sender->send (m);
             }
             {
                 OSCMessage m ("/ambix_encoder/active_sources");
                 m.addInt32 (active);
                 for (int i = 0; i < oscSenders.size(); i++)
-                    oscSenders.getUnchecked(i)->send (m);
+                    oscSenders.getUnchecked(i)->sender->send (m);
             }
             if (isLinked())
             {
@@ -387,7 +387,7 @@ void Ambix_encoderAudioProcessor::sendOSC()
                 s.addFloat32 (size_param);
                 for (int i = 0; i < oscSenders.size(); i++)
                 {
-                    auto* snd = oscSenders.getUnchecked(i);
+                    auto* snd = oscSenders.getUnchecked(i)->sender.get();
                     snd->send (a); snd->send (e); snd->send (w); snd->send (s);
                 }
             }
@@ -408,7 +408,7 @@ void Ambix_encoderAudioProcessor::sendOSC()
 
                 for (int i = 0; i < oscSenders.size(); i++)
                 {
-                    auto* snd = oscSenders.getUnchecked(i);
+                    auto* snd = oscSenders.getUnchecked(i)->sender.get();
                     snd->send (az); snd->send (el); snd->send (sz);
                     snd->send (mt);
                 }
@@ -683,7 +683,14 @@ void Ambix_encoderAudioProcessor::refreshOscOutput()
 
 void Ambix_encoderAudioProcessor::rebuildOscSenders()
 {
-    OwnedArray<OSCSender> newSenders;
+    // Build the desired (ip, port) list first, then reconcile against the
+    // existing senders. Keeping an OSCSender alive across rebuilds preserves
+    // its OS-assigned source port — the visualizer keys its AmbixSource
+    // pucks on senderIp:senderPort, so a shifting port (e.g. due to
+    // /ambi_enc_subscribe heartbeats triggering this function) would
+    // duplicate the puck on every refresh.
+    struct Wanted { juce::String ip; int port; };
+    std::vector<Wanted> wanted;
 
     if (osc_out)
     {
@@ -702,10 +709,7 @@ void Ambix_encoderAudioProcessor::rebuildOscSenders()
                 tmp_ip = "127.0.0.1";
 
             if (tmp_ip.isNotEmpty() && tmp_port.getIntValue() > 0)
-            {
-                newSenders.add (new OSCSender());
-                newSenders.getLast()->connect (tmp_ip, tmp_port.getIntValue());
-            }
+                wanted.push_back ({ tmp_ip, tmp_port.getIntValue() });
 
             tmp_out_ips   = tmp_out_ips.fromFirstOccurrenceOf   (";", false, false).trim();
             tmp_out_ports = tmp_out_ports.fromFirstOccurrenceOf (";", false, false).trim();
@@ -718,15 +722,43 @@ void Ambix_encoderAudioProcessor::rebuildOscSenders()
         {
             if (sub.ip.isEmpty() || sub.port <= 0)
                 continue;
-            newSenders.add (new OSCSender());
-            newSenders.getLast()->connect (sub.ip, sub.port);
+            wanted.push_back ({ sub.ip, sub.port });
         }
     }
 
+    // Reconcile: for each desired destination either reuse the existing
+    // sender (preserving its source port) or create a new one. Anything left
+    // in the old list is dropped on scope exit.
+    OwnedArray<OscDest> newSenders;
     {
         const ScopedLock sl (oscSenders_lock);
+        for (const auto& w : wanted)
+        {
+            std::unique_ptr<juce::OSCSender> takenSender;
+            for (int i = 0; i < oscSenders.size(); ++i)
+            {
+                auto* existing = oscSenders.getUnchecked (i);
+                if (existing != nullptr && existing->ip == w.ip && existing->port == w.port)
+                {
+                    takenSender = std::move (existing->sender);
+                    oscSenders.remove (i, true);
+                    break;
+                }
+            }
+            if (takenSender == nullptr)
+            {
+                takenSender = std::make_unique<juce::OSCSender>();
+                takenSender->connect (w.ip, w.port);
+            }
+            auto* dest = new OscDest();
+            dest->ip = w.ip;
+            dest->port = w.port;
+            dest->sender = std::move (takenSender);
+            newSenders.add (dest);
+        }
         oscSenders.swapWith (newSenders);
     }
+    // newSenders now owns the now-unwanted destinations; destructed on exit.
 
     sendChangeMessage();
 }
