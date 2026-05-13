@@ -940,17 +940,37 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
         }
     }
 
-    // per-source meters (read pre-encoding source level)
+    // per-source meters (read pre-encoding source level). Compute the
+    // block's mean-square ourselves and feed it through a ~300 ms EMA so
+    // block-to-block RMS variation for pink noise / music doesn't show up
+    // as visible flicker in the visualizer.
+    constexpr float kMeterTauSec = 0.3f;
+    const float blockDt = (float) NumSamples / (float) SampleRate;
+    const float emaAlpha = std::exp (-blockDt / kMeterTauSec);
     for (int s = 0; s < kMaxSources; ++s)
     {
         if (s < active)
         {
+            // Keep the legacy MyMeterDsp running too — its peak-hold + fast-
+            // attack ballistics still drive the legacy /ambi_enc meter. The
+            // smoothed-RMS value below is what feeds the per-source meter.
             sourceMeterDsp.getUnchecked(s)
                 ->calc ((float*) InputBuffer.getReadPointer(s), NumSamples);
-            source_meter[s].store (sourceMeterDsp.getUnchecked(s)->getRMS());
+
+            const float* p = InputBuffer.getReadPointer (s);
+            double sumSq = 0.0;
+            for (int i = 0; i < NumSamples; ++i)
+                sumSq += (double) p[i] * (double) p[i];
+            const float blockMs = (float) (sumSq / juce::jmax (1, NumSamples));
+
+            float ms = source_meter_ema[s];
+            ms = emaAlpha * ms + (1.f - emaAlpha) * blockMs;
+            source_meter_ema[s] = ms;
+            source_meter[s].store (std::sqrt (ms));
         }
         else
         {
+            source_meter_ema[s] = 0.f;
             source_meter[s].store (0.f);
         }
     }

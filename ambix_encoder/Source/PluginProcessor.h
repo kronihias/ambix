@@ -281,8 +281,13 @@ private:
     float rms;
     float dpk;
 
-    // per-source meter snapshot (lock-free single-writer)
+    // per-source meter snapshot (lock-free single-writer). Updated each
+    // audio block from a ~300 ms-time-constant EMA of the source input's
+    // mean-square — block-RMS alone visibly flickers for pink noise / music
+    // because block boundaries (typically 64–512 samples) are well below
+    // the signal's macroscopic energy time constant.
     std::array<std::atomic<float>, kMaxSources> source_meter {};
+    std::array<float,              kMaxSources> source_meter_ema {};
 
 #if WITH_OSC
     OSCReceiver oscReceiver;
