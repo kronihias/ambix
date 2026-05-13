@@ -510,7 +510,7 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
         return;
     }
 
-    // Per-source: /ambix_encoder/source/<n>/{azimuth|elevation|size|gain}
+    // Per-source: /ambix_encoder/source/<n>/{azimuth|elevation|size}
     if (address.startsWith ("/ambix_encoder/source/"))
     {
         const String tail = address.substring (juce::String("/ambix_encoder/source/").length());
@@ -523,6 +523,41 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
         const String sub = tail.substring (slashPos + 1);
         const float v = firstFloat (0.f);
 
+        if (isLinked())
+        {
+            // The visualizer sends per-source OSC for every puck it draws,
+            // but in linked mode there's no such thing as a "per-source" az
+            // or el — every source lives at globalAz + offset(idx). Translate
+            // the per-source write into a global one so the whole constellation
+            // shifts and the dragged source lands where the user expects.
+            const int active = getActiveSources();
+            const float widthDeg = width_param * 360.f;
+            float offsetDeg = 0.f;
+            if (active > 1)
+                offsetDeg = (float) idx * widthDeg / (float)(active - 1)
+                          - widthDeg / 2.f;
+
+            if (sub == "azimuth")
+            {
+                const float newCentreAz = v - offsetDeg;
+                setParameterNotifyingHost (this, AzimuthParam,
+                                           jlimit (0.f, 1.f, (newCentreAz + 180.f) / 360.f));
+            }
+            else if (sub == "elevation")
+            {
+                // All linked sources share elevation, so the dragged value
+                // *is* the new global elevation.
+                setParameterNotifyingHost (this, ElevationParam,
+                                           jlimit (0.f, 1.f, (v + 180.f) / 360.f));
+            }
+            else if (sub == "size")
+            {
+                setParameterNotifyingHost (this, SizeParam, jlimit (0.f, 1.f, v));
+            }
+            return;
+        }
+
+        // Unlinked: each source has its own params.
         if (sub == "azimuth")
             setParameterNotifyingHost (this, sourceParamIndex (idx, SrcAz),
                                        jlimit(0.f, 1.f, (v + 180.f) / 360.f));
