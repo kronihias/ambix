@@ -255,37 +255,70 @@ const String Ambix_encoderAudioProcessor::getParameterLabel(int index)
 #if WITH_ADVANCED_CONTROL
 void Ambix_encoderAudioProcessor::calcNewParameters(double SampleRate, int BufferLength)
 {
-    double factor = (double)BufferLength/SampleRate;
-    float speed_fact2 = (float)factor * 0.002777777f;
+    const double factor = (double)BufferLength/SampleRate;
+    const float speed_fact2 = (float)factor * 0.002777777f;
+    const float deg_sec     = speed_param*360.f;
 
-    float deg_sec = speed_param*360.f;
-
-    float newval = 0.f;
-
-    if ((azimuth_mv_param < 0.48f) || (azimuth_mv_param > 0.52f))
+    // Compute az/el deltas in [0,1] param-space units. The dead-zone around
+    // the centre detents (0.48..0.52 az / 0.45..0.55 el) is kept identical
+    // to the original linked-mode behaviour.
+    float dAz = 0.f;
+    bool  moveAz = false;
+    if (azimuth_mv_param < 0.48f)
     {
-        if (azimuth_mv_param < 0.48f)
-            newval = azimuth_param - powf(deg_sec, (0.48f - azimuth_mv_param)*2.0833333f) * speed_fact2;
-
-        if (azimuth_mv_param > 0.52f)
-            newval = azimuth_param + powf(deg_sec, (azimuth_mv_param - 0.52f)*2.0833333f) * speed_fact2;
-
-        if (newval < 0.f) newval = 1.f;
-        if (newval > 1.f) newval = 0.f;
-        setParameterNotifyingHost(this, AzimuthParam, newval);
+        dAz = -powf (deg_sec, (0.48f - azimuth_mv_param) * 2.0833333f) * speed_fact2;
+        moveAz = true;
+    }
+    else if (azimuth_mv_param > 0.52f)
+    {
+        dAz =  powf (deg_sec, (azimuth_mv_param - 0.52f) * 2.0833333f) * speed_fact2;
+        moveAz = true;
     }
 
-    if ((elevation_mv_param <= 0.45f) || (elevation_mv_param >= 0.55f))
+    float dEl = 0.f;
+    bool  moveEl = false;
+    if (elevation_mv_param <= 0.45f)
     {
-        if (elevation_mv_param <= 0.45f)
-            newval = elevation_param - powf(deg_sec, (0.45f - elevation_mv_param)*2.22222f) * speed_fact2;
+        dEl = -powf (deg_sec, (0.45f - elevation_mv_param) * 2.22222f) * speed_fact2;
+        moveEl = true;
+    }
+    else if (elevation_mv_param >= 0.55f)
+    {
+        dEl =  powf (deg_sec, (elevation_mv_param - 0.55f) * 2.22222f) * speed_fact2;
+        moveEl = true;
+    }
 
-        if (elevation_mv_param >= 0.55f)
-            newval = elevation_param + powf(deg_sec, (elevation_mv_param - 0.55f)*2.22222f) * speed_fact2;
+    auto wrap01 = [] (float v)
+    {
+        if (v < 0.f) v += 1.f;
+        if (v > 1.f) v -= 1.f;
+        return v;
+    };
 
-        if (newval < 0.f) newval = 1.f;
-        if (newval > 1.f) newval = 0.f;
-        setParameterNotifyingHost(this, ElevationParam, newval);
+    if (isLinked())
+    {
+        // Original behaviour: drive global az/el so the linked-mode auto-
+        // spread rotates as a whole.
+        if (moveAz)
+            setParameterNotifyingHost (this, AzimuthParam,   wrap01 (azimuth_param   + dAz));
+        if (moveEl)
+            setParameterNotifyingHost (this, ElevationParam, wrap01 (elevation_param + dEl));
+    }
+    else
+    {
+        // Unlinked: apply the same delta to every active source so the
+        // group translates as a constellation, preserving the relative
+        // positions the user set up.
+        const int active = getActiveSources();
+        for (int i = 0; i < active; ++i)
+        {
+            if (moveAz)
+                setParameterNotifyingHost (this, sourceParamIndex (i, SrcAz),
+                                           wrap01 (source_params[i].az + dAz));
+            if (moveEl)
+                setParameterNotifyingHost (this, sourceParamIndex (i, SrcEl),
+                                           wrap01 (source_params[i].el + dEl));
+        }
     }
 }
 #endif
