@@ -93,8 +93,7 @@ public:
 
 
 class SphereOpenGL : public Component,
-                    public OpenGLRenderer,
-                    private juce::Timer
+                    public OpenGLRenderer
 {
 
 public:
@@ -105,21 +104,9 @@ public:
     void newOpenGLContextCreated();
     void openGLContextClosing();
 
-    void paint (juce::Graphics& g) override;
-
     void mouseDown (const MouseEvent& e);
     void mouseUp (const MouseEvent& e);
     void mouseDrag (const MouseEvent& e);
-
-private:
-    // Periodically invalidates the JUCE component-painting cache so the
-    // source-number overlay tracks the live source positions. With
-    // setComponentPaintingEnabled(true), JUCE only re-runs paint() when
-    // the component itself requests a repaint — continuous GL frames
-    // don't trigger that on their own.
-    void timerCallback() override { repaint(); }
-
-public:
 
     Ambix_encoderAudioProcessor* processor;
 
@@ -138,6 +125,14 @@ private:
     float _dragStartDistToCenter = 0.f;
 
     int   _draggingSource = -1; // unlinked mode per-source drag
+
+    // Pre-rendered "1", "2", ... textures used by renderOpenGL to label
+    // sources directly in OpenGL — avoids JUCE's component-painting cache
+    // (which doesn't auto-invalidate during continuous GL repainting) and
+    // keeps the labels glued to the moving source dots every frame.
+    juce::OwnedArray<juce::OpenGLTexture> labelTextures;
+    void buildLabelTextures();
+    void releaseLabelTextures();
 };
 
 

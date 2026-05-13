@@ -33,17 +33,12 @@ SphereOpenGL::SphereOpenGL() :
     sphere_source_small(0.05f, 12, 12)
 {
     openGLContext.setRenderer (this);
-    // Enable JUCE component painting on top of the GL framebuffer so paint()
-    // can overlay source-number labels on each puck.
-    openGLContext.setComponentPaintingEnabled (true);
+    // Source-number labels are drawn directly in renderOpenGL using
+    // pre-rendered textures, so JUCE doesn't need to composite anything
+    // over the framebuffer.
+    openGLContext.setComponentPaintingEnabled (false);
     openGLContext.setContinuousRepainting(true);
     openGLContext.attachTo (*this);
-
-    // setContinuousRepainting drives the GL renderer continuously but the
-    // component-paint cache only refreshes when JUCE thinks something
-    // changed. Drive it ourselves so the source-number labels track the
-    // live source positions.
-    startTimerHz (30);
 
     setSize(240,240);
 }
@@ -133,10 +128,93 @@ void SphereOpenGL::renderOpenGL()
     // back hemisphere too.
     glColor4f(0.89f, 0.89f, 0.9f, 0.7f);
     sphere.draw(0, 0, 0);
+
+    // Source-number labels: textured quads drawn at each source's projected
+    // position. Done in GL (no JUCE paint cache) so they redraw with the
+    // dots every frame, no timer needed.
+    if (processor && ! labelTextures.isEmpty())
+    {
+        const int active = processor->getActiveSources();
+
+        glDisable (GL_LIGHTING);
+        glDisable (GL_DEPTH_TEST);
+        glEnable (GL_TEXTURE_2D);
+        glColor4f (1.f, 1.f, 1.f, 1.f); // texture's own ARGB drives colour
+
+        // Quad half-size in clip space — small enough to read but not so
+        // big it covers the dot. Tied to the sphere_source radius (0.1)
+        // so the label scales with the visible source dots.
+        constexpr float kLabelHalf = 0.085f;
+
+        for (int i = 0; i < active && i < labelTextures.size(); ++i)
+        {
+            const auto pos = processor->getSourceDisplayPos (i);
+            const float az = pos.azDeg * (float) DEG2RAD;
+            const float el = pos.elDeg * (float) DEG2RAD;
+            const float x = 0.9f * sinf (az) * cosf (el);
+            const float y = 0.9f * cosf (az) * cosf (el);
+            // Push slightly toward camera so the label sits on top of the
+            // dot even with depth-test disabled (also fine if test re-
+            // enabled later).
+            const float z = 0.9f * sinf (el) + 0.05f;
+
+            labelTextures.getUnchecked (i)->bind();
+            glBegin (GL_QUADS);
+                glTexCoord2f (0.f, 1.f); glVertex3f (x - kLabelHalf, y - kLabelHalf, z);
+                glTexCoord2f (1.f, 1.f); glVertex3f (x + kLabelHalf, y - kLabelHalf, z);
+                glTexCoord2f (1.f, 0.f); glVertex3f (x + kLabelHalf, y + kLabelHalf, z);
+                glTexCoord2f (0.f, 0.f); glVertex3f (x - kLabelHalf, y + kLabelHalf, z);
+            glEnd();
+        }
+
+        glBindTexture (GL_TEXTURE_2D, 0);
+        glDisable (GL_TEXTURE_2D);
+        glEnable (GL_DEPTH_TEST);
+        glEnable (GL_LIGHTING);
+    }
 }
 
-void SphereOpenGL::newOpenGLContextCreated() {}
-void SphereOpenGL::openGLContextClosing() {}
+void SphereOpenGL::newOpenGLContextCreated()
+{
+    // Textures must be created with a live GL context — defer until here.
+    buildLabelTextures();
+}
+
+void SphereOpenGL::openGLContextClosing()
+{
+    releaseLabelTextures();
+}
+
+void SphereOpenGL::buildLabelTextures()
+{
+    releaseLabelTextures();
+
+    // One texture per possible source number. Pre-rendered with JUCE's
+    // font into a small ARGB image, then uploaded via OpenGLTexture.
+    constexpr int kTexSize = 64;
+    const int maxLabels = Ambix_encoderAudioProcessor::kMaxSources;
+
+    for (int n = 1; n <= maxLabels; ++n)
+    {
+        juce::Image img (juce::Image::ARGB, kTexSize, kTexSize, true);
+        {
+            juce::Graphics g (img);
+            g.setColour (juce::Colours::black);
+            g.setFont (juce::Font (juce::FontOptions { kTexSize * 0.55f, juce::Font::bold }));
+            g.drawText (juce::String (n),
+                        0, 0, kTexSize, kTexSize,
+                        juce::Justification::centred);
+        }
+        auto* tex = new juce::OpenGLTexture();
+        tex->loadImage (img);
+        labelTextures.add (tex);
+    }
+}
+
+void SphereOpenGL::releaseLabelTextures()
+{
+    labelTextures.clear();
+}
 
 namespace
 {
@@ -148,34 +226,6 @@ namespace
     inline float sphereRadiusPx (const juce::Component& c) noexcept
     {
         return 0.9f * (float) juce::jmin (c.getWidth(), c.getHeight()) * 0.5f;
-    }
-}
-
-void SphereOpenGL::paint (juce::Graphics& g)
-{
-    // Overlay source numbers on top of the GL-rendered yellow dots so the
-    // user can tell sources apart at a glance — same convention as the
-    // Hammer-Aitoff view's per-puck label.
-    if (! processor) return;
-
-    const float sphereR = sphereRadiusPx (*this);
-    const int active = processor->getActiveSources();
-
-    g.setFont (juce::Font (juce::FontOptions { 11.f, juce::Font::bold }));
-
-    for (int i = 0; i < active; ++i)
-    {
-        const auto pos = processor->getSourceDisplayPos (i);
-        const float az = pos.azDeg * (float) DEG2RAD;
-        const float el = pos.elDeg * (float) DEG2RAD;
-        const float r_pixels = sphereR * cosf (el);
-        const float sx = (float) getWidth()  / 2.f + r_pixels * sinf (az);
-        const float sy = (float) getHeight() / 2.f - r_pixels * cosf (az);
-
-        g.setColour (juce::Colours::black);
-        g.drawText (juce::String (i + 1),
-                    (int)(sx - 10), (int)(sy - 7), 20, 14,
-                    juce::Justification::centred);
     }
 }
 
