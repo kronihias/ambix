@@ -174,6 +174,17 @@ void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
             if (d < bestD) { bestD = d; best = i; }
         }
         _draggingSource = best;
+
+        // Override the global-param snapshot with the picked source's
+        // actual position. mouseDrag's hemisphere logic keys off the sign
+        // of _mTheta — if the source is in the lower hemisphere but the
+        // global elevation_param is in the upper hemisphere (or vice
+        // versa), the first mouse-move flips the source across the
+        // equator. Initialising _mTheta/_mPhi from the source we just
+        // picked makes the drag start coherent with where the puck is.
+        const auto pos = processor->getSourceDisplayPos (best);
+        _mPhi   = pos.azDeg * (float) DEG2RAD;
+        _mTheta = pos.elDeg * (float) DEG2RAD;
     }
     else
     {
