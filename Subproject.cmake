@@ -109,6 +109,20 @@ ENDIF(WITH_LegendreU)
 #SORT IT
 LIST ( SORT SOURCE )
 
+# Local Network permission for plugins that talk to other ambix tools over
+# UDP / NSD (currently only ambix_encoder ↔ ambix_visualizer). Set the flag
+# before INCLUDE(Subproject.cmake) to opt the target into the macOS Local
+# Network privacy prompt — required for NSD broadcasts on macOS 14+ when
+# the plugin is run standalone. Inside a DAW host (Reaper/Logic) the host's
+# own NSLocalNetworkUsageDescription + granted permission is what matters,
+# but adding it here doesn't hurt and helps the BUILD_STANDALONE variant.
+if (WITH_LOCAL_NETWORK)
+    set (_LOCAL_NETWORK_ARGS
+        LOCAL_NETWORK_PERMISSION_ENABLED  TRUE
+        LOCAL_NETWORK_PERMISSION_TEXT     "Used to discover and stream OSC to other ambix tools (e.g. ambix Visualizer) on the local network."
+        PLIST_TO_MERGE                    "<key>NSBonjourServices</key><array><string>_ambix.encoder.v1._udp</string><string>_ambix.visualizer.v1._udp</string></array>")
+endif()
+
 juce_add_plugin (${SUBPROJECT_NAME}
     PLUGIN_MANUFACTURER_CODE Kron
     PLUGIN_CODE ${PLUGIN_CODE}
@@ -116,7 +130,8 @@ juce_add_plugin (${SUBPROJECT_NAME}
     PRODUCT_NAME ${SUBPROJECT_NAME}
     FORMATS ${_FORMATS}
     VERSION ${VERSION}
-    LV2URI http://www.matthiaskronlachner.com/${SUBPROJECT_NAME})
+    LV2URI http://www.matthiaskronlachner.com/${SUBPROJECT_NAME}
+    ${_LOCAL_NETWORK_ARGS})
 
 juce_generate_juce_header(${SUBPROJECT_NAME})
 

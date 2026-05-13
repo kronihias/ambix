@@ -1,6 +1,7 @@
 SET ( WITH_EIGEN TRUE )
 SET ( WITH_SphericalHarmonic TRUE )
 SET ( WITH_MyMeterDsp TRUE )
+SET ( WITH_LOCAL_NETWORK TRUE )  # enables NSLocalNetworkUsageDescription
 
 # MAX_INPUT_CHANNELS defaults to AMBI_CHANNELS (the SH coefficient count on
 # the output bus) inside PluginProcessor.h — 36 for fixed 5th-order, 64 for
