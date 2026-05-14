@@ -1125,6 +1125,12 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("discoverable",     discoverable);
 #endif
 
+    // Editor UI state — size + active view. Stored on the processor so it
+    // persists across editor close/reopen and across session saves.
+    xml.setAttribute ("editor_w",       editor_width);
+    xml.setAttribute ("editor_h",       editor_height);
+    xml.setAttribute ("editor_hammer",  editor_hammer_view);
+
     copyXmlToBinary (xml, destData);
 }
 
@@ -1162,6 +1168,12 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
         if (osc_out)
             refreshOscOutput();
 #endif
+
+        // Editor UI state — only restore if the saved value is sensible
+        // (a freshly-created session won't have these attributes).
+        editor_width       = xmlState->getIntAttribute  ("editor_w",      editor_width);
+        editor_height      = xmlState->getIntAttribute  ("editor_h",      editor_height);
+        editor_hammer_view = xmlState->getBoolAttribute ("editor_hammer", editor_hammer_view);
 
         applyParamsToEncoders();
     }

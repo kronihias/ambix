@@ -444,11 +444,17 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
 
     // Resize: the encoder editor scales the panner + table proportionally.
     // Minimum size keeps all controls legible; maximum is generous so a user
-    // who wants a giant panner gets one.
+    // who wants a giant panner gets one. Size + active-view are persisted
+    // on the processor so reopening the editor (or recalling a session)
+    // restores whatever the user left behind.
     resizeLimits.setSizeLimits (520, 420, 1400, 1200);
     addAndMakeVisible (resizer);
     setResizable (true, true);
-    setSize (640, 520);
+    _hammerView = ownerFilter->editor_hammer_view;
+    btn_view_sphere.setToggleState (! _hammerView, juce::dontSendNotification);
+    btn_view_hammer.setToggleState (  _hammerView, juce::dontSendNotification);
+    setSize (juce::jlimit (520, 1400, ownerFilter->editor_width),
+             juce::jlimit (420, 1200, ownerFilter->editor_height));
 
     ownerFilter->addChangeListener (this);
     ownerFilter->sendChangeMessage();
@@ -562,6 +568,13 @@ void Ambix_encoderAudioProcessorEditor::resized()
 {
     const int W = getWidth();
     const int H = getHeight();
+
+    // Persist the size on the processor so a close/reopen reads it back.
+    if (auto* proc = getProcessor())
+    {
+        proc->editor_width  = W;
+        proc->editor_height = H;
+    }
 
     // --- Header strip ---------------------------------------------------------
     btn_settings.setBounds (4, 4, 24, 24);
@@ -825,12 +838,14 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
     else if (buttonThatWasClicked == &btn_view_sphere)
     {
         _hammerView = false;
+        ourProcessor->editor_hammer_view = false;
         updateActivePanner();
         resized();   // panner aspect ratio differs between Sphere (1:1) and H-A (2:1)
     }
     else if (buttonThatWasClicked == &btn_view_hammer)
     {
         _hammerView = true;
+        ourProcessor->editor_hammer_view = true;
         updateActivePanner();
         resized();
     }

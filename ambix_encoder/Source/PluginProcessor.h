@@ -176,6 +176,14 @@ public:
     int m_id; // id of this instance
     static int s_ID; // global instance counter
 
+    // Editor UI state persisted in the plugin state so re-opening the
+    // editor (or recalling the session) restores window size + which
+    // panner was last visible. Defaults match the editor's initial
+    // setSize / view-toggle defaults.
+    int  editor_width      { 640 };
+    int  editor_height     { 520 };
+    bool editor_hammer_view { false };
+
 #if WITH_OSC
     void timerCallback() override; // call osc send in timer callback
 
