@@ -202,6 +202,12 @@ void SourceRegistry::applyAmbixSourceUpdate (const AmbixSourceUpdate& update)
                 }
                 break;
             }
+            case P::Mute:
+                src.muted = update.value >= 0.5f;
+                break;
+            case P::Solo:
+                src.soloed = update.value >= 0.5f;
+                break;
         }
 
         // If the legacy /ambi_enc puck for this plugin still exists from

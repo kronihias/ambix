@@ -55,6 +55,8 @@ namespace
         if (leaf == "size")      { outParam = Param::Size;      return true; }
         if (leaf == "rms")       { outParam = Param::Rms;       return true; }
         if (leaf == "peak")      { outParam = Param::Peak;      return true; }
+        if (leaf == "mute")      { outParam = Param::Mute;      return true; }
+        if (leaf == "solo")      { outParam = Param::Solo;      return true; }
         return false;
     }
 }

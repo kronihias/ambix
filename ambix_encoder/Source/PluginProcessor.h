@@ -122,7 +122,7 @@ public:
     // automation works regardless of the linked toggle, but only consulted when
     // unlinked.
     static constexpr int kMaxSources         = MAX_INPUT_CHANNELS;
-    static constexpr int kPerSourceParams    = 3;  // az, el, size
+    static constexpr int kPerSourceParams    = 5;  // az, el, size, mute, solo
     static constexpr int kBaseParams         = 13;
     static constexpr int kTotalParams        = kBaseParams + kMaxSources * kPerSourceParams;
 
@@ -144,7 +144,7 @@ public:
         SourceParamsBase = 13   // per-source params follow
     };
 
-    enum SourceSubParam { SrcAz = 0, SrcEl, SrcSize };
+    enum SourceSubParam { SrcAz = 0, SrcEl, SrcSize, SrcMute, SrcSolo };
 
     static constexpr int sourceParamIndex (int srcIdx, int sub)
     {
@@ -255,10 +255,12 @@ private:
     float linked_param;
     float num_active_sources_param;
 
-    // per-source params (azimuth, elevation, size), all stored in [0,1].
-    // Azimuth and elevation share the [0,1] → [-180°, +180°] encoding so
-    // mouse/OSC paths into both don't need a special case.
-    struct SourceParams { float az, el, size; };
+    // per-source params (azimuth, elevation, size, mute, solo). All stored
+    // in [0,1] so they're properly automatable. Azimuth/elevation share
+    // the [0,1] → [-180°, +180°] encoding; size is plain 0..1; mute/solo
+    // are booleans encoded as >0.5 = on. Mute/solo are orthogonal to
+    // position so they apply regardless of linked/unlinked mode.
+    struct SourceParams { float az, el, size, mute, solo; };
     std::array<SourceParams, kMaxSources> source_params;
 
     // last osc value sent (deltas only)

@@ -278,6 +278,8 @@ void MainComponent::handleIncoming (const OscListenerThread::IncomingMessage& ms
             case P::Size:      up.param = SrcParam::Size;      break;
             case P::Rms:       up.param = SrcParam::Rms;       break;
             case P::Peak:      up.param = SrcParam::Peak;      break;
+            case P::Mute:      up.param = SrcParam::Mute;      break;
+            case P::Solo:      up.param = SrcParam::Solo;      break;
             default: return; // global params: ignore
         }
         registry.applyAmbixSourceUpdate (up);

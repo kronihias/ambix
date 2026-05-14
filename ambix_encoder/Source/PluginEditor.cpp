@@ -38,10 +38,13 @@ namespace {
     }
 
     // Column-width ratios for the source table (sum = 1.0 nominal).
+    // The two right-most columns are fixed-pixel-width S/M buttons sitting
+    // outside this ratio — handled separately in the layout.
     constexpr float kColW_Num  = 0.12f;
-    constexpr float kColW_Az   = 0.32f;
+    constexpr float kColW_Az   = 0.30f;
     constexpr float kColW_El   = 0.28f;
-    constexpr float kColW_Size = 0.28f;
+    constexpr float kColW_Size = 0.26f;
+    constexpr int   kColW_SoloMute = 28; // px each; total 56 px fixed
     constexpr int   kRowHeight    = 22;
     constexpr int   kHeaderHeight = 18;
 }
@@ -83,6 +86,24 @@ SourceTableRow::SourceTableRow (Ambix_encoderAudioProcessor& p, int sourceIndex)
     setup (num_el,    -90.,  90., 1.,   juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")), "elevation (deg)");
     setup (num_size,    0.,   1., 0.01, juce::String(),                                     "size (0 = sharp, 1 = wide)");
 
+    // S / M toggles. Both work in linked AND unlinked mode — they don't
+    // depend on per-source positions.
+    auto setupBtn = [this] (juce::TextButton& b, const juce::String& text,
+                            const juce::String& tip, juce::Colour onColour)
+    {
+        addAndMakeVisible (b);
+        b.setButtonText (text);
+        b.setClickingTogglesState (true);
+        b.setTooltip (tip);
+        b.setColour (juce::TextButton::buttonOnColourId,  onColour);
+        b.setColour (juce::TextButton::buttonColourId,    juce::Colour (0x44000000));
+        b.setColour (juce::TextButton::textColourOnId,    juce::Colours::black);
+        b.setColour (juce::TextButton::textColourOffId,   juce::Colour (0xff999999));
+        b.addListener (this);
+    };
+    setupBtn (btn_solo, "S", "Solo this source (mutes all unsoloed sources)", juce::Colour (0xffe5c34a));
+    setupBtn (btn_mute, "M", "Mute this source",                              juce::Colour (0xffd06464));
+
     refreshFromProcessor();
 }
 
@@ -95,6 +116,12 @@ void SourceTableRow::refreshFromProcessor()
     num_az  .setValue (pos.azDeg, juce::dontSendNotification);
     num_el  .setValue (pos.elDeg, juce::dontSendNotification);
     num_size.setValue (pos.size,  juce::dontSendNotification);
+
+    using Proc = Ambix_encoderAudioProcessor;
+    const bool soloed = processor.getParameter (Proc::sourceParamIndex (idx, Proc::SrcSolo)) >= 0.5f;
+    const bool muted  = processor.getParameter (Proc::sourceParamIndex (idx, Proc::SrcMute)) >= 0.5f;
+    if (btn_solo.getToggleState() != soloed) btn_solo.setToggleState (soloed, juce::dontSendNotification);
+    if (btn_mute.getToggleState() != muted)  btn_mute.setToggleState (muted,  juce::dontSendNotification);
 }
 
 void SourceTableRow::setEditable (bool canEdit)
@@ -105,15 +132,25 @@ void SourceTableRow::setEditable (bool canEdit)
     num_az  .setEnabled (canEdit); num_az  .setAlpha (alpha);
     num_el  .setEnabled (canEdit); num_el  .setAlpha (alpha);
     num_size.setEnabled (canEdit); num_size.setAlpha (alpha);
+    // Solo/mute stay editable in linked mode — they're orthogonal to the
+    // position auto-spread, and you'd want to mute/solo individual sources
+    // even when the constellation moves as one.
 }
 
 void SourceTableRow::resized()
 {
     auto r = getLocalBounds();
-    const int total = r.getWidth();
-    const int wNum  = (int) (total * kColW_Num);
-    const int wAz   = (int) (total * kColW_Az);
-    const int wEl   = (int) (total * kColW_El);
+    // S/M buttons take a fixed pixel width on the right; remaining width is
+    // split between #/Az/El/Size by their ratios (renormalised since the
+    // four columns no longer need to sum to 1.0 of the full row width).
+    btn_mute.setBounds (r.removeFromRight (kColW_SoloMute).reduced (1, 2));
+    btn_solo.setBounds (r.removeFromRight (kColW_SoloMute).reduced (1, 2));
+
+    const int post = r.getWidth();
+    constexpr float baseSum = kColW_Num + kColW_Az + kColW_El + kColW_Size;
+    const int wNum  = (int) (post * kColW_Num  / baseSum);
+    const int wAz   = (int) (post * kColW_Az   / baseSum);
+    const int wEl   = (int) (post * kColW_El   / baseSum);
 
     lbl     .setBounds (r.removeFromLeft (wNum));
     num_az  .setBounds (r.removeFromLeft (wAz) .reduced (2, 2));
@@ -146,6 +183,19 @@ void SourceTableRow::sliderValueChanged (juce::Slider* s)
             (float) s->getValue());
 }
 
+void SourceTableRow::buttonClicked (juce::Button* b)
+{
+    using Proc = Ambix_encoderAudioProcessor;
+    if (b == &btn_solo)
+        setParameterNotifyingHost (&processor,
+            Proc::sourceParamIndex (idx, Proc::SrcSolo),
+            btn_solo.getToggleState() ? 1.f : 0.f);
+    else if (b == &btn_mute)
+        setParameterNotifyingHost (&processor,
+            Proc::sourceParamIndex (idx, Proc::SrcMute),
+            btn_mute.getToggleState() ? 1.f : 0.f);
+}
+
 //==============================================================================
 void SourceTableHeader::paint (juce::Graphics& g)
 {
@@ -156,15 +206,23 @@ void SourceTableHeader::paint (juce::Graphics& g)
     g.setFont (juce::Font (juce::FontOptions { 11.f, juce::Font::bold }));
 
     auto r = getLocalBounds();
-    const int total = r.getWidth();
-    const int wNum  = (int) (total * kColW_Num);
-    const int wAz   = (int) (total * kColW_Az);
-    const int wEl   = (int) (total * kColW_El);
+    // Mirror SourceTableRow::resized — fixed-pixel S/M columns on the
+    // right, ratios applied to the remaining width.
+    const auto mCol = r.removeFromRight (kColW_SoloMute);
+    const auto sCol = r.removeFromRight (kColW_SoloMute);
 
-    g.drawText ("#",         r.removeFromLeft (wNum),  juce::Justification::centred);
-    g.drawText ("Azimuth",   r.removeFromLeft (wAz),   juce::Justification::centred);
-    g.drawText ("Elevation", r.removeFromLeft (wEl),   juce::Justification::centred);
-    g.drawText ("Size",      r,                        juce::Justification::centred);
+    const int post = r.getWidth();
+    constexpr float baseSum = kColW_Num + kColW_Az + kColW_El + kColW_Size;
+    const int wNum  = (int) (post * kColW_Num / baseSum);
+    const int wAz   = (int) (post * kColW_Az  / baseSum);
+    const int wEl   = (int) (post * kColW_El  / baseSum);
+
+    g.drawText ("#",         r.removeFromLeft (wNum), juce::Justification::centred);
+    g.drawText ("Azimuth",   r.removeFromLeft (wAz),  juce::Justification::centred);
+    g.drawText ("Elevation", r.removeFromLeft (wEl),  juce::Justification::centred);
+    g.drawText ("Size",      r,                       juce::Justification::centred);
+    g.drawText ("S",         sCol,                    juce::Justification::centred);
+    g.drawText ("M",         mCol,                    juce::Justification::centred);
 }
 
 //==============================================================================

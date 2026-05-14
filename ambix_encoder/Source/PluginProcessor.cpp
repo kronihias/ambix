@@ -128,12 +128,15 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
         source_peak[i].store (0.f);
     }
 
-    // initial per-source positions: at front, on the equator, full sharpness.
+    // initial per-source positions: at front, on the equator, full sharpness,
+    // no mute, no solo.
     for (int i = 0; i < kMaxSources; ++i)
     {
         source_params[i].az   = 0.5f;
         source_params[i].el   = 0.5f;
         source_params[i].size = 0.f;
+        source_params[i].mute = 0.f;
+        source_params[i].solo = 0.f;
     }
 
     Ambix_encoderAudioProcessor::s_ID++;
@@ -431,12 +434,17 @@ void Ambix_encoderAudioProcessor::sendOSC()
                 rm.addFloat32 (pos.rms);
                 OSCMessage pk (OSCAddressPattern (base + "/peak"));
                 pk.addFloat32 (pos.peak);
+                OSCMessage mu (OSCAddressPattern (base + "/mute"));
+                mu.addInt32 (source_params[s].mute >= 0.5f ? 1 : 0);
+                OSCMessage so (OSCAddressPattern (base + "/solo"));
+                so.addInt32 (source_params[s].solo >= 0.5f ? 1 : 0);
 
                 for (int i = 0; i < oscSenders.size(); i++)
                 {
                     auto* snd = oscSenders.getUnchecked(i)->sender.get();
                     snd->send (az); snd->send (el); snd->send (sz);
                     snd->send (rm); snd->send (pk);
+                    snd->send (mu); snd->send (so);
                 }
             }
         }
@@ -588,10 +596,17 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
             {
                 setParameterNotifyingHost (this, SizeParam, jlimit (0.f, 1.f, v));
             }
-            return;
+            // mute/solo are per-source even in linked mode — fall through
+            // to the unlinked path so the rest of the cases (mute, solo)
+            // are handled uniformly.
+            else if (sub != "mute" && sub != "solo")
+            {
+                return;
+            }
         }
 
-        // Unlinked: each source has its own params.
+        // Per-source params (always applied regardless of linked state for
+        // mute/solo; az/el/size only reach here in unlinked mode).
         if (sub == "azimuth")
             setParameterNotifyingHost (this, sourceParamIndex (idx, SrcAz),
                                        jlimit(0.f, 1.f, (wrapAz (v) + 180.f) / 360.f));
@@ -603,6 +618,10 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
                                        jlimit(0.f, 1.f, (v + 180.f) / 360.f));
         else if (sub == "size")
             setParameterNotifyingHost (this, sourceParamIndex (idx, SrcSize), jlimit(0.f, 1.f, v));
+        else if (sub == "mute")
+            setParameterNotifyingHost (this, sourceParamIndex (idx, SrcMute), v >= 0.5f ? 1.f : 0.f);
+        else if (sub == "solo")
+            setParameterNotifyingHost (this, sourceParamIndex (idx, SrcSolo), v >= 0.5f ? 1.f : 0.f);
         return;
     }
 }
@@ -951,8 +970,21 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     for (int i = 0; i < kMaxSources; ++i)
         AmbiEnc.getUnchecked(i)->calcParams();
 
+    // Solo/mute gating: if any source within the active range is soloed, only
+    // soloed sources contribute. Mute always silences the source regardless of
+    // solo state. Both apply in linked AND unlinked mode — they're orthogonal
+    // to the position auto-spread.
+    bool anySolo = false;
+    for (int i = 0; i < active; ++i)
+        if (source_params[i].solo >= 0.5f) { anySolo = true; break; }
+
     for (int in_ch = 0; in_ch < active; ++in_ch)
     {
+        const bool muted     = source_params[in_ch].mute >= 0.5f;
+        const bool soloed    = source_params[in_ch].solo >= 0.5f;
+        const bool effSilent = muted || (anySolo && ! soloed);
+        if (effSilent) continue;
+
         const float* in_channel_data = InputBuffer.getReadPointer (in_ch);
 
         for (int out_ch = 0; out_ch < numOut; ++out_ch)

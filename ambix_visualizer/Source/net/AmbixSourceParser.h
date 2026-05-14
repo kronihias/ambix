@@ -9,6 +9,8 @@
 //   /ambix_encoder/source/<n>/size      <float 0..1>
 //   /ambix_encoder/source/<n>/rms       <float 0..1>
 //   /ambix_encoder/source/<n>/peak      <float 0..1>
+//   /ambix_encoder/source/<n>/mute      <int 0|1>
+//   /ambix_encoder/source/<n>/solo      <int 0|1>
 // And the global counterparts:
 //   /ambix_encoder/linked         <int>
 //   /ambix_encoder/active_sources <int>
@@ -26,6 +28,8 @@ struct AmbixSourcePayload
         Size,
         Rms,
         Peak,
+        Mute,
+        Solo,
         // Global (per-plugin) scalars. sourceIndex is unused for these.
         Linked,
         ActiveSources,

@@ -25,20 +25,21 @@
 class Ambix_encoderAudioProcessorEditor;
 
 // One row in the per-source table. Layout is a single horizontal strip:
-//   [#]  [Az number]  [El number]  [Size number]
-// Each value is a number box (Slider::IncDecButtons-less, TextBoxOnly style)
-// so drag-up / drag-down or double-click adjusts it without the slider bar.
-// Values mirror the *effective* per-source positions — that is, in linked
-// mode they show the auto-spread positions, not the (unused) per-source
-// params behind them. Editing is disabled in linked mode (greyed out).
+//   [#]  [Az]  [El]  [Size]  [S][M]
+// Az/El/Size are number boxes (Slider::LinearBar with transparent bar);
+// S (solo) and M (mute) are toggle buttons that work in both linked and
+// unlinked modes (they're orthogonal to position). Az/El/Size are
+// greyed out in linked mode but mute/solo stay editable.
 class SourceTableRow : public juce::Component,
-                      public juce::Slider::Listener
+                      public juce::Slider::Listener,
+                      public juce::Button::Listener
 {
 public:
     SourceTableRow (Ambix_encoderAudioProcessor& p, int sourceIndex);
     void resized() override;
     void paint   (juce::Graphics& g) override;
     void sliderValueChanged (juce::Slider* s) override;
+    void buttonClicked      (juce::Button* b) override;
 
     void refreshFromProcessor();
     void setEditable (bool canEdit);
@@ -46,8 +47,9 @@ public:
 private:
     Ambix_encoderAudioProcessor& processor;
     int idx;
-    juce::Slider num_az, num_el, num_size;
-    juce::Label  lbl;
+    juce::Slider       num_az, num_el, num_size;
+    juce::TextButton   btn_solo, btn_mute;
+    juce::Label        lbl;
     bool editable { true };
 };
 
