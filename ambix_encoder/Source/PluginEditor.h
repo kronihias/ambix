@@ -53,11 +53,18 @@ private:
     bool editable { true };
 };
 
-// Column header for the source table. Painted statically.
+// Column header for the source table. Clicking the S or M column resets
+// (clears) all solos / mutes across active sources — same pattern as
+// IEM MultiEncoder. The other columns are inert.
 class SourceTableHeader : public juce::Component
 {
 public:
+    void setProcessor (Ambix_encoderAudioProcessor* p) { processor = p; }
     void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+
+private:
+    Ambix_encoderAudioProcessor* processor = nullptr;
 };
 
 

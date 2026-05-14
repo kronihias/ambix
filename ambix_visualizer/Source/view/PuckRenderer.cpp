@@ -63,6 +63,15 @@ namespace PuckRenderer
             g.drawEllipse (puckRect.expanded (ringExpand), 2.5f);
         }
 
+        // Solo indicator: solid yellow outer ring. Drawn before mute so a
+        // muted+soloed puck still shows the dashed-red on top (= "soloed
+        // but you've muted me anyway", an unusual but valid state).
+        if (source.soloed)
+        {
+            g.setColour (juce::Colour (0xffe5c34a).withAlpha (isBackHemisphere ? 0.5f : 0.95f));
+            g.drawEllipse (puckRect.expanded (ringExpand), 1.8f);
+        }
+
         // Muted indicator: dashed outer ring
         if (source.muted)
         {

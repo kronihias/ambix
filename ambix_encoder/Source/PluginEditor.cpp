@@ -225,6 +225,29 @@ void SourceTableHeader::paint (juce::Graphics& g)
     g.drawText ("M",         mCol,                    juce::Justification::centred);
 }
 
+void SourceTableHeader::mouseDown (const juce::MouseEvent& e)
+{
+    if (! processor) return;
+
+    // Recompute column rects the same way paint() does so the hit-test
+    // stays in sync with the visible layout.
+    auto r = getLocalBounds();
+    const auto mCol = r.removeFromRight (kColW_SoloMute);
+    const auto sCol = r.removeFromRight (kColW_SoloMute);
+
+    const bool clickedSolo = sCol.contains (e.getPosition());
+    const bool clickedMute = mCol.contains (e.getPosition());
+    if (! clickedSolo && ! clickedMute) return;
+
+    using Proc = Ambix_encoderAudioProcessor;
+    const auto sub = clickedSolo ? Proc::SrcSolo : Proc::SrcMute;
+    // Clear the param for every source slot (not just active ones — if
+    // the user later raises the active count, sources shouldn't come
+    // back in a stale soloed/muted state).
+    for (int i = 0; i < Proc::kMaxSources; ++i)
+        setParameterNotifyingHost (processor, Proc::sourceParamIndex (i, sub), 0.f);
+}
+
 //==============================================================================
 Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_encoderAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
@@ -407,6 +430,11 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
 
     // Source table
     addAndMakeVisible (table_header);
+    table_header.setProcessor (ownerFilter);
+    // Click-to-reset on S/M is signalled by the hand cursor — full Component
+    // doesn't ship SettableTooltipClient so we lean on the cursor + comment
+    // in the header for discoverability.
+    table_header.setMouseCursor (juce::MouseCursor::PointingHandCursor);
     addAndMakeVisible (table_viewport);
     table_viewport.setViewedComponent (&table_holder, false);
     table_viewport.setScrollBarsShown (true, false);
