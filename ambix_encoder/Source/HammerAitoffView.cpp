@@ -227,8 +227,25 @@ void HammerAitoffView::paint (juce::Graphics& g)
     g.drawLine (cx - 5, cy, cx + 5, cy, 1.0f);
     g.drawLine (cx, cy - 5, cx, cy + 5, 1.0f);
 
-    // Sources
+    // Master azimuth/elevation marker — only meaningful in linked mode
+    // with more than one source, where it shows the centre of the auto-
+    // spread (same convention as the sphere view's small red dot).
     const int active = processor->getActiveSources();
+    if (active > 1 && processor->isLinked())
+    {
+        const float masterAzDeg = (processor->getParameter (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * 360.f;
+        const float masterElDeg = (processor->getParameter (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f;
+        const float azRad = masterAzDeg * juce::MathConstants<float>::pi / 180.f;
+        const float elRad = masterElDeg * juce::MathConstants<float>::pi / 180.f;
+        const auto p = project (azRad, elRad);
+        const juce::Point<float> sp { cx + p.x * bounds.getWidth() * 0.5f,
+                                      cy - p.y * bounds.getHeight() * 0.5f };
+        const float r = 4.f;
+        g.setColour (juce::Colours::red.withAlpha (0.7f));
+        g.fillEllipse (sp.x - r, sp.y - r, r * 2.f, r * 2.f);
+    }
+
+    // Sources
     for (int i = 0; i < active; ++i)
     {
         const auto sp = sourceScreenPos (i);
