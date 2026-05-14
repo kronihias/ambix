@@ -140,11 +140,14 @@ void SourceTableRow::setEditable (bool canEdit)
 void SourceTableRow::resized()
 {
     auto r = getLocalBounds();
-    // S/M buttons take a fixed pixel width on the right; remaining width is
-    // split between #/Az/El/Size by their ratios (renormalised since the
-    // four columns no longer need to sum to 1.0 of the full row width).
-    btn_mute.setBounds (r.removeFromRight (kColW_SoloMute).reduced (1, 2));
-    btn_solo.setBounds (r.removeFromRight (kColW_SoloMute).reduced (1, 2));
+    // S/M buttons: square, centred in their column so they line up with the
+    // centred header letters. withSizeKeepingCentre keeps them on the
+    // column's horizontal centreline regardless of cell width.
+    const int btnSize = juce::jmin (kColW_SoloMute - 4, kRowHeight - 4);
+    btn_mute.setBounds (r.removeFromRight (kColW_SoloMute)
+                          .withSizeKeepingCentre (btnSize, btnSize));
+    btn_solo.setBounds (r.removeFromRight (kColW_SoloMute)
+                          .withSizeKeepingCentre (btnSize, btnSize));
 
     const int post = r.getWidth();
     constexpr float baseSum = kColW_Num + kColW_Az + kColW_El + kColW_Size;
