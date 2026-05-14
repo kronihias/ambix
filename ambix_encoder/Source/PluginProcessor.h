@@ -281,18 +281,20 @@ private:
     float rms;
     float dpk;
 
-    // EMA accumulator (mean-square) for the W-channel RMS, mirroring the
-    // per-source meter smoothing so every RMS value the encoder emits
-    // settles to a steady reading on steady signals.
+    // Running RMS estimate for the W-channel meter, using the same
+    // recursive Newton-sqrt update as source_rms_ema. Stores y directly
+    // (not mean-square), so reading is a single load with no sqrt.
     float overall_rms_ema { 0.f };
 
-    // Per-source meter snapshot (lock-free single-writer). RMS goes through
-    // a ~300 ms EMA so steady signals show steady levels; peak comes from
-    // MyMeterDsp's fast-attack + peak-hold ballistic so transients still
-    // show up promptly and decay naturally on their own.
+    // Per-source meter snapshot (lock-free single-writer). RMS uses the
+    // recursive Newton-sqrt form from embedded.com — fused IIR averager
+    // + 1 Newton sqrt iteration per block — so y converges to the true
+    // RMS with linear-in-dB ballistic. Peak comes from MyMeterDsp's
+    // fast-attack + peak-hold ballistic so transients still show up
+    // promptly and decay naturally on their own.
     std::array<std::atomic<float>, kMaxSources> source_rms {};
     std::array<std::atomic<float>, kMaxSources> source_peak {};
-    std::array<float,              kMaxSources> source_rms_ema {};
+    std::array<float,              kMaxSources> source_rms_ema {}; // running y (per article)
 
 #if WITH_OSC
     OSCReceiver oscReceiver;

@@ -966,13 +966,25 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
         }
     }
 
-    // per-source meters (read pre-encoding source level). Compute the
-    // block's mean-square ourselves and feed it through a ~300 ms EMA so
-    // block-to-block RMS variation for pink noise / music doesn't show up
-    // as visible flicker in the visualizer.
+    // Per-source meters (read pre-encoding source level). RMS uses the
+    // recursive-Newton form from "Improve your root mean calculations"
+    // (https://www.embedded.com/improve-your-root-mean-calculations/):
+    //
+    //   y(n) = y(n-1) + a · ( blockMs / y(n-1) - y(n-1) )
+    //
+    // y converges to sqrt(steady-state blockMs) = RMS, with a one-pole
+    // IIR averager and one Newton sqrt iteration fused in a single step.
+    // Compared to sqrt-of-EMA-on-MS the release is twice as fast in dB —
+    // perceptually linear in dB matches the PPM/IEC meter spec.
+    //
+    // Per-sample as in the article would force a serial loop; we run the
+    // block's SIMD sum-of-squares once (cheap) and apply one recursive
+    // update per block, with the IIR coefficient scaled to block rate.
     constexpr float kMeterTauSec = 0.3f;
     const float blockDt = (float) NumSamples / (float) SampleRate;
-    const float emaAlpha = std::exp (-blockDt / kMeterTauSec);
+    const float emaAlpha    = std::exp (-blockDt / kMeterTauSec);
+    const float recCoef     = 1.f - emaAlpha;     // = 1 - exp(-Δt/τ); article's `a`
+    constexpr float kRmsFloor = 1e-6f;
     for (int s = 0; s < kMaxSources; ++s)
     {
         if (s < active)
@@ -983,16 +995,26 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
                 ->calc ((float*) InputBuffer.getReadPointer(s), NumSamples);
             source_peak[s].store (sourceMeterDsp.getUnchecked(s)->getPeak());
 
-            // RMS goes through our own 300 ms EMA on mean-square so steady
-            // signals show steady levels (MyMeterDsp's RMS has the same
-            // block-jitter problem we wanted to avoid in the first place).
+            // RMS: recursive Newton-sqrt form (see header comment).
             const float sumSq = sumOfSquares (InputBuffer.getReadPointer (s), NumSamples);
             const float blockMs = sumSq / (float) juce::jmax (1, NumSamples);
 
-            float ms = source_rms_ema[s];
-            ms = emaAlpha * ms + (1.f - emaAlpha) * blockMs;
-            source_rms_ema[s] = ms;
-            source_rms[s].store (std::sqrt (ms));
+            float y = source_rms_ema[s];
+            if (y <= kRmsFloor)
+            {
+                // Startup or post-silence — Newton needs a seed close to the
+                // true RMS, otherwise the blockMs/y term blows up. Direct
+                // sqrt for the first non-trivial block; recursive thereafter.
+                y = std::sqrt (blockMs);
+                if (y < kRmsFloor) y = kRmsFloor;
+            }
+            else
+            {
+                y += recCoef * (blockMs / y - y);
+                if (y < kRmsFloor) y = kRmsFloor;
+            }
+            source_rms_ema[s] = y;
+            source_rms[s].store (y);
         }
         else
         {
@@ -1013,10 +1035,23 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
         _my_meter_dsp.calc ((float*) buffer.getReadPointer(0), NumSamples);
         dpk = _my_meter_dsp.getPeak();
 
+        // Same recursive-Newton RMS as the per-source path.
         const float sumSq = sumOfSquares (buffer.getReadPointer (0), NumSamples);
         const float blockMs = sumSq / (float) juce::jmax (1, NumSamples);
-        overall_rms_ema = emaAlpha * overall_rms_ema + (1.f - emaAlpha) * blockMs;
-        rms = std::sqrt (overall_rms_ema);
+
+        float y = overall_rms_ema;
+        if (y <= kRmsFloor)
+        {
+            y = std::sqrt (blockMs);
+            if (y < kRmsFloor) y = kRmsFloor;
+        }
+        else
+        {
+            y += recCoef * (blockMs / y - y);
+            if (y < kRmsFloor) y = kRmsFloor;
+        }
+        overall_rms_ema = y;
+        rms = y;
     }
 #endif
 }
