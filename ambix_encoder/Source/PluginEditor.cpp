@@ -650,7 +650,13 @@ void Ambix_encoderAudioProcessorEditor::resized()
         pannerW = pannerH = juce::jmin (availW, availH);
     }
 
-    const int pannerY = contentTop + (availH - pannerH) / 2;
+    // Pin the panner area to the top of the content row — when the editor
+    // is much taller than the natural panner size, any extra space falls
+    // below the panner (between it and the bottom-strip controls) rather
+    // than pushing the panner toward the centre. Matches the visual weight
+    // distribution most users seem to expect (controls + visual at the top,
+    // dead space below if any).
+    const int pannerY = contentTop;
 
     sphere_opengl.setBounds (pannerLeft, pannerY, pannerW, pannerH);
     hammer_view  .setBounds (pannerLeft, pannerY, pannerW, pannerH);
