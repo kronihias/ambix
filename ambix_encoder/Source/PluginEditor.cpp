@@ -649,10 +649,17 @@ void Ambix_encoderAudioProcessorEditor::resized()
                           pannerW + sliderW + sliderGap, 28);
     }
 
-    // Table on the right
+    // Table on the right. The rows live inside the viewport with a 12-px
+    // inset on the right to leave room for the scrollbar (see
+    // layoutTableRows). The header must match that inset, otherwise its
+    // rightmost columns sit 12 px further right than the row buttons and
+    // the S/M letters no longer align over the toggles.
+    constexpr int kScrollBarReserve = 12;
     const int tableX = W - tableW - 8;
-    table_header  .setBounds (tableX, contentTop, tableW, kHeaderHeight);
-    table_viewport.setBounds (tableX, contentTop + kHeaderHeight, tableW, contentHeight - kHeaderHeight);
+    table_header  .setBounds (tableX, contentTop,
+                              tableW - kScrollBarReserve, kHeaderHeight);
+    table_viewport.setBounds (tableX, contentTop + kHeaderHeight,
+                              tableW, contentHeight - kHeaderHeight);
     layoutTableRows (table_viewport.getWidth());
 
     // Resizer in the bottom-right corner
