@@ -1019,7 +1019,16 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     constexpr float kRmsFloor = 1e-6f;
     for (int s = 0; s < kMaxSources; ++s)
     {
-        if (s < active)
+        // Reflect effective contribution to the output: a muted source — or
+        // an unsoloed source while another source is soloed — produces no
+        // signal in the encode loop above and therefore should read no
+        // level. Reading the raw input level here would be confusing for
+        // the user (mute toggle on → audio silenced → meter still bouncing).
+        const bool muted     = (s < active) && source_params[s].mute >= 0.5f;
+        const bool soloed    = (s < active) && source_params[s].solo >= 0.5f;
+        const bool effSilent = muted || (anySolo && ! soloed);
+
+        if (s < active && ! effSilent)
         {
             // Run MyMeterDsp for the peak: it does fast-attack + 500 ms
             // hold + 20 dB/s release — exactly what a peak meter wants.
@@ -1050,6 +1059,11 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
         }
         else
         {
+            // Inactive slot OR muted/solo-suppressed: reset everything so
+            // unmuting cleanly re-seeds via the direct-sqrt path on the
+            // next active block (no overshoot from stale state).
+            if (s < kMaxSources)
+                sourceMeterDsp.getUnchecked(s)->reset();
             source_rms_ema[s] = 0.f;
             source_rms[s].store (0.f);
             source_peak[s].store (0.f);
