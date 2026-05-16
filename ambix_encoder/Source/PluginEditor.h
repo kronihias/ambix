@@ -20,6 +20,7 @@
 #include "PluginProcessor.h"
 #include "SphereOpenGL.h"
 #include "HammerAitoffView.h"
+#include "PopoutPanner.h"
 #include "Settings.h"
 
 class Ambix_encoderAudioProcessorEditor;
@@ -127,7 +128,13 @@ private:
     // New controls
     juce::TextButton btn_view_sphere    { "Sphere" };
     juce::TextButton btn_view_hammer    { "Hammer-Aitoff" };
+    juce::TextButton btn_popout         { juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x97")) }; // ↗
     juce::TextButton btn_linked_toggle  { "Linked" };
+
+    // Owned popout — non-null while the detached panner window is open.
+    // Created on demand from the popout-button handler, reset when the
+    // popout's OS close button is clicked.
+    std::unique_ptr<PopoutPanner> popout;
     juce::ComboBox   cmb_active_sources;
     juce::Label      lbl_sources        { {}, "Sources:" };
 

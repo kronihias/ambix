@@ -410,6 +410,12 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     btn_view_hammer.setConnectedEdges (juce::Button::ConnectedOnLeft);
     btn_view_hammer.addListener (this);
 
+    // Popout: opens / closes a detached panner window the user can move to
+    // a different screen or take fullscreen via the OS title-bar buttons.
+    addAndMakeVisible (btn_popout);
+    btn_popout.setTooltip ("Open a detached panner window (drag to a second screen, fullscreen via title bar)");
+    btn_popout.addListener (this);
+
     // Linked toggle
     addAndMakeVisible (btn_linked_toggle);
     btn_linked_toggle.setClickingTogglesState (true);
@@ -583,6 +589,7 @@ void Ambix_encoderAudioProcessorEditor::resized()
     btn_settings.setBounds (4, 4, 24, 24);
     btn_view_sphere.setBounds (32, 6, 60, 22);
     btn_view_hammer.setBounds (92, 6, 90, 22);
+    btn_popout     .setBounds (188, 6, 26, 22);
 
     // ID at the far right
     lbl_id.setBounds (W - 76, 6, 24, 22);
@@ -842,6 +849,24 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
             launchOptions.resizable = false;
             launchOptions.useBottomRightCornerResizer = false;
             _settingsDialogWindow = launchOptions.launchAsync();
+        }
+    }
+    else if (buttonThatWasClicked == &btn_popout)
+    {
+        // Toggle: if a popout is open, close it; otherwise create one
+        // mirroring the main editor's current view. The popout's OS close
+        // button calls our lambda to drop the unique_ptr, guaranteeing
+        // destruction on the message thread (where DocumentWindow lives).
+        if (popout != nullptr)
+        {
+            popout.reset();
+        }
+        else
+        {
+            popout = std::make_unique<PopoutPanner> (
+                *ourProcessor,
+                _hammerView,
+                [this]() { popout.reset(); });
         }
     }
     else if (buttonThatWasClicked == &btn_view_sphere)
