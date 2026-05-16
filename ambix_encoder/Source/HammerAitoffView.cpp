@@ -94,7 +94,12 @@ int HammerAitoffView::findSourceUnder (juce::Point<float> screenPt) const
     if (! processor) return -1;
     const int active = processor->getActiveSources();
     int best = -1;
-    float bestDistSq = 18.f * 18.f; // hit radius
+    // Match the visScale used in paint() so a bigger panner = bigger hit
+    // zone too (no point growing the pucks without growing the grab area).
+    const auto bounds = getProjectionBounds();
+    const float visScale = juce::jlimit (1.0f, 3.0f, bounds.getWidth() / 600.f);
+    const float hitR = 18.f * visScale;
+    float bestDistSq = hitR * hitR;
     for (int i = 0; i < active; ++i)
     {
         const auto sp = sourceScreenPos (i);
@@ -227,6 +232,13 @@ void HammerAitoffView::paint (juce::Graphics& g)
     g.drawLine (cx - 5, cy, cx + 5, cy, 1.0f);
     g.drawLine (cx, cy - 5, cx, cy + 5, 1.0f);
 
+    // Visual size scale: pucks/labels grow with the ellipse so a fullscreen
+    // popout doesn't end up with tiny dots floating in a huge ellipse, but
+    // never shrink below the legible inline-editor size. Reference width
+    // 600 px gives the original ~7 px puck — same as inline editor. Scale
+    // factor capped at 3× for very large windows.
+    const float visScale = juce::jlimit (1.0f, 3.0f, bounds.getWidth() / 600.f);
+
     // Master azimuth/elevation marker — only meaningful in linked mode
     // with more than one source, where it shows the centre of the auto-
     // spread (same convention as the sphere view's small red dot).
@@ -240,7 +252,7 @@ void HammerAitoffView::paint (juce::Graphics& g)
         const auto p = project (azRad, elRad);
         const juce::Point<float> sp { cx + p.x * bounds.getWidth() * 0.5f,
                                       cy - p.y * bounds.getHeight() * 0.5f };
-        const float r = 4.f;
+        const float r = 4.f * visScale;
         g.setColour (juce::Colours::red.withAlpha (0.7f));
         g.fillEllipse (sp.x - r, sp.y - r, r * 2.f, r * 2.f);
     }
@@ -254,7 +266,7 @@ void HammerAitoffView::paint (juce::Graphics& g)
         // Size halo (visualises the size param as a translucent disc).
         if (pos.size > 0.f)
         {
-            const float radius = 6.f + pos.size * 26.f;
+            const float radius = (6.f + pos.size * 26.f) * visScale;
             g.setColour (juce::Colours::yellow.withAlpha (0.18f));
             g.fillEllipse (sp.x - radius, sp.y - radius, radius * 2.f, radius * 2.f);
         }
@@ -262,24 +274,27 @@ void HammerAitoffView::paint (juce::Graphics& g)
         // Meter ring (thickness scaled by RMS).
         if (pos.rms > 0.005f)
         {
-            const float ringR = 14.f;
-            const float thickness = juce::jmin (4.f, pos.rms * 12.f + 1.f);
+            const float ringR = 14.f * visScale;
+            const float thickness = juce::jmin (4.f * visScale, pos.rms * 12.f + 1.f);
             g.setColour (juce::Colours::limegreen.withAlpha (0.7f));
             g.drawEllipse (sp.x - ringR, sp.y - ringR, ringR * 2.f, ringR * 2.f, thickness);
         }
 
         // Dot
-        const float r = 7.f;
+        const float r = 7.f * visScale;
         g.setColour (draggingSource == i ? juce::Colours::orange : juce::Colours::yellow);
         g.fillEllipse (sp.x - r, sp.y - r, r * 2.f, r * 2.f);
         g.setColour (juce::Colours::black);
         g.drawEllipse (sp.x - r, sp.y - r, r * 2.f, r * 2.f, 1.f);
 
         // Label
+        const float labelSize = 11.f * visScale;
+        const int halfBoxW = (int) (10.f * visScale);
+        const int halfBoxH = (int) (7.f  * visScale);
         g.setColour (juce::Colours::black);
-        g.setFont (juce::Font (juce::FontOptions { 11.f, juce::Font::bold }));
+        g.setFont (juce::Font (juce::FontOptions { labelSize, juce::Font::bold }));
         g.drawText (juce::String (i + 1),
-                    (int)(sp.x - 10), (int)(sp.y - 7), 20, 14,
+                    (int)(sp.x - halfBoxW), (int)(sp.y - halfBoxH), halfBoxW * 2, halfBoxH * 2,
                     juce::Justification::centred);
     }
 }
