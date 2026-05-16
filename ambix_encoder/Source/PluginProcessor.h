@@ -178,11 +178,15 @@ public:
 
     // Editor UI state persisted in the plugin state so re-opening the
     // editor (or recalling the session) restores window size + which
-    // panner was last visible. Defaults match the editor's initial
-    // setSize / view-toggle defaults.
-    int  editor_width      { 640 };
-    int  editor_height     { 520 };
-    bool editor_hammer_view { false };
+    // panner was last visible. Per-view sizes so switching between Sphere
+    // (1:1 panner) and Hammer-Aitoff (2:1 panner) restores each layout
+    // independently — the editor reads the slot for whichever view is
+    // active and writes back to it on every resize.
+    int  editor_width_sphere  { 640 };
+    int  editor_height_sphere { 520 };
+    int  editor_width_hammer  { 980 };
+    int  editor_height_hammer { 460 };
+    bool editor_hammer_view   { false };
 
 #if WITH_OSC
     void timerCallback() override; // call osc send in timer callback

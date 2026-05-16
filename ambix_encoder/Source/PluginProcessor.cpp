@@ -1125,11 +1125,16 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("discoverable",     discoverable);
 #endif
 
-    // Editor UI state — size + active view. Stored on the processor so it
-    // persists across editor close/reopen and across session saves.
-    xml.setAttribute ("editor_w",       editor_width);
-    xml.setAttribute ("editor_h",       editor_height);
-    xml.setAttribute ("editor_hammer",  editor_hammer_view);
+    // Editor UI state — per-view size + active view. Stored on the
+    // processor so it persists across editor close/reopen and across
+    // session saves. Each panner remembers its own layout so toggling
+    // between Sphere (1:1) and H-A (2:1) restores the visually balanced
+    // window shape the user set up for that view.
+    xml.setAttribute ("editor_w_sphere",  editor_width_sphere);
+    xml.setAttribute ("editor_h_sphere",  editor_height_sphere);
+    xml.setAttribute ("editor_w_hammer",  editor_width_hammer);
+    xml.setAttribute ("editor_h_hammer",  editor_height_hammer);
+    xml.setAttribute ("editor_hammer",    editor_hammer_view);
 
     copyXmlToBinary (xml, destData);
 }
@@ -1169,11 +1174,24 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
             refreshOscOutput();
 #endif
 
-        // Editor UI state — only restore if the saved value is sensible
-        // (a freshly-created session won't have these attributes).
-        editor_width       = xmlState->getIntAttribute  ("editor_w",      editor_width);
-        editor_height      = xmlState->getIntAttribute  ("editor_h",      editor_height);
-        editor_hammer_view = xmlState->getBoolAttribute ("editor_hammer", editor_hammer_view);
+        // Editor UI state — per-view sizes + active-view flag. Older
+        // sessions wrote a single editor_w / editor_h pair before the
+        // per-view split; honour either path so saved projects don't
+        // wake up at the default 640×520.
+        editor_width_sphere  = xmlState->getIntAttribute  ("editor_w_sphere", editor_width_sphere);
+        editor_height_sphere = xmlState->getIntAttribute  ("editor_h_sphere", editor_height_sphere);
+        editor_width_hammer  = xmlState->getIntAttribute  ("editor_w_hammer", editor_width_hammer);
+        editor_height_hammer = xmlState->getIntAttribute  ("editor_h_hammer", editor_height_hammer);
+        editor_hammer_view   = xmlState->getBoolAttribute ("editor_hammer",   editor_hammer_view);
+        if (xmlState->hasAttribute ("editor_w") && xmlState->hasAttribute ("editor_h"))
+        {
+            // Single-pair legacy state — apply it to whichever view was
+            // active at save time so the user's saved layout doesn't reset.
+            const int w = xmlState->getIntAttribute ("editor_w");
+            const int h = xmlState->getIntAttribute ("editor_h");
+            if (editor_hammer_view) { editor_width_hammer = w; editor_height_hammer = h; }
+            else                    { editor_width_sphere = w; editor_height_sphere = h; }
+        }
 
         applyParamsToEncoders();
     }
