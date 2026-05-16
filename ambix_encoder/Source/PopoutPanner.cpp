@@ -136,6 +136,13 @@ PopoutPanner::PopoutPanner (Ambix_encoderAudioProcessor& proc,
 
     setVisible (true);
     toFront (true);
+
+    // Show the track name (and ID) in the window title so multiple popouts
+    // from different encoder instances are immediately distinguishable. The
+    // host can rename a track at any time, so poll periodically and refresh
+    // when it changes — getTrackName is just a string copy under a lock.
+    refreshTitle();
+    startTimer (1000);
 }
 
 PopoutPanner::~PopoutPanner()
@@ -164,4 +171,26 @@ bool PopoutPanner::isHammerView() const
     if (auto* c = dynamic_cast<Content*> (getContentComponent()))
         return c->isHammerView();
     return false;
+}
+
+void PopoutPanner::timerCallback()
+{
+    const auto current = processor.getTrackName();
+    if (current != lastTrackName)
+        refreshTitle();
+}
+
+void PopoutPanner::refreshTitle()
+{
+    const auto trackName = processor.getTrackName();
+    lastTrackName = trackName;
+
+    juce::String title;
+    if (trackName.isNotEmpty())
+        title << trackName << " — ambix_encoder";
+    else
+        title << "ambix_encoder panner";
+
+    title << " [ID " << processor.m_id << "]";
+    setName (title);
 }

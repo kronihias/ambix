@@ -40,7 +40,8 @@
 #include "SphereOpenGL.h"
 #include "HammerAitoffView.h"
 
-class PopoutPanner : public juce::DocumentWindow
+class PopoutPanner : public juce::DocumentWindow,
+                     private juce::Timer
 {
 public:
     PopoutPanner (Ambix_encoderAudioProcessor& proc,
@@ -58,7 +59,11 @@ public:
     bool isHammerView() const;
 
 private:
+    void timerCallback() override; // polls track name, refreshes title
+    void refreshTitle();
+
     class Content;  // forward — implementation lives in the .cpp
     Ambix_encoderAudioProcessor& processor;
     std::function<void()> onClose;
+    juce::String lastTrackName;
 };
