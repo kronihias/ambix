@@ -23,6 +23,8 @@ public:
     Content (Ambix_encoderAudioProcessor& proc, bool initialHammer)
         : processor (proc), hammerView (initialHammer)
     {
+        // Notify owner when the view toggle changes so it can persist.
+        // (Set by PopoutPanner via setOnViewChange after construction.)
         sphere_opengl.processor = &processor;
         addChildComponent (sphere_opengl);
 
@@ -70,6 +72,8 @@ public:
 
     bool isHammerView() const noexcept { return hammerView; }
 
+    void setOnViewChange (std::function<void(bool)> cb) { onViewChange = std::move (cb); }
+
 private:
     void setHammerView (bool h)
     {
@@ -77,6 +81,7 @@ private:
         hammerView = h;
         applyVisibility();
         resized();
+        if (onViewChange) onViewChange (h);
     }
 
     void applyVisibility()
@@ -91,32 +96,43 @@ private:
     SphereOpenGL     sphere_opengl;
     HammerAitoffView hammer_view;
     juce::TextButton btn_sphere, btn_hammer;
+    std::function<void(bool)> onViewChange;
 };
 
 //==============================================================================
 PopoutPanner::PopoutPanner (Ambix_encoderAudioProcessor& proc,
                             bool initialHammerView,
+                            int  initialWidth,
+                            int  initialHeight,
                             std::function<void()> onCloseCallback)
     : juce::DocumentWindow ("ambix_encoder panner",
                             juce::Colour (0xff141414),
                             juce::DocumentWindow::allButtons),
+      processor (proc),
       onClose (std::move (onCloseCallback))
 {
     setUsingNativeTitleBar (true);
     setResizable (true, true);
     setResizeLimits (320, 240, 4096, 4096);
+    // Float above the DAW's plugin window so the popout stays visible
+    // when the user clicks back into the main editor.
+    setAlwaysOnTop (true);
 
-    // setContentOwned takes ownership of the heap-allocated Content; it's
-    // freed when the DocumentWindow itself is destroyed.
-    setContentOwned (new Content (proc, initialHammerView), true);
+    auto* content = new Content (proc, initialHammerView);
+    content->setOnViewChange ([this] (bool h)
+    {
+        processor.popout_hammer_view = h;
+    });
+    setContentOwned (content, true);
 
-    // Sensible default size — wider for H-A, squarer for Sphere. The OS
-    // will let the user drag-resize and toggle fullscreen via the title
-    // bar (native fullscreen button on macOS, Win/Linux equivalent).
-    if (initialHammerView)
-        centreWithSize (900, 480);
-    else
-        centreWithSize (560, 600);
+    // Use the persisted size if it's sane; otherwise pick a sensible
+    // default per view (wider for H-A, squarer for Sphere). Clamp to the
+    // resize limits so old/corrupt state can't open the window off-screen.
+    const int defaultW = initialHammerView ? 900 : 560;
+    const int defaultH = initialHammerView ? 480 : 600;
+    const int w = juce::jlimit (320, 4096, initialWidth  > 0 ? initialWidth  : defaultW);
+    const int h = juce::jlimit (240, 4096, initialHeight > 0 ? initialHeight : defaultH);
+    centreWithSize (w, h);
 
     setVisible (true);
     toFront (true);
@@ -132,6 +148,15 @@ void PopoutPanner::closeButtonPressed()
     // Delegate to the owner (the editor) so it can drop the unique_ptr.
     // Destroying the window inline here would re-enter our own callbacks.
     if (onClose) onClose();
+}
+
+void PopoutPanner::resized()
+{
+    juce::DocumentWindow::resized();
+    // Persist the popout's current size so a close-and-reopen (or
+    // session save) restores exactly where the user left it.
+    processor.popout_width  = getWidth();
+    processor.popout_height = getHeight();
 }
 
 bool PopoutPanner::isHammerView() const

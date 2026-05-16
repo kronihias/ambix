@@ -45,10 +45,13 @@ class PopoutPanner : public juce::DocumentWindow
 public:
     PopoutPanner (Ambix_encoderAudioProcessor& proc,
                   bool initialHammerView,
+                  int  initialWidth,
+                  int  initialHeight,
                   std::function<void()> onCloseCallback);
     ~PopoutPanner() override;
 
     void closeButtonPressed() override;
+    void resized() override;
 
     // True if the popout is currently showing Hammer-Aitoff; the editor
     // reads this to persist the view choice on the processor side.
@@ -56,5 +59,6 @@ public:
 
 private:
     class Content;  // forward — implementation lives in the .cpp
+    Ambix_encoderAudioProcessor& processor;
     std::function<void()> onClose;
 };

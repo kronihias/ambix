@@ -475,6 +475,22 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     updateActivePanner();
     timerCallback();
     startTimer (45);
+
+    // Re-open the popout if it was open at save time. Use the persisted
+    // popout view + size so the user finds the layout they left.
+    if (ownerFilter->popout_open)
+    {
+        popout = std::make_unique<PopoutPanner> (
+            *ownerFilter,
+            ownerFilter->popout_hammer_view,
+            ownerFilter->popout_width,
+            ownerFilter->popout_height,
+            [this]()
+            {
+                getProcessor()->popout_open = false;
+                popout.reset();
+            });
+    }
 }
 
 Ambix_encoderAudioProcessorEditor::~Ambix_encoderAudioProcessorEditor()
@@ -854,19 +870,33 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
     else if (buttonThatWasClicked == &btn_popout)
     {
         // Toggle: if a popout is open, close it; otherwise create one
-        // mirroring the main editor's current view. The popout's OS close
-        // button calls our lambda to drop the unique_ptr, guaranteeing
-        // destruction on the message thread (where DocumentWindow lives).
+        // using the persisted size/view (falling back to the main editor's
+        // current view on first open). The popout's OS close button calls
+        // our lambda to drop the unique_ptr and clear popout_open, so
+        // destruction always happens on the message thread.
         if (popout != nullptr)
         {
+            ourProcessor->popout_open = false;
             popout.reset();
         }
         else
         {
+            // First-ever open inherits the main view; subsequent reopens
+            // use the popout's own remembered view.
+            const bool useHammer = ourProcessor->popout_open ? ourProcessor->popout_hammer_view
+                                                              : _hammerView;
+            ourProcessor->popout_hammer_view = useHammer;
+            ourProcessor->popout_open = true;
             popout = std::make_unique<PopoutPanner> (
                 *ourProcessor,
-                _hammerView,
-                [this]() { popout.reset(); });
+                useHammer,
+                ourProcessor->popout_width,
+                ourProcessor->popout_height,
+                [this]()
+                {
+                    getProcessor()->popout_open = false;
+                    popout.reset();
+                });
         }
     }
     else if (buttonThatWasClicked == &btn_view_sphere)

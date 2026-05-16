@@ -188,6 +188,14 @@ public:
     int  editor_height_hammer { 460 };
     bool editor_hammer_view   { false };
 
+    // Popout window state: whether it was open at save time, its size,
+    // and which view it had. Read on editor construction; the popout
+    // writes back on resize / view-toggle / close.
+    bool popout_open        { false };
+    int  popout_width       { 800 };
+    int  popout_height      { 600 };
+    bool popout_hammer_view { false };
+
 #if WITH_OSC
     void timerCallback() override; // call osc send in timer callback
 

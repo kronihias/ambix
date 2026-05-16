@@ -1135,6 +1135,10 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("editor_w_hammer",  editor_width_hammer);
     xml.setAttribute ("editor_h_hammer",  editor_height_hammer);
     xml.setAttribute ("editor_hammer",    editor_hammer_view);
+    xml.setAttribute ("popout_open",      popout_open);
+    xml.setAttribute ("popout_w",         popout_width);
+    xml.setAttribute ("popout_h",         popout_height);
+    xml.setAttribute ("popout_hammer",    popout_hammer_view);
 
     copyXmlToBinary (xml, destData);
 }
@@ -1183,6 +1187,10 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
         editor_width_hammer  = xmlState->getIntAttribute  ("editor_w_hammer", editor_width_hammer);
         editor_height_hammer = xmlState->getIntAttribute  ("editor_h_hammer", editor_height_hammer);
         editor_hammer_view   = xmlState->getBoolAttribute ("editor_hammer",   editor_hammer_view);
+        popout_open          = xmlState->getBoolAttribute ("popout_open",     popout_open);
+        popout_width         = xmlState->getIntAttribute  ("popout_w",        popout_width);
+        popout_height        = xmlState->getIntAttribute  ("popout_h",        popout_height);
+        popout_hammer_view   = xmlState->getBoolAttribute ("popout_hammer",   popout_hammer_view);
         if (xmlState->hasAttribute ("editor_w") && xmlState->hasAttribute ("editor_h"))
         {
             // Single-pair legacy state — apply it to whichever view was
