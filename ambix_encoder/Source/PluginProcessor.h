@@ -182,11 +182,12 @@ public:
     // (1:1 panner) and Hammer-Aitoff (2:1 panner) restores each layout
     // independently — the editor reads the slot for whichever view is
     // active and writes back to it on every resize.
-    int  editor_width_sphere  { 640 };
-    int  editor_height_sphere { 520 };
-    int  editor_width_hammer  { 980 };
-    int  editor_height_hammer { 460 };
-    bool editor_hammer_view   { false };
+    // Single persisted editor size. View toggle recomputes width to fit the
+    // new panner's aspect at the current height — per-view memory turned
+    // out to confuse the layout when both slots had been resized independently.
+    int  editor_width       { 640 };
+    int  editor_height      { 520 };
+    bool editor_hammer_view { false };
 
     // Popout window state: whether it was open at save time, its size,
     // and which view it had. Read on editor construction; the popout

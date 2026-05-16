@@ -1130,12 +1130,10 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
     // session saves. Each panner remembers its own layout so toggling
     // between Sphere (1:1) and H-A (2:1) restores the visually balanced
     // window shape the user set up for that view.
-    xml.setAttribute ("editor_w_sphere",  editor_width_sphere);
-    xml.setAttribute ("editor_h_sphere",  editor_height_sphere);
-    xml.setAttribute ("editor_w_hammer",  editor_width_hammer);
-    xml.setAttribute ("editor_h_hammer",  editor_height_hammer);
-    xml.setAttribute ("editor_hammer",    editor_hammer_view);
-    xml.setAttribute ("popout_open",      popout_open);
+    xml.setAttribute ("editor_w",       editor_width);
+    xml.setAttribute ("editor_h",       editor_height);
+    xml.setAttribute ("editor_hammer",  editor_hammer_view);
+    xml.setAttribute ("popout_open",    popout_open);
     xml.setAttribute ("popout_w",         popout_width);
     xml.setAttribute ("popout_h",         popout_height);
     xml.setAttribute ("popout_hammer",    popout_hammer_view);
@@ -1182,25 +1180,22 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
         // sessions wrote a single editor_w / editor_h pair before the
         // per-view split; honour either path so saved projects don't
         // wake up at the default 640×520.
-        editor_width_sphere  = xmlState->getIntAttribute  ("editor_w_sphere", editor_width_sphere);
-        editor_height_sphere = xmlState->getIntAttribute  ("editor_h_sphere", editor_height_sphere);
-        editor_width_hammer  = xmlState->getIntAttribute  ("editor_w_hammer", editor_width_hammer);
-        editor_height_hammer = xmlState->getIntAttribute  ("editor_h_hammer", editor_height_hammer);
-        editor_hammer_view   = xmlState->getBoolAttribute ("editor_hammer",   editor_hammer_view);
-        popout_open          = xmlState->getBoolAttribute ("popout_open",     popout_open);
-        popout_width         = xmlState->getIntAttribute  ("popout_w",        popout_width);
-        popout_height        = xmlState->getIntAttribute  ("popout_h",        popout_height);
-        popout_hammer_view   = xmlState->getBoolAttribute ("popout_hammer",   popout_hammer_view);
-        if (xmlState->hasAttribute ("editor_w") && xmlState->hasAttribute ("editor_h"))
+        editor_width       = xmlState->getIntAttribute  ("editor_w",      editor_width);
+        editor_height      = xmlState->getIntAttribute  ("editor_h",      editor_height);
+        editor_hammer_view = xmlState->getBoolAttribute ("editor_hammer", editor_hammer_view);
+        popout_open        = xmlState->getBoolAttribute ("popout_open",   popout_open);
+        popout_width       = xmlState->getIntAttribute  ("popout_w",      popout_width);
+        popout_height      = xmlState->getIntAttribute  ("popout_h",      popout_height);
+        popout_hammer_view = xmlState->getBoolAttribute ("popout_hammer", popout_hammer_view);
+        // Older per-view-pair attributes — fold the active-view pair into
+        // the single slot so saved projects don't reset to defaults.
+        if (xmlState->hasAttribute ("editor_w_sphere") || xmlState->hasAttribute ("editor_w_hammer"))
         {
-            // Single-pair legacy state — apply it to whichever view was
-            // active at save time so the user's saved layout doesn't reset.
-            const int w = xmlState->getIntAttribute ("editor_w");
-            const int h = xmlState->getIntAttribute ("editor_h");
-            if (editor_hammer_view) { editor_width_hammer = w; editor_height_hammer = h; }
-            else                    { editor_width_sphere = w; editor_height_sphere = h; }
+            const auto wTag = editor_hammer_view ? "editor_w_hammer" : "editor_w_sphere";
+            const auto hTag = editor_hammer_view ? "editor_h_hammer" : "editor_h_sphere";
+            editor_width  = xmlState->getIntAttribute (wTag, editor_width);
+            editor_height = xmlState->getIntAttribute (hTag, editor_height);
         }
-
         applyParamsToEncoders();
     }
 }

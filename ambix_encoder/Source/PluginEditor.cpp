@@ -459,10 +459,8 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     _hammerView = ownerFilter->editor_hammer_view;
     btn_view_sphere.setToggleState (! _hammerView, juce::dontSendNotification);
     btn_view_hammer.setToggleState (  _hammerView, juce::dontSendNotification);
-    const int initialW = _hammerView ? ownerFilter->editor_width_hammer  : ownerFilter->editor_width_sphere;
-    const int initialH = _hammerView ? ownerFilter->editor_height_hammer : ownerFilter->editor_height_sphere;
-    setSize (juce::jlimit (520, 1400, initialW),
-             juce::jlimit (420, 1200, initialH));
+    setSize (juce::jlimit (520, 1400, ownerFilter->editor_width),
+             juce::jlimit (420, 1200, ownerFilter->editor_height));
 
     ownerFilter->addChangeListener (this);
     ownerFilter->sendChangeMessage();
@@ -593,12 +591,13 @@ void Ambix_encoderAudioProcessorEditor::resized()
     const int W = getWidth();
     const int H = getHeight();
 
-    // Persist size to the *active* view's slot so each view remembers its
-    // own layout. Switching views restores the matching pair below.
+    // Persist the current size on the processor so a close/reopen reads it
+    // back. View-toggle re-derives width from height + new view's aspect
+    // (see buttonClicked for btn_view_sphere / btn_view_hammer).
     if (auto* proc = getProcessor())
     {
-        if (_hammerView) { proc->editor_width_hammer = W; proc->editor_height_hammer = H; }
-        else             { proc->editor_width_sphere = W; proc->editor_height_sphere = H; }
+        proc->editor_width  = W;
+        proc->editor_height = H;
     }
 
     // --- Header strip ---------------------------------------------------------
@@ -899,29 +898,22 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
                 });
         }
     }
-    else if (buttonThatWasClicked == &btn_view_sphere)
+    else if (buttonThatWasClicked == &btn_view_sphere || buttonThatWasClicked == &btn_view_hammer)
     {
-        // Save current size into the H-A slot (we're leaving that view),
-        // flip, then size up the sphere slot. setSize triggers resized()
-        // which writes back to the sphere slot — so the round-trip preserves
-        // whatever each view was last set to.
-        ourProcessor->editor_width_hammer  = getWidth();
-        ourProcessor->editor_height_hammer = getHeight();
-        _hammerView = false;
-        ourProcessor->editor_hammer_view = false;
+        // Keep the editor's height, recompute width to match the new view's
+        // natural aspect (sphere ≈ height+148 because the panner is square;
+        // H-A ≈ 2·height-10 because the panner is 2:1). The constants come
+        // from the resized() layout: 158 px of header + bottom strip + table
+        // column ~256 px + ~50 px of margins.
+        const bool newHammer = (buttonThatWasClicked == &btn_view_hammer);
+        _hammerView = newHammer;
+        ourProcessor->editor_hammer_view = newHammer;
         updateActivePanner();
-        setSize (juce::jlimit (520, 1400, ourProcessor->editor_width_sphere),
-                 juce::jlimit (420, 1200, ourProcessor->editor_height_sphere));
-    }
-    else if (buttonThatWasClicked == &btn_view_hammer)
-    {
-        ourProcessor->editor_width_sphere  = getWidth();
-        ourProcessor->editor_height_sphere = getHeight();
-        _hammerView = true;
-        ourProcessor->editor_hammer_view = true;
-        updateActivePanner();
-        setSize (juce::jlimit (520, 1400, ourProcessor->editor_width_hammer),
-                 juce::jlimit (420, 1200, ourProcessor->editor_height_hammer));
+
+        const int currentH = getHeight();
+        const int targetW  = newHammer ? juce::jlimit (520, 1400, 2 * currentH - 10)
+                                       : juce::jlimit (520, 1400,     currentH + 148);
+        setSize (targetW, currentH);
     }
     else if (buttonThatWasClicked == &btn_linked_toggle)
     {

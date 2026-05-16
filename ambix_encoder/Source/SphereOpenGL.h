@@ -124,7 +124,11 @@ private:
     float _mWidth = 0.f;
     float _dragStartDistToCenter = 0.f;
 
-    int   _draggingSource = -1; // unlinked mode per-source drag
+    // Per-touch-source drag state keyed by MouseInputSource::getIndex().
+    // Lets multiple fingers drag separate source pucks at once on touch
+    // displays. The single _mPhi/_mTheta snapshot above is still used for
+    // relative-mode and Alt-drag-width (modifier-driven, mouse-only).
+    std::map<int, int> draggingByTouchIndex;
 
     // Pre-rendered "1", "2", ... textures used by renderOpenGL to label
     // sources directly in OpenGL — avoids JUCE's component-painting cache

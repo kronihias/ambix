@@ -31,6 +31,7 @@ public:
 
     void mouseDown  (const juce::MouseEvent& e) override;
     void mouseDrag  (const juce::MouseEvent& e) override;
+    void mouseUp    (const juce::MouseEvent& e) override;
 
 private:
     void timerCallback() override { repaint(); }
@@ -48,7 +49,16 @@ private:
     juce::Point<float> sourceScreenPos (int idx) const;
 
     Ambix_encoderAudioProcessor* processor = nullptr;
-    int draggingSource = -1;
+
+    // Per-touch-source drag state keyed by MouseInputSource::getIndex().
+    // JUCE delivers each finger as an independent event stream with its own
+    // index, so storing one puck index per source means multiple fingers
+    // can drag separate pucks at the same time on touch displays.
+    std::map<int, int> draggingByTouchIndex;
+
+    // Index of the puck currently rendered in "dragging" colour (orange).
+    // Tracks the most recently grabbed puck across all touches.
+    int lastGrabbed = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HammerAitoffView)
 };

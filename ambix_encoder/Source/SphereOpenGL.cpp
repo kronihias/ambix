@@ -100,8 +100,12 @@ void SphereOpenGL::renderOpenGL()
             const float y = 0.9f * cosf(az) * cosf(el);
             const float z = 0.9f * sinf(el);
 
-            // dot colour: yellow normally, orange when dragging this source
-            if (_draggingSource == i)
+            // dot colour: yellow normally, orange when any finger is
+            // currently dragging this source
+            bool isDragging = false;
+            for (const auto& kv : draggingByTouchIndex)
+                if (kv.second == i) { isDragging = true; break; }
+            if (isDragging)
                 glColor4f (1.f, 0.6f, 0.f, 1.f);
             else
                 glColor4f (1.f, 1.f, 0.f, 1.f);
@@ -246,7 +250,9 @@ void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
 
     if (! processor->isLinked())
     {
-        // Pick the source closest to the cursor.
+        // Pick the source closest to this touch / mouse position. Each
+        // active touch source gets its own puck assignment so multiple
+        // fingers can drag separate pucks at once.
         const int active = processor->getActiveSources();
         int best = 0;
         float bestD = 1e9f;
@@ -263,22 +269,15 @@ void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
             const float d = dx*dx + dy*dy;
             if (d < bestD) { bestD = d; best = i; }
         }
-        _draggingSource = best;
+        draggingByTouchIndex[e.source.getIndex()] = best;
 
         // Override the global-param snapshot with the picked source's
-        // actual position. mouseDrag's hemisphere logic keys off the sign
-        // of _mTheta — if the source is in the lower hemisphere but the
-        // global elevation_param is in the upper hemisphere (or vice
-        // versa), the first mouse-move flips the source across the
-        // equator. Initialising _mTheta/_mPhi from the source we just
-        // picked makes the drag start coherent with where the puck is.
+        // actual position so the absolute-mode hemisphere logic starts
+        // coherent with where the puck is. (Note: this snapshot is
+        // mouse-only — relative / Alt drags don't multi-touch.)
         const auto pos = processor->getSourceDisplayPos (best);
         _mPhi   = pos.azDeg * (float) DEG2RAD;
         _mTheta = pos.elDeg * (float) DEG2RAD;
-    }
-    else
-    {
-        _draggingSource = -1;
     }
 
     if (e.mods.isAltDown() && processor->isLinked())
@@ -357,18 +356,22 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
         setParameterNotifyingHost (processor, Ambix_encoderAudioProcessor::ElevationParam,
                                    mTheta / (2.f * (float)M_PI) + 0.5f);
     }
-    else if (_draggingSource >= 0)
+    else
     {
+        // Route the drag to whichever puck THIS touch source picked up.
+        auto it = draggingByTouchIndex.find (e.source.getIndex());
+        if (it == draggingByTouchIndex.end()) return;
+        const int draggingSource = it->second;
         setParameterNotifyingHost (processor,
-                                   Ambix_encoderAudioProcessor::sourceParamIndex (_draggingSource, Ambix_encoderAudioProcessor::SrcAz),
+                                   Ambix_encoderAudioProcessor::sourceParamIndex (draggingSource, Ambix_encoderAudioProcessor::SrcAz),
                                    jlimit (0.f, 1.f, mPhi   / (2.f * (float)M_PI) + 0.5f));
         setParameterNotifyingHost (processor,
-                                   Ambix_encoderAudioProcessor::sourceParamIndex (_draggingSource, Ambix_encoderAudioProcessor::SrcEl),
+                                   Ambix_encoderAudioProcessor::sourceParamIndex (draggingSource, Ambix_encoderAudioProcessor::SrcEl),
                                    jlimit (0.f, 1.f, mTheta / (2.f * (float)M_PI) + 0.5f));
     }
 }
 
-void SphereOpenGL::mouseUp(const juce::MouseEvent& /*e*/)
+void SphereOpenGL::mouseUp(const juce::MouseEvent& e)
 {
-    _draggingSource = -1;
+    draggingByTouchIndex.erase (e.source.getIndex());
 }

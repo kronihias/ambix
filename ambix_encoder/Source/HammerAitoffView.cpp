@@ -282,7 +282,12 @@ void HammerAitoffView::paint (juce::Graphics& g)
 
         // Dot
         const float r = 7.f * visScale;
-        g.setColour (draggingSource == i ? juce::Colours::orange : juce::Colours::yellow);
+        // Highlight any puck currently being dragged by any finger.
+        bool isDragging = (lastGrabbed == i);
+        if (! isDragging)
+            for (const auto& kv : draggingByTouchIndex)
+                if (kv.second == i) { isDragging = true; break; }
+        g.setColour (isDragging ? juce::Colours::orange : juce::Colours::yellow);
         g.fillEllipse (sp.x - r, sp.y - r, r * 2.f, r * 2.f);
         g.setColour (juce::Colours::black);
         g.drawEllipse (sp.x - r, sp.y - r, r * 2.f, r * 2.f, 1.f);
@@ -304,20 +309,33 @@ void HammerAitoffView::resized() {}
 void HammerAitoffView::mouseDown (const juce::MouseEvent& e)
 {
     if (! processor) return;
-    draggingSource = findSourceUnder (e.getPosition().toFloat());
-    if (draggingSource < 0)
+    int puck = findSourceUnder (e.getPosition().toFloat());
+    if (puck < 0)
     {
         // Click in empty space: drag the nearest source there (simpler than
         // creating new sources). Fall through to mouseDrag for the position
         // update.
-        draggingSource = 0;
+        puck = 0;
     }
+    draggingByTouchIndex[e.source.getIndex()] = puck;
+    lastGrabbed = puck;
     mouseDrag (e);
+}
+
+void HammerAitoffView::mouseUp (const juce::MouseEvent& e)
+{
+    draggingByTouchIndex.erase (e.source.getIndex());
+    if (draggingByTouchIndex.empty())
+        lastGrabbed = -1;
 }
 
 void HammerAitoffView::mouseDrag (const juce::MouseEvent& e)
 {
-    if (! processor || draggingSource < 0) return;
+    if (! processor) return;
+    auto it = draggingByTouchIndex.find (e.source.getIndex());
+    if (it == draggingByTouchIndex.end()) return;
+    const int draggingSource = it->second;
+    lastGrabbed = draggingSource;
 
     const auto bounds = getProjectionBounds();
     const float cx = bounds.getCentreX();
