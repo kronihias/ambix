@@ -192,7 +192,7 @@ See [`ambix_visualizer/README.md`](ambix_visualizer/README.md) for build instruc
 
 ## Prerequisites for Building
 
-CMake, a working build environment, FFTW3, and Eigen 3 are required. Standalone applications additionally require the ASIO SDK for Windows ASIO support.
+CMake and a working build environment are required. FFTW3 is required on Linux/Windows; Eigen 3 ships as a git submodule (no system install needed). Standalone applications additionally require the ASIO SDK for Windows ASIO support.
 
 **Linux** — install dependencies (Debian/Ubuntu):
 
@@ -200,23 +200,16 @@ CMake, a working build environment, FFTW3, and Eigen 3 are required. Standalone 
 sudo apt install libasound2-dev libjack-jackd2-dev \
     ladspa-sdk \
     libcurl4-openssl-dev \
-    libfreetype6-dev \
+    libfreetype-dev libfontconfig1-dev \
     libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev \
-    libwebkit2gtk-4.0-dev \
+    libwebkit2gtk-4.1-dev \
     libglu1-mesa-dev mesa-common-dev \
-    libfftw3-dev \
-    libzita-convolver3 \
-    libzita-convolver-dev \
-    libeigen3-dev
+    libfftw3-dev
 ```
 
-**macOS** — install dependencies via MacPorts:
+> On older Ubuntu/Debian where `libwebkit2gtk-4.1-dev` is not available, substitute `libwebkit2gtk-4.0-dev` — JUCE 8 loads whichever is present at runtime. Likewise, fall back to `libfreetype6-dev` if `libfreetype-dev` is unavailable. If you intend to enable `WITH_ZITA_CONVOLVER` (off by default), also install `libzita-convolver-dev`.
 
-```bash
-sudo port install eigen3-devel
-```
-
-**Windows** — download FFTW3 and Eigen manually (see their respective project pages).
+**Windows** — download FFTW3 manually (see the FFTW project page).
 
 Clone the repository including submodules:
 
