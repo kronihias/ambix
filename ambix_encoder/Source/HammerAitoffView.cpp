@@ -128,15 +128,17 @@ juce::Rectangle<float> HammerAitoffView::getProjectionBounds() const
     // Inset so dots don't run off the edge.
     const float pad = 12.f;
     auto r = getLocalBounds().toFloat().reduced (pad);
-    // Aspect = 2 / (visYMax - visYMin) so the visible region just fills the
-    // shorter axis. Full sphere is 2:1; upper hemisphere (-10..+90) is
-    // ~1.7:1.
+    // Aspect math: project() normalises raw x by 2√2 and raw y by √2 — i.e.
+    // the unit circle in (xN, yN) actually represents the 2:1 Hammer ellipse.
+    // For an undistorted picture, screen aspect must therefore be
+    //     (xN range / yN range) × (2√2 / √2)  =  (2 / dY) × 2  =  4 / dY.
+    // Full sphere (dY = 2) → 2:1. Upper-only (-10..+90°, dY ≈ 1.174) → ~3.4:1.
     const auto er = getVisibleEleDegRange();
     constexpr float deg2rad = juce::MathConstants<float>::pi / 180.f;
     const float visYMin = std::sin (er.getStart() * deg2rad);
     const float visYMax = std::sin (er.getEnd()   * deg2rad);
     const float dY = juce::jmax (0.001f, visYMax - visYMin);
-    const float ar = 2.f / dY;
+    const float ar = 4.f / dY;
     if (r.getWidth() / r.getHeight() > ar)
         r = r.withSizeKeepingCentre (r.getHeight() * ar, r.getHeight());
     else
