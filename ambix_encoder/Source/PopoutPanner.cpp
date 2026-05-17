@@ -125,6 +125,13 @@ PopoutPanner::PopoutPanner (Ambix_encoderAudioProcessor& proc,
     });
     setContentOwned (content, true);
 
+    // Catch ESC from anywhere inside the popout (sphere/HA view children
+    // included) — a KeyListener fires before normal focus routing, so it
+    // doesn't matter which child grabbed focus most recently.
+    content->addKeyListener (this);
+    content->setWantsKeyboardFocus (true);
+    content->grabKeyboardFocus();
+
     // Use the persisted size if it's sane; otherwise pick a sensible
     // default per view (wider for H-A, squarer for Sphere). Clamp to the
     // resize limits so old/corrupt state can't open the window off-screen.
@@ -155,6 +162,16 @@ void PopoutPanner::closeButtonPressed()
     // Delegate to the owner (the editor) so it can drop the unique_ptr.
     // Destroying the window inline here would re-enter our own callbacks.
     if (onClose) onClose();
+}
+
+bool PopoutPanner::keyPressed (const juce::KeyPress& key, juce::Component* /*originating*/)
+{
+    if (key == juce::KeyPress::escapeKey)
+    {
+        closeButtonPressed();
+        return true;
+    }
+    return false;
 }
 
 void PopoutPanner::resized()

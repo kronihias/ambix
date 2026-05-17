@@ -41,6 +41,7 @@
 #include "HammerAitoffView.h"
 
 class PopoutPanner : public juce::DocumentWindow,
+                     public juce::KeyListener,
                      private juce::Timer
 {
 public:
@@ -53,6 +54,11 @@ public:
 
     void closeButtonPressed() override;
     void resized() override;
+
+    // ESC closes the popout, matching the OS convention for transient
+    // detached windows. We register as a KeyListener on the content so the
+    // shortcut fires regardless of which child currently has focus.
+    bool keyPressed (const juce::KeyPress& key, juce::Component* originating) override;
 
     // True if the popout is currently showing Hammer-Aitoff; the editor
     // reads this to persist the view choice on the processor side.
