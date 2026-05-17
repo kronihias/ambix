@@ -215,6 +215,12 @@ public:
     int  popout_height      { 600 };
     bool popout_hammer_view { false };
 
+    // When true, the Hammer-Aitoff view clips to the upper hemisphere
+    // (plus a small dip below the equator). Mirrors the visualizer's
+    // "Upper only" toggle. State lives here so the inline editor and the
+    // popout always agree, and so it survives session reload.
+    bool ha_upper_hemisphere_only { false };
+
 #if WITH_OSC
     void timerCallback() override; // call osc send in timer callback
 

@@ -1281,6 +1281,7 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("popout_w",         popout_width);
     xml.setAttribute ("popout_h",         popout_height);
     xml.setAttribute ("popout_hammer",    popout_hammer_view);
+    xml.setAttribute ("ha_upper_only",    ha_upper_hemisphere_only);
 
     copyXmlToBinary (xml, destData);
 }
@@ -1331,6 +1332,7 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
         popout_width       = xmlState->getIntAttribute  ("popout_w",      popout_width);
         popout_height      = xmlState->getIntAttribute  ("popout_h",      popout_height);
         popout_hammer_view = xmlState->getBoolAttribute ("popout_hammer", popout_hammer_view);
+        ha_upper_hemisphere_only = xmlState->getBoolAttribute ("ha_upper_only", ha_upper_hemisphere_only);
         const auto savedDir = xmlState->getStringAttribute ("last_config_dir", {});
         if (savedDir.isNotEmpty())
             lastConfigDir = juce::File (savedDir);
