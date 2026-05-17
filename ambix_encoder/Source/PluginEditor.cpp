@@ -416,15 +416,14 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     btn_popout.setTooltip ("Open a detached panner window (drag to a second screen, fullscreen via title bar)");
     btn_popout.addListener (this);
 
-    // Import / Export source layout (JSON, format-compatible with
-    // SPARTA AmbiENC and IEM MultiEncoder).
-    addAndMakeVisible (btn_import);
-    btn_import.setTooltip ("Import source layout from JSON (SPARTA / IEM compatible). Switches to unlinked mode.");
-    btn_import.addListener (this);
-
-    addAndMakeVisible (btn_export);
-    btn_export.setTooltip ("Export current source layout to JSON (SPARTA / IEM compatible)");
-    btn_export.addListener (this);
+    // Presets button — opens a menu with load/save-from-file, save-as-named,
+    // and the on-disk preset list. Format is JSON, SPARTA AmbiENC / IEM
+    // MultiEncoder compatible. Same toolbar style as mcfx_mimoeq.
+    addAndMakeVisible (btn_presets);
+    btn_presets.setTooltip ("Save / load named source-layout presets (stored under the user's app-data folder), "
+                            "or import / export a JSON file anywhere on disk. "
+                            "JSON format is compatible with SPARTA AmbiENC and IEM MultiEncoder.");
+    btn_presets.addListener (this);
 
     // Linked toggle
     addAndMakeVisible (btn_linked_toggle);
@@ -628,11 +627,10 @@ void Ambix_encoderAudioProcessorEditor::resized()
     // --- Bottom controls (fixed height) --------------------------------------
     const int bottomY = H - 90;
 
-    // Import / Export live at the right edge of the bottom (blue) panel —
-    // out of the way of the Linked toggle and Sources combo in the header.
-    // The blue panel inset is 24 px on each side; keep a small gap.
-    btn_export.setBounds (W - 100, bottomY + 26, 70, 28);
-    btn_import.setBounds (W - 174, bottomY + 26, 70, 28);
+    // Presets sits in the header, to the left of the ID label. Matches the
+    // mcfx_mimoeq toolbar placement so users moving between plugins see the
+    // same affordance in the same spot.
+    btn_presets.setBounds (W - 178, 6, 96, 22);
     // Global size + width only apply in linked mode (where they drive the
     // auto-spread for all sources). Hide them in unlinked mode — each
     // source has its own size column in the table, and width is meaningless
@@ -882,57 +880,9 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
             _settingsDialogWindow = launchOptions.launchAsync();
         }
     }
-    else if (buttonThatWasClicked == &btn_import)
+    else if (buttonThatWasClicked == &btn_presets)
     {
-        // Async file picker. Keep the chooser alive via the editor-owned
-        // unique_ptr so it doesn't die before the user picks.
-        auto startDir = ourProcessor->lastConfigDir.isDirectory()
-                            ? ourProcessor->lastConfigDir
-                            : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
-        fileChooser = std::make_unique<juce::FileChooser> (
-            "Import source layout (JSON, SPARTA/IEM compatible)",
-            startDir, "*.json");
-        fileChooser->launchAsync (juce::FileBrowserComponent::openMode
-                                  | juce::FileBrowserComponent::canSelectFiles,
-            [this] (const juce::FileChooser& fc) {
-                const auto f = fc.getResult();
-                if (f.existsAsFile())
-                {
-                    auto r = getProcessor()->loadConfigurationFromFile (f);
-                    if (r.failed())
-                        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
-                            .withIconType (juce::MessageBoxIconType::WarningIcon)
-                            .withTitle ("Import failed")
-                            .withMessage (r.getErrorMessage())
-                            .withButton ("OK"), nullptr);
-                }
-            });
-    }
-    else if (buttonThatWasClicked == &btn_export)
-    {
-        auto startDir = ourProcessor->lastConfigDir.isDirectory()
-                            ? ourProcessor->lastConfigDir
-                            : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
-        fileChooser = std::make_unique<juce::FileChooser> (
-            "Export source layout (JSON, SPARTA/IEM compatible)",
-            startDir.getChildFile ("ambix_encoder_layout.json"),
-            "*.json");
-        fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
-                                  | juce::FileBrowserComponent::canSelectFiles
-                                  | juce::FileBrowserComponent::warnAboutOverwriting,
-            [this] (const juce::FileChooser& fc) {
-                auto f = fc.getResult();
-                if (f.getFullPathName().isEmpty()) return;
-                if (! f.hasFileExtension ("json"))
-                    f = f.withFileExtension ("json");
-                auto r = getProcessor()->saveConfigurationToFile (f);
-                if (r.failed())
-                    juce::AlertWindow::showAsync (juce::MessageBoxOptions()
-                        .withIconType (juce::MessageBoxIconType::WarningIcon)
-                        .withTitle ("Export failed")
-                        .withMessage (r.getErrorMessage())
-                        .withButton ("OK"), nullptr);
-            });
+        showPresetsMenu();
     }
     else if (buttonThatWasClicked == &btn_popout)
     {
@@ -1011,4 +961,266 @@ void Ambix_encoderAudioProcessorEditor::updateID()
 {
     Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
     ourProcessor->m_id = txt_id.getText().getIntValue();
+}
+
+//==============================================================================
+// Presets menu
+//
+// One toolbar button replaces the old Import/Export pair. Named presets live
+// as JSON files under userApplicationDataDirectory/ambix_encoder/presets and
+// are listed inline in the menu so a single click loads one. Save/load to
+// arbitrary paths is still available via the "Load from file..." /
+// "Save to file..." entries. All prompts are async — no blocking modals.
+
+namespace
+{
+    // Start the file pickers in the user's preset folder when it exists, so
+    // the chooser drops them right where named presets live; otherwise fall
+    // back to the processor's lastConfigDir (if any), then the home folder.
+    juce::File pickStartDir (const PresetManager& pm, const juce::File& lastConfigDir)
+    {
+        auto dir = pm.getPresetDir();
+        if (dir.isDirectory()) return dir;
+        if (lastConfigDir.isDirectory()) return lastConfigDir;
+        return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+    }
+}
+
+void Ambix_encoderAudioProcessorEditor::savePresetFile (const juce::File& file)
+{
+    auto r = getProcessor()->saveConfigurationToFile (file);
+    if (r.failed())
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+            .withIconType (juce::MessageBoxIconType::WarningIcon)
+            .withTitle ("Save preset failed")
+            .withMessage (r.getErrorMessage())
+            .withButton ("OK"), nullptr);
+}
+
+void Ambix_encoderAudioProcessorEditor::loadPresetFile (const juce::File& file)
+{
+    auto r = getProcessor()->loadConfigurationFromFile (file);
+    if (r.failed())
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+            .withIconType (juce::MessageBoxIconType::WarningIcon)
+            .withTitle ("Load preset failed")
+            .withMessage (r.getErrorMessage())
+            .withButton ("OK"), nullptr);
+}
+
+void Ambix_encoderAudioProcessorEditor::showPresetsMenu()
+{
+    juce::PopupMenu m;
+
+    m.addItem ("Load from file...", [this]
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+                          "Load source layout (JSON, SPARTA/IEM compatible)",
+                          pickStartDir (presets_, getProcessor()->lastConfigDir),
+                          "*.json");
+        fileChooser->launchAsync (juce::FileBrowserComponent::openMode
+                                  | juce::FileBrowserComponent::canSelectFiles,
+            [this] (const juce::FileChooser& fc)
+            {
+                const auto f = fc.getResult();
+                if (! f.existsAsFile()) return;
+                loadPresetFile (f);
+            });
+    });
+
+    m.addItem ("Save to file...", [this]
+    {
+        fileChooser = std::make_unique<juce::FileChooser> (
+                          "Save source layout (JSON, SPARTA/IEM compatible)",
+                          pickStartDir (presets_, getProcessor()->lastConfigDir)
+                              .getChildFile ("ambix_encoder_layout.json"),
+                          "*.json");
+        fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
+                                  | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::warnAboutOverwriting,
+            [this] (const juce::FileChooser& fc)
+            {
+                auto f = fc.getResult();
+                if (f.getFullPathName().isEmpty()) return;
+                if (! f.hasFileExtension ("json"))
+                    f = f.withFileExtension ("json");
+                savePresetFile (f);
+            });
+    });
+
+    m.addSeparator();
+
+    m.addItem ("Save as named preset...", [this] { promptSaveAsNamedPreset(); });
+
+    m.addSeparator();
+
+    const auto entries = presets_.listPresets();
+    if (entries.empty())
+    {
+        m.addItem ("(no presets yet)", false, false, [] {});
+    }
+    else
+    {
+        for (const auto& e : entries)
+        {
+            auto file = e.file;
+            m.addItem (e.name, [this, file] { loadPresetFile (file); });
+        }
+    }
+
+    m.addSeparator();
+
+    juce::PopupMenu renameMenu, deleteMenu;
+    for (const auto& e : entries)
+    {
+        auto file = e.file;
+        renameMenu.addItem (e.name, [this, file] { promptRenamePreset (file); });
+        deleteMenu.addItem (e.name, [this, file] { confirmDeletePreset (file); });
+    }
+    m.addSubMenu ("Rename preset", renameMenu, ! entries.empty());
+    m.addSubMenu ("Delete preset", deleteMenu, ! entries.empty());
+
+    m.addSeparator();
+
+    m.addItem ("Reveal preset folder", [this]
+    {
+        presets_.ensurePresetDirExists();
+        presets_.getPresetDir().revealToUser();
+    });
+
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&btn_presets));
+}
+
+void Ambix_encoderAudioProcessorEditor::promptSaveAsNamedPreset()
+{
+    alertWindow_ = std::make_unique<juce::AlertWindow> (
+                       "Save preset",
+                       "Enter a name for this preset:",
+                       juce::MessageBoxIconType::QuestionIcon);
+
+    alertWindow_->addTextEditor ("name", "", {}, false);
+    alertWindow_->addButton ("Save",   1, juce::KeyPress (juce::KeyPress::returnKey));
+    alertWindow_->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    alertWindow_->enterModalState (true,
+        juce::ModalCallbackFunction::create ([this] (int result)
+        {
+            if (result == 0 || alertWindow_ == nullptr) { alertWindow_.reset(); return; }
+
+            const auto raw   = alertWindow_->getTextEditorContents ("name");
+            const auto clean = PresetManager::sanitise (raw);
+            alertWindow_.reset();
+
+            if (clean.isEmpty())
+            {
+                juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                    .withIconType (juce::MessageBoxIconType::WarningIcon)
+                    .withTitle ("Save preset")
+                    .withMessage ("Preset name is empty.")
+                    .withButton ("OK"), nullptr);
+                return;
+            }
+
+            if (! presets_.ensurePresetDirExists())
+            {
+                juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                    .withIconType (juce::MessageBoxIconType::WarningIcon)
+                    .withTitle ("Save preset")
+                    .withMessage ("Could not create the preset folder.")
+                    .withButton ("OK"), nullptr);
+                return;
+            }
+
+            const auto file = presets_.fileForName (clean);
+
+            if (file.existsAsFile())
+            {
+                alertWindow_ = std::make_unique<juce::AlertWindow> (
+                                   "Overwrite preset?",
+                                   "A preset named \"" + clean + "\" already exists.\n"
+                                   "Overwrite it?",
+                                   juce::MessageBoxIconType::WarningIcon);
+                alertWindow_->addButton ("Overwrite", 1, juce::KeyPress (juce::KeyPress::returnKey));
+                alertWindow_->addButton ("Cancel",    0, juce::KeyPress (juce::KeyPress::escapeKey));
+                alertWindow_->enterModalState (true,
+                    juce::ModalCallbackFunction::create ([this, file] (int r)
+                    {
+                        alertWindow_.reset();
+                        if (r != 1) return;
+                        savePresetFile (file);
+                    }), false);
+                return;
+            }
+
+            savePresetFile (file);
+        }), false);
+}
+
+void Ambix_encoderAudioProcessorEditor::promptRenamePreset (const juce::File& file)
+{
+    const auto oldName = file.getFileNameWithoutExtension();
+
+    alertWindow_ = std::make_unique<juce::AlertWindow> (
+                       "Rename preset",
+                       "Enter a new name for \"" + oldName + "\":",
+                       juce::MessageBoxIconType::QuestionIcon);
+
+    alertWindow_->addTextEditor ("name", oldName, {}, false);
+    alertWindow_->addButton ("Rename", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    alertWindow_->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    alertWindow_->enterModalState (true,
+        juce::ModalCallbackFunction::create ([this, file, oldName] (int result)
+        {
+            if (result == 0 || alertWindow_ == nullptr) { alertWindow_.reset(); return; }
+
+            const auto raw   = alertWindow_->getTextEditorContents ("name");
+            const auto clean = PresetManager::sanitise (raw);
+            alertWindow_.reset();
+
+            if (clean.isEmpty() || clean == oldName) return;
+
+            const auto target = presets_.fileForName (clean);
+            if (target.existsAsFile())
+            {
+                juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                    .withIconType (juce::MessageBoxIconType::WarningIcon)
+                    .withTitle ("Rename preset")
+                    .withMessage ("A preset named \"" + clean + "\" already exists.")
+                    .withButton ("OK"), nullptr);
+                return;
+            }
+
+            if (! file.moveFileTo (target))
+                juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                    .withIconType (juce::MessageBoxIconType::WarningIcon)
+                    .withTitle ("Rename preset")
+                    .withMessage ("Rename failed.")
+                    .withButton ("OK"), nullptr);
+        }), false);
+}
+
+void Ambix_encoderAudioProcessorEditor::confirmDeletePreset (const juce::File& file)
+{
+    alertWindow_ = std::make_unique<juce::AlertWindow> (
+                       "Delete preset?",
+                       "Delete preset \"" + file.getFileNameWithoutExtension() + "\"?\n"
+                       "This cannot be undone.",
+                       juce::MessageBoxIconType::WarningIcon);
+    alertWindow_->addButton ("Delete", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    alertWindow_->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    alertWindow_->enterModalState (true,
+        juce::ModalCallbackFunction::create ([this, file] (int result)
+        {
+            alertWindow_.reset();
+            if (result != 1) return;
+
+            if (! file.deleteFile())
+                juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                    .withIconType (juce::MessageBoxIconType::WarningIcon)
+                    .withTitle ("Delete preset")
+                    .withMessage ("Delete failed.")
+                    .withButton ("OK"), nullptr);
+        }), false);
 }

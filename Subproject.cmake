@@ -114,6 +114,14 @@ IF(WITH_DISCOVERY_HUB)
 	LIST ( APPEND HEADER ${SRC_DIR}/common/DiscoveryHub.h)
 ENDIF(WITH_DISCOVERY_HUB)
 
+# PresetManager: shared helper for per-user JSON preset folders. Ported
+# from mcfx (mcfx_graph / mcfx_mimoeq) — pure I/O, no UI, so each plugin
+# editor builds its own PopupMenu and load/save logic on top.
+IF(WITH_PRESET_MANAGER)
+	LIST ( APPEND SOURCE ${SRC_DIR}/common/Presets/PresetManager.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/Presets/PresetManager.h)
+ENDIF(WITH_PRESET_MANAGER)
+
 
 #SORT IT
 LIST ( SORT SOURCE )

@@ -22,6 +22,7 @@
 #include "HammerAitoffView.h"
 #include "PopoutPanner.h"
 #include "Settings.h"
+#include "../../common/Presets/PresetManager.h"
 
 class Ambix_encoderAudioProcessorEditor;
 
@@ -110,6 +111,17 @@ private:
     void updateActivePanner();
     void layoutTableRows (int viewportWidth);
 
+    // Presets menu plumbing — mirrors the mcfx_mimoeq toolbar Presets button.
+    // One button replaces the old Load + Save pair; named presets live as
+    // JSON files in the per-user preset folder and appear inline in the menu
+    // so a single click loads one. All prompts are async (AlertWindow).
+    void showPresetsMenu();
+    void promptSaveAsNamedPreset();
+    void promptRenamePreset (const juce::File& file);
+    void confirmDeletePreset (const juce::File& file);
+    void loadPresetFile (const juce::File& file);
+    void savePresetFile (const juce::File& file);
+
     juce::LookAndFeel_V3 globalLaF;
 
     juce::Slider sld_el;
@@ -130,9 +142,14 @@ private:
     juce::TextButton btn_view_hammer    { "Hammer-Aitoff" };
     juce::TextButton btn_popout         { juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x97")) }; // ↗
     juce::TextButton btn_linked_toggle  { "Linked" };
-    juce::TextButton btn_import         { "Import" };
-    juce::TextButton btn_export         { "Export" };
-    std::unique_ptr<juce::FileChooser> fileChooser; // kept alive across async picker
+    juce::TextButton btn_presets        { "Presets" };
+
+    // Preset storage: ~/Library/Application Support/ambix_encoder/presets/*.json
+    // (and platform equivalents). PresetManager only does I/O; the popup
+    // menu and modal prompts live in this editor.
+    PresetManager presets_              { "ambix_encoder" };
+    std::unique_ptr<juce::FileChooser> fileChooser;   // kept alive across async picker
+    std::unique_ptr<juce::AlertWindow> alertWindow_;  // ditto for save-as / rename / delete prompts
 
     // Owned popout — non-null while the detached panner window is open.
     // Created on demand from the popout-button handler, reset when the
