@@ -313,26 +313,31 @@ void HammerAitovView::mouseDrag (const juce::MouseEvent& e)
 
 void HammerAitovView::sendPositionUpdate (const EncoderSource& src, float azDeg, float elDeg)
 {
-    if (src.senderIp.isEmpty())
+    if (src.senderIp.isEmpty() || src.replyPort <= 0)
         return;
 
-    if (src.origin == EncoderOrigin::Ambix)
+    switch (src.origin)
     {
-        if (src.replyPort > 0)
+        case EncoderOrigin::Ambix:
             sender.sendAmbiEncSet (src.senderIp, src.replyPort, src.id,
                                    azDeg, elDeg, src.size);
-    }
-    else
-    {
-        if (src.replyPort > 0)
-        {
+            break;
+
+        case EncoderOrigin::AmbixSource:
+            sender.sendAmbixSourceParam (src.senderIp, src.replyPort, src.id,
+                                         OscCommandSender::AmbixSourceParam::Azimuth, azDeg);
+            sender.sendAmbixSourceParam (src.senderIp, src.replyPort, src.id,
+                                         OscCommandSender::AmbixSourceParam::Elevation, elDeg);
+            break;
+
+        case EncoderOrigin::MultiEncoder:
             sender.sendMultiEncoderParam (src.senderIp, src.replyPort, src.trackName,
                                           MultiEncoderPayload::Param::Azimuth,
                                           src.id, azDeg);
             sender.sendMultiEncoderParam (src.senderIp, src.replyPort, src.trackName,
                                           MultiEncoderPayload::Param::Elevation,
                                           src.id, elDeg);
-        }
+            break;
     }
 }
 

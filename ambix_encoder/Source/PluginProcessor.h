@@ -35,13 +35,25 @@
 
 #define _2PI 6.2831853071795
 
+// Maximum number of input source channels supported by the unified binary.
+// The plugin allocates this many panners/encoders at construction; the active
+// count is exposed at runtime via NumActiveSourcesParam.
+//
+// Defaults to AMBI_CHANNELS — the number of SH coefficients on the output
+// bus — so a 5th-order build has 36 source slots, a 7th-order (universal)
+// build has 64. Override via -DMAX_INPUT_CHANNELS=N if you need fewer or
+// more independent of the ambisonic order.
+#ifndef MAX_INPUT_CHANNELS
+ #define MAX_INPUT_CHANNELS AMBI_CHANNELS
+#endif
+
 //==============================================================================
 /**
 */
 class Ambix_encoderAudioProcessor  : public AudioProcessor,
 #if WITH_OSC
                                     public Timer,
-                                    private OSCReceiver::ListenerWithOSCAddress<OSCReceiver::RealtimeCallback>,
+                                    private OSCReceiver::Listener<OSCReceiver::RealtimeCallback>,
                                     private juce::ChangeListener,
 #endif
                                     public ChangeBroadcaster
@@ -90,14 +102,10 @@ public:
     bool silenceInProducesSilenceOut() const override;
     double getTailLengthSeconds() const override;
 
-    void calcAzimuth();
-
     void updateTrackProperties (const TrackProperties& properties) override;
 
     String getTrackName() const;  // thread-safe accessor used by sendOSC()
 
-    // Expose the VST3 extensions object so the JUCE VST3 wrapper can pass
-    // host-side interfaces (e.g. REAPER's IReaperHostApplication) to it.
     juce::VST3ClientExtensions* getVST3ClientExtensions() override
     {
         return &reaperIntegration;
@@ -107,22 +115,69 @@ public:
     void calcNewParameters(double SampleRate, int BufferLength);
 #endif
 
+    //==============================================================================
+    // Parameter layout. Indices are stable so DAW automation survives revisions.
+    // Per-source params start at SourceParamsBase and pack 4 floats per source
+    // in (az, el, size, gain) order. They are always exposed to the host so
+    // automation works regardless of the linked toggle, but only consulted when
+    // unlinked.
+    static constexpr int kMaxSources         = MAX_INPUT_CHANNELS;
+    static constexpr int kPerSourceParams    = 5;  // az, el, size, mute, solo
+    static constexpr int kBaseParams         = 13;
+    static constexpr int kTotalParams        = kBaseParams + kMaxSources * kPerSourceParams;
+
     enum Parameters
-	{
-		AzimuthParam,
+    {
+        AzimuthParam = 0,
         ElevationParam,
         SizeParam,
-#if INPUT_CHANNELS > 1
-        WidthParam, // if multiple sources
-#endif
-        AzimuthSetParam, // for advanced control...
+        WidthParam,
+        AzimuthSetParam,    // advanced control
         AzimuthSetRelParam,
         AzimuthMvParam,
         ElevationSetParam,
         ElevationSetRelParam,
         ElevationMvParam,
-        SpeedParam
-	};
+        SpeedParam,
+        LinkedParam,            // 0 = unlinked, 1 = linked
+        NumActiveSourcesParam,  // 0..1 mapped to 1..kMaxSources (round)
+        SourceParamsBase = 13   // per-source params follow
+    };
+
+    enum SourceSubParam { SrcAz = 0, SrcEl, SrcSize, SrcMute, SrcSolo };
+
+    static constexpr int sourceParamIndex (int srcIdx, int sub)
+    {
+        return SourceParamsBase + srcIdx * kPerSourceParams + sub;
+    }
+
+    // Decode the active source count from NumActiveSourcesParam (0..1 → 1..kMaxSources).
+    int getActiveSources() const;
+
+    bool isLinked() const { return linked_param >= 0.5f; }
+
+    // Source-layout import / export. JSON format follows SPARTA's
+    // GenericLayout / IEM MultiEncoder convention:
+    //   { "Name": "...", "Description": "...",
+    //     "GenericLayout": { "Name": "Source Directions",
+    //                        "Elements": [ { "Azimuth", "Elevation",
+    //                                        "Radius", "IsImaginary",
+    //                                        "Channel", "Gain" }, ... ] } }
+    // So a file written by one tool can be loaded into any of the three.
+    // Loading auto-switches to unlinked mode and sets the active source
+    // count from the highest non-imaginary Channel in the file.
+    juce::Result saveConfigurationToFile   (const juce::File& file);
+    juce::Result loadConfigurationFromFile (const juce::File& file);
+    juce::Result loadConfigurationFromString (const juce::String& jsonText);
+
+    // Last-used directory for the file picker. Stored in plugin state so
+    // the user lands back where they left off across sessions.
+    juce::File lastConfigDir;
+
+    // Snapshot of per-source positions for the editor / Hammer-Aitoff view.
+    // Returns degrees in (-180..180, -90..90) for convenience.
+    struct SourcePos { float azDeg, elDeg, size, rms, peak; };
+    SourcePos getSourceDisplayPos (int idx) const;
 
     //==============================================================================
     int getNumPrograms() override;
@@ -137,76 +192,78 @@ public:
 
 
     int m_id; // id of this instance
-
     static int s_ID; // global instance counter
+
+    // Editor UI state persisted in the plugin state so re-opening the
+    // editor (or recalling the session) restores window size + which
+    // panner was last visible. Per-view sizes so switching between Sphere
+    // (1:1 panner) and Hammer-Aitoff (2:1 panner) restores each layout
+    // independently — the editor reads the slot for whichever view is
+    // active and writes back to it on every resize.
+    // Single persisted editor size. View toggle recomputes width to fit the
+    // new panner's aspect at the current height — per-view memory turned
+    // out to confuse the layout when both slots had been resized independently.
+    int  editor_width       { 640 };
+    int  editor_height      { 520 };
+    bool editor_hammer_view { false };
+
+    // Popout window state: whether it was open at save time, its size,
+    // and which view it had. Read on editor construction; the popout
+    // writes back on resize / view-toggle / close.
+    bool popout_open        { false };
+    int  popout_width       { 800 };
+    int  popout_height      { 600 };
+    bool popout_hammer_view { false };
+
+    // When true, the Hammer-Aitoff view clips to the upper hemisphere
+    // (plus a small dip below the equator). Mirrors the visualizer's
+    // "Upper only" toggle. State lives here so the inline editor and the
+    // popout always agree, and so it survives session reload.
+    bool ha_upper_hemisphere_only { false };
 
 #if WITH_OSC
     void timerCallback() override; // call osc send in timer callback
 
-    // JUCE OSC
     void oscMessageReceived (const OSCMessage& message) override;
 
     void sendOSC(); // send osc data
 
-    // UI toggles. Semantics (decoupled now):
-    //   osc_out       — enable sending to the manual ip:port list.
-    //   osc_in        — honour /ambi_enc_set for remote parameter control.
-    //   discoverable  — advertise on the LAN + accept /ambi_enc_subscribe and
-    //                   stream /ambi_enc to every subscriber, regardless of
-    //                   osc_out. Subscriber traffic is independent of the
-    //                   manual send/receive toggles.
     void oscOut(bool arg);
     void oscIn (bool arg);
     void setDiscoverable (bool arg);
 
     void changeTimer(int time);
 
-    // osc stuff
     bool osc_in;
-	bool osc_out;
+    bool osc_out;
     int osc_interval;
 
-	String osc_in_port, osc_out_ip, osc_out_port;
+    String osc_in_port, osc_out_ip, osc_out_port;
 
-    // zeroconf discovery
     bool discoverable;
     std::unique_ptr<NetworkAdvertiser> networkAdvertiser;
     void refreshAdvertiser();
-    void rebuildOscSenders(); // combines manual + subscribers
-
-    // Decides whether the UDP receive socket should be bound, and whether the
-    // send timer should be running, based on the current flags + subscriber
-    // count. Called from every setter that affects those conditions.
+    void rebuildOscSenders();
     void refreshOscReceiverBinding();
     void refreshOscOutput();
 
     void dispatchSubscribe   (const juce::OSCMessage& m);
     void dispatchUnsubscribe (const juce::OSCMessage& m);
 
-    // Rebuilds sender list when NSD expires subscribers.
     void changeListenerCallback (juce::ChangeBroadcaster* source) override;
-
 #endif
 
-    // Fully constructed by the member-initializer list so the VST3 wrapper
-    // can call setIHostApplication on it even before our ctor body runs.
     ReaperVST3Integration reaperIntegration;
 
-    // Stable per-plugin-load identifier broadcast in the NSD description as
-    // `euid=...`. The visualizer keys its subscription list on this — it is
-    // invariant across Advertiser rebuilds, unlike juce's `Service::instanceID`
-    // which mints a fresh random value every time the Advertiser is recreated
-    // (e.g. when the description changes after a project-name poll).
     const juce::String instanceUuid { juce::Uuid().toDashedString() };
 
+    //==========================================================================
+    // Per-source per-block RMS (W-channel encoded contribution magnitude is too
+    // entangled across sources, so we measure each input pre-encoding instead).
+    // Read by the editor for VU display + sent over OSC.
+    float getSourceMeter (int idx) const;
+
 private:
-    // Lightweight timer that polls REAPER's project name for this plugin
-    // instance. Runs regardless of whether the OSC-send timer is active —
-    // without it, the project name would only resolve AFTER the first
-    // subscriber arrived, which triggered a description change and (before we
-    // added the stable `euid`) would have invalidated that very subscription.
-    // Decoupling project-poll from OSC-send keeps the first-ever broadcast
-    // carrying the right `proj=` value.
     struct ReaperPollTimer : public juce::Timer
     {
         explicit ReaperPollTimer (Ambix_encoderAudioProcessor& p) : owner (p) {}
@@ -217,25 +274,42 @@ private:
     void pollReaperProject();
 
     CriticalSection track_name_lock;
-    String          track_name;   // updated by the host via updateTrackProperties()
+    String          track_name;
 
-    // Cached "last seen" REAPER project name; compared each poll tick so we
-    // only rebuild the NSD advertiser when the project is saved/renamed/changed.
     String          currentReaperProject;
 
     OwnedArray<AmbixEncoder> AmbiEnc;
 
+    // Recompute per-source target azimuth/elevation/size from the active
+    // parameter model (linked vs unlinked). Called whenever a relevant param
+    // changes, and once per processBlock() before the gain ramp.
+    void applyParamsToEncoders();
+
+    // Migrate global → per-source positions when switching modes so the user
+    // doesn't lose context between linked and unlinked.
+    void linkedToUnlinkedSnapshot();
+    void unlinkedToLinkedSnapshot();
+
     double SampleRate;
 
-    unsigned int NumParameters;
-
-    float azimuth_param; // for multiple inputs this is the center
+    // global (linked-mode) params
+    float azimuth_param;
     float elevation_param;
     float size_param;
-    float width_param;  // arrange sources with equal angular distance
+    float width_param;
+    float linked_param;
+    float num_active_sources_param;
 
-    // last osc value sent...
-    float _azimuth_param; // for multiple inputs this is the center
+    // per-source params (azimuth, elevation, size, mute, solo). All stored
+    // in [0,1] so they're properly automatable. Azimuth/elevation share
+    // the [0,1] → [-180°, +180°] encoding; size is plain 0..1; mute/solo
+    // are booleans encoded as >0.5 = on. Mute/solo are orthogonal to
+    // position so they apply regardless of linked/unlinked mode.
+    struct SourceParams { float az, el, size, mute, solo; };
+    std::array<SourceParams, kMaxSources> source_params;
+
+    // last osc value sent (deltas only)
+    float _azimuth_param;
     float _elevation_param;
     float _size_param;
     float _rms;
@@ -248,30 +322,49 @@ private:
 
     AudioSampleBuffer InputBuffer;
 
-    MyMeterDsp _my_meter_dsp;
+    MyMeterDsp _my_meter_dsp; // overall W-channel meter (legacy /ambi_enc)
+    OwnedArray<MyMeterDsp> sourceMeterDsp;
 
-    float rms; // rms of W channel
-    float dpk; // peak value of W channel
+    float rms;
+    float dpk;
+
+    // Running RMS estimate for the W-channel meter, using the same
+    // recursive Newton-sqrt update as source_rms_ema. Stores y directly
+    // (not mean-square), so reading is a single load with no sqrt.
+    float overall_rms_ema { 0.f };
+
+    // Per-source meter snapshot (lock-free single-writer). RMS uses the
+    // recursive Newton-sqrt form from embedded.com — fused IIR averager
+    // + 1 Newton sqrt iteration per block — so y converges to the true
+    // RMS with linear-in-dB ballistic. Peak comes from MyMeterDsp's
+    // fast-attack + peak-hold ballistic so transients still show up
+    // promptly and decay naturally on their own.
+    std::array<std::atomic<float>, kMaxSources> source_rms {};
+    std::array<std::atomic<float>, kMaxSources> source_peak {};
+    std::array<float,              kMaxSources> source_rms_ema {}; // running y (per article)
 
 #if WITH_OSC
     OSCReceiver oscReceiver;
-    bool receiverBound { false }; // tracks whether oscReceiver is connected so
-                                  // refreshOscReceiverBinding() can idempotently
-                                  // bind/unbind.
+    bool receiverBound { false };
 
-    CriticalSection oscSenders_lock; // protects oscSenders against concurrent
-                                     // access from Timer thread (sendOSC) and
-                                     // OSC receiver / NSD threads.
-    OwnedArray<OSCSender> oscSenders;
+    CriticalSection oscSenders_lock;
 
+    // Wraps an OSCSender alongside its destination so rebuildOscSenders can
+    // reconcile the desired list against the existing senders by (ip, port)
+    // and KEEP the existing OSCSender object (and its ephemeral source UDP
+    // port) when a destination is still wanted. Recreating an OSCSender
+    // every rebuild would shift the OS-assigned source port each time —
+    // visualizer side keys per-source pucks on senderIp:senderPort, so a
+    // shifting port spawns a new puck on every rebuild.
+    struct OscDest
+    {
+        juce::String ip;
+        int port { 0 };
+        std::unique_ptr<juce::OSCSender> sender;
+    };
+    OwnedArray<OscDest> oscSenders;
 #endif
-    /*
-    void calcParams();
 
-    Array<float> ambi_gain;
-    Array<float> _ambi_gain; // buffer for gain ramp
-    */
-    //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_encoderAudioProcessor)
 };
 

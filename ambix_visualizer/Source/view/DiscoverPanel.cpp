@@ -479,12 +479,23 @@ void DiscoverPanel::addGroupForProject (const juce::String& projectName,
     {
         for (const auto& src : sources)
         {
-            if (src.origin == EncoderOrigin::Ambix
-                && src.id == enc.encoderId
-                && src.trackName == enc.track)
+            const bool isAmbix = src.origin == EncoderOrigin::Ambix
+                              && src.id == enc.encoderId
+                              && src.trackName == enc.track;
+            // AmbixSource pucks share the encoder's reply port — match the
+            // NSD record's port against the puck's replyPort. All per-source
+            // pucks belonging to one plugin instance assign together.
+            const bool isAmbixPerSource = src.origin == EncoderOrigin::AmbixSource
+                                        && src.replyPort == enc.port;
+            if (isAmbix)
             {
                 sourceRegistry.setGroup (src.key(), newGroupId);
-                break;
+                break; // ambix legacy = one puck per plugin, done.
+            }
+            if (isAmbixPerSource)
+            {
+                sourceRegistry.setGroup (src.key(), newGroupId);
+                // don't break — keep scanning for other sources on the same plugin.
             }
         }
     }

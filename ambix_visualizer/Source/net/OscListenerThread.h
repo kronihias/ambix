@@ -3,13 +3,14 @@
 #include <JuceHeader.h>
 
 #include "AmbiEncParser.h"
+#include "AmbixSourceParser.h"
 #include "MultiEncoderParser.h"
 
 class OscListenerThread : private juce::Thread,
                           private juce::AsyncUpdater
 {
 public:
-    enum class Kind { Ambix, MultiEncoder };
+    enum class Kind { Ambix, AmbixSource, MultiEncoder };
 
     struct IncomingMessage
     {
@@ -17,6 +18,7 @@ public:
         int senderPort { 0 };
         Kind kind { Kind::Ambix };
         AmbiEncPayload      ambix;
+        AmbixSourcePayload  ambixSource;
         MultiEncoderPayload multiEncoder;
     };
 

@@ -4,144 +4,130 @@
 
 int Ambix_encoderAudioProcessor::getNumParameters()
 {
-
-    return NumParameters;
+    return kTotalParams;
 }
 
 float Ambix_encoderAudioProcessor::getParameter (int index)
 {
-
-    switch (index) {
-        case AzimuthParam:
-            return azimuth_param;
-            break;
-
-        case ElevationParam:
-            return elevation_param;
-            break;
-
-        case SizeParam:
-            return size_param;
-            break;
-
-#if INPUT_CHANNELS > 1
-        case WidthParam:
-            return width_param;
-            break;
-#endif
-            // advanced ctl
-        case AzimuthSetParam:
-            return azimuth_set_param;
-            break;
-
-        case AzimuthSetRelParam:
-            return azimuth_set_rel_param;
-            break;
-
-        case AzimuthMvParam:
-            return azimuth_mv_param;
-            break;
-
-
-        case ElevationSetParam:
-            return elevation_set_param;
-            break;
-
-        case ElevationSetRelParam:
-            return elevation_set_rel_param;
-            break;
-
-        case ElevationMvParam:
-            return elevation_mv_param;
-            break;
-
-        case SpeedParam:
-            return speed_param;
-            break;
-
-        default:
-            return 0.f;
+    if (index >= SourceParamsBase && index < kTotalParams)
+    {
+        const int srcIdx = (index - SourceParamsBase) / kPerSourceParams;
+        const int sub    = (index - SourceParamsBase) % kPerSourceParams;
+        switch (sub) {
+            case SrcAz:   return source_params[srcIdx].az;
+            case SrcEl:   return source_params[srcIdx].el;
+            case SrcSize: return source_params[srcIdx].size;
+            case SrcMute: return source_params[srcIdx].mute;
+            case SrcSolo: return source_params[srcIdx].solo;
+        }
+        return 0.f;
     }
 
+    switch (index) {
+        case AzimuthParam:           return azimuth_param;
+        case ElevationParam:         return elevation_param;
+        case SizeParam:              return size_param;
+        case WidthParam:             return width_param;
+        case AzimuthSetParam:        return azimuth_set_param;
+        case AzimuthSetRelParam:     return azimuth_set_rel_param;
+        case AzimuthMvParam:         return azimuth_mv_param;
+        case ElevationSetParam:      return elevation_set_param;
+        case ElevationSetRelParam:   return elevation_set_rel_param;
+        case ElevationMvParam:       return elevation_mv_param;
+        case SpeedParam:             return speed_param;
+        case LinkedParam:            return linked_param;
+        case NumActiveSourcesParam:  return num_active_sources_param;
+        default:                     return 0.f;
+    }
 }
 
 void Ambix_encoderAudioProcessor::setParameter (int index, float newValue)
 {
+    if (index >= SourceParamsBase && index < kTotalParams)
+    {
+        const int srcIdx = (index - SourceParamsBase) / kPerSourceParams;
+        const int sub    = (index - SourceParamsBase) % kPerSourceParams;
+        switch (sub) {
+            case SrcAz:   source_params[srcIdx].az   = newValue; break;
+            case SrcEl:   source_params[srcIdx].el   = newValue; break;
+            case SrcSize: source_params[srcIdx].size = newValue; break;
+            case SrcMute: source_params[srcIdx].mute = newValue; break;
+            case SrcSolo: source_params[srcIdx].solo = newValue; break;
+        }
+        sendChangeMessage();
+        return;
+    }
 
     float tempvalue = 0.0f;
 
     switch (index) {
         case AzimuthParam:
-            azimuth_param=newValue;
-            calcAzimuth();
-
+            azimuth_param = newValue;
             break;
 
         case ElevationParam:
-            elevation_param=newValue;
-            for (int i=0; i < AmbiEnc.size(); i++) {
-                AmbiEnc.getUnchecked(i)->elevation=elevation_param;
-            }
+            elevation_param = newValue;
             break;
 
         case SizeParam:
             size_param = newValue;
-            for (int i=0; i < AmbiEnc.size(); i++) {
-                AmbiEnc.getUnchecked(i)->size=size_param;
-            }
             break;
 
-#if INPUT_CHANNELS > 1
         case WidthParam:
-            width_param=newValue;
-            calcAzimuth();
+            width_param = newValue;
             break;
-#endif
-            // advanced ctl
 
-        case AzimuthSetParam: // set Azimuth if NOT moving!
+        case LinkedParam: {
+            const bool wasLinked = linked_param >= 0.5f;
+            const bool nowLinked = newValue     >= 0.5f;
+            linked_param = newValue;
+            if (wasLinked && ! nowLinked)
+                linkedToUnlinkedSnapshot();
+            else if (! wasLinked && nowLinked)
+                unlinkedToLinkedSnapshot();
+            break;
+        }
+
+        case NumActiveSourcesParam:
+            num_active_sources_param = newValue;
+            break;
+
+        case AzimuthSetParam:
             if ((newValue != azimuth_set_param) && ((azimuth_mv_param > 0.48f) && (azimuth_mv_param < 0.52f)))
                 setParameterNotifyingHost(this, AzimuthParam, newValue);
-            azimuth_set_param=newValue;
+            azimuth_set_param = newValue;
             break;
 
-        case AzimuthSetRelParam: // relative movement!
+        case AzimuthSetRelParam:
             if ((newValue != azimuth_set_rel_param) && ((azimuth_mv_param > 0.48f) && (azimuth_mv_param < 0.52f)))
             {
-                tempvalue = azimuth_param+(newValue-azimuth_set_rel_param);
-                if (tempvalue < 0.0f) { // wrap it around!
-                    tempvalue = 1.0f + tempvalue;
-                } else if (tempvalue > 1.0f){
-                    tempvalue = tempvalue - 1.0f;
-                }
+                tempvalue = azimuth_param + (newValue - azimuth_set_rel_param);
+                if (tempvalue < 0.0f)      tempvalue = 1.0f + tempvalue;
+                else if (tempvalue > 1.0f) tempvalue = tempvalue - 1.0f;
                 setParameterNotifyingHost(this, AzimuthParam, tempvalue);
             }
-            azimuth_set_rel_param=newValue;
+            azimuth_set_rel_param = newValue;
             break;
 
         case AzimuthMvParam:
             azimuth_mv_param = newValue;
             break;
 
-
         case ElevationSetParam:
             if ((newValue != elevation_set_param) && ((elevation_mv_param > 0.48f) && (elevation_mv_param < 0.52f)))
                 setParameterNotifyingHost(this, ElevationParam, newValue);
-            elevation_set_param=newValue;
+            elevation_set_param = newValue;
             break;
 
-        case ElevationSetRelParam: // relative movement!
+        case ElevationSetRelParam:
             if ((newValue != elevation_set_rel_param) && ((elevation_mv_param > 0.48f) && (elevation_mv_param < 0.52f)))
             {
-                tempvalue = elevation_param + (newValue-elevation_set_rel_param);
-                if (tempvalue < 0.0f) { // wrap it around!
-                    tempvalue = 1.0f + tempvalue;
-                } else if (tempvalue > 1.0f){
-                    tempvalue = tempvalue - 1.0f;
-                }
+                tempvalue = elevation_param + (newValue - elevation_set_rel_param);
+                if (tempvalue < 0.0f)      tempvalue = 1.0f + tempvalue;
+                else if (tempvalue > 1.0f) tempvalue = tempvalue - 1.0f;
                 setParameterNotifyingHost(this, ElevationParam, tempvalue);
             }
-            elevation_set_rel_param=newValue;
+            elevation_set_rel_param = newValue;
             break;
 
         case ElevationMvParam:
@@ -154,272 +140,191 @@ void Ambix_encoderAudioProcessor::setParameter (int index, float newValue)
 
         default:
             break;
-
     }
 
-    sendChangeMessage(); // send message to gui!
-}
-
-// calculate the individual azimuth for all sources
-void Ambix_encoderAudioProcessor::calcAzimuth()
-{
-    if (AmbiEnc.size() == 1) {
-        AmbiEnc.getFirst()->azimuth = azimuth_param;
-    }
-    else if (AmbiEnc.size() > 1)
-    {
-        for (int i=0; i < AmbiEnc.size(); i++) {
-
-            float angle = azimuth_param - width_param / 2.f + i * width_param / (AmbiEnc.size()-1);
-
-            // angle = fmodf(angle, 1.f);
-            if (angle < 0.f)
-                angle = 1.f + angle;
-
-            if (angle > 1.f) {
-                angle -= 1.f;
-            }
-
-            //std::cout << "source # " << i << " angle: " << (angle-0.5f)*360 << std::endl;
-
-            AmbiEnc.getUnchecked(i)->azimuth = angle;
-        }
-
-    }
-
+    sendChangeMessage();
 }
 
 const String Ambix_encoderAudioProcessor::getParameterName (int index)
 {
-    switch (index) {
-        case AzimuthParam:
-            return "Azimuth";
-            break;
-
-        case ElevationParam:
-            return "Elevation";
-            break;
-
-        case SizeParam:
-            return "Size";
-            break;
-
-#if INPUT_CHANNELS > 1
-        case WidthParam:
-            return "Source width";
-            break;
-#endif
-
-            // advanced ctl
-        case AzimuthSetParam:
-            return "SetAzimuth";
-            break;
-
-        case AzimuthSetRelParam:
-            return "SetRelAzimuth";
-            break;
-
-        case AzimuthMvParam:
-            return "MoveAzimuth";
-            break;
-
-
-        case ElevationSetParam:
-            return "SetElevation";
-            break;
-
-        case ElevationSetRelParam:
-            return "SetRelElevation";
-            break;
-
-        case ElevationMvParam:
-            return "MoveElevation";
-            break;
-
-        case SpeedParam:
-            return "MoveSpeed";
-            break;
-
-        default:
-            return "";
+    if (index >= SourceParamsBase && index < kTotalParams)
+    {
+        const int srcIdx = (index - SourceParamsBase) / kPerSourceParams + 1;
+        const int sub    = (index - SourceParamsBase) % kPerSourceParams;
+        const char* subNames[] = { "Az", "El", "Size", "Mute", "Solo" };
+        return String("Src") + String(srcIdx) + subNames[sub];
     }
 
+    switch (index) {
+        case AzimuthParam:           return "Azimuth";
+        case ElevationParam:         return "Elevation";
+        case SizeParam:              return "Size";
+        case WidthParam:             return "Source width";
+        case AzimuthSetParam:        return "SetAzimuth";
+        case AzimuthSetRelParam:     return "SetRelAzimuth";
+        case AzimuthMvParam:         return "MoveAzimuth";
+        case ElevationSetParam:      return "SetElevation";
+        case ElevationSetRelParam:   return "SetRelElevation";
+        case ElevationMvParam:       return "MoveElevation";
+        case SpeedParam:             return "MoveSpeed";
+        case LinkedParam:            return "Linked";
+        case NumActiveSourcesParam:  return "ActiveSources";
+        default:                     return "";
+    }
 }
 
 const String Ambix_encoderAudioProcessor::getParameterText (int index)
 {
     String text;
 
-    switch (index) {
-        case AzimuthParam:
-            text << String((azimuth_param - 0.5f) * 360).substring(0, 5) << " deg";
-            break;
-
-        case ElevationParam:
-            text << String((elevation_param - 0.5f) * 360).substring(0, 5) << " deg";
-            break;
-
-        case SizeParam:
-            text << String(size_param).substring(0, 5);
-            break;
-
-#if INPUT_CHANNELS > 1
-        case WidthParam:
-            text << String(width_param * 360).substring(0, 5) << " deg";
-            break;
-#endif
-            // advanced ctl
-        case AzimuthSetParam:
-            text << String((azimuth_set_param - 0.5f) * 360).substring(0, 5) << " deg";
-            break;
-
-        case AzimuthSetRelParam:
-            text << String((azimuth_set_rel_param - 0.5f) * 360).substring(0, 5) << " deg";
-            break;
-
-        case AzimuthMvParam:
-			if (azimuth_mv_param <= 0.48f)
-			{
-                text << String(powf(speed_param*360.f, (0.45f - azimuth_mv_param)*2.22222f)).substring(0, 5) << " deg/sec"; // from 0->90deg/sec
-			} else if (azimuth_mv_param >= 0.52f) {
-                text << String(powf(speed_param*360.f, (azimuth_mv_param - 0.55f)*2.22222f)).substring(0, 5) << " deg/sec";
-			} else {
-				text << "do not rotate";
-			}
-			break;
-
-
-        case ElevationSetParam:
-            text << String((elevation_set_param - 0.5f) * 360).substring(0, 5) << " deg";
-            break;
-
-        case ElevationSetRelParam:
-            text << String((elevation_set_rel_param - 0.5f) * 360).substring(0, 5) << " deg";
-            break;
-
-        case ElevationMvParam:
-			if (elevation_mv_param <= 0.48f)
-			{
-                text << String(powf(speed_param*360.f, (0.45f - elevation_mv_param)*2.22222f)).substring(0, 5) << " deg/sec"; // from 0->90deg/sec
-			} else if (elevation_mv_param >= 0.52f) {
-                text << String(powf(speed_param*360.f, (elevation_mv_param - 0.55f)*2.22222f)).substring(0, 5) << " deg/sec";
-			} else {
-				text << "do not rotate";
-			}
-			break;
-
-        case SpeedParam:
-            text << String((speed_param) * 360).substring(0, 5) << " deg";
-            break;
-
-        default:
-            break;
+    if (index >= SourceParamsBase && index < kTotalParams)
+    {
+        const int srcIdx = (index - SourceParamsBase) / kPerSourceParams;
+        const int sub    = (index - SourceParamsBase) % kPerSourceParams;
+        switch (sub) {
+            case SrcAz:   text << String((source_params[srcIdx].az  - 0.5f) * 360).substring(0, 5) << " deg"; break;
+            case SrcEl:   text << String((source_params[srcIdx].el  - 0.5f) * 360).substring(0, 5) << " deg"; break;
+            case SrcSize: text << String(source_params[srcIdx].size).substring(0, 5);                         break;
+            case SrcMute: text << (source_params[srcIdx].mute >= 0.5f ? "on" : "off"); break;
+            case SrcSolo: text << (source_params[srcIdx].solo >= 0.5f ? "on" : "off"); break;
+        }
+        return text;
     }
 
-	return text;
+    switch (index) {
+        case AzimuthParam:           text << String((azimuth_param - 0.5f) * 360).substring(0, 5) << " deg"; break;
+        case ElevationParam:         text << String((elevation_param - 0.5f) * 360).substring(0, 5) << " deg"; break;
+        case SizeParam:              text << String(size_param).substring(0, 5); break;
+        case WidthParam:             text << String(width_param * 360).substring(0, 5) << " deg"; break;
+        case AzimuthSetParam:        text << String((azimuth_set_param - 0.5f) * 360).substring(0, 5) << " deg"; break;
+        case AzimuthSetRelParam:     text << String((azimuth_set_rel_param - 0.5f) * 360).substring(0, 5) << " deg"; break;
+
+        case AzimuthMvParam:
+            if (azimuth_mv_param <= 0.48f)
+                text << String(powf(speed_param*360.f, (0.45f - azimuth_mv_param)*2.22222f)).substring(0, 5) << " deg/sec";
+            else if (azimuth_mv_param >= 0.52f)
+                text << String(powf(speed_param*360.f, (azimuth_mv_param - 0.55f)*2.22222f)).substring(0, 5) << " deg/sec";
+            else
+                text << "do not rotate";
+            break;
+
+        case ElevationSetParam:      text << String((elevation_set_param - 0.5f) * 360).substring(0, 5) << " deg"; break;
+        case ElevationSetRelParam:   text << String((elevation_set_rel_param - 0.5f) * 360).substring(0, 5) << " deg"; break;
+
+        case ElevationMvParam:
+            if (elevation_mv_param <= 0.48f)
+                text << String(powf(speed_param*360.f, (0.45f - elevation_mv_param)*2.22222f)).substring(0, 5) << " deg/sec";
+            else if (elevation_mv_param >= 0.52f)
+                text << String(powf(speed_param*360.f, (elevation_mv_param - 0.55f)*2.22222f)).substring(0, 5) << " deg/sec";
+            else
+                text << "do not rotate";
+            break;
+
+        case SpeedParam:             text << String((speed_param) * 360).substring(0, 5) << " deg"; break;
+        case LinkedParam:            text << (linked_param >= 0.5f ? "linked" : "unlinked"); break;
+        case NumActiveSourcesParam:  text << String (getActiveSources()); break;
+
+        default: break;
+    }
+    return text;
 }
 
 const String Ambix_encoderAudioProcessor::getParameterLabel(int index)
 {
-    String text;
+    if (index >= SourceParamsBase && index < kTotalParams)
+    {
+        const int sub = (index - SourceParamsBase) % kPerSourceParams;
+        switch (sub) {
+            case SrcAz: case SrcEl: return "degree";
+            default:                return "";
+        }
+    }
 
     switch (index) {
         case AzimuthParam:
-            text << "degree";
-            break;
-
         case ElevationParam:
-            text << "degree";
-            break;
-
-        case SizeParam:
-            text << "";
-            break;
-
-#if INPUT_CHANNELS > 1
         case WidthParam:
-            text << "degree";
-            break;
-#endif
-
-            // advanced ctl
         case AzimuthSetParam:
-            text << "degree";
-            break;
-
         case AzimuthSetRelParam:
-            text << "degree";
-            break;
-
-        case AzimuthMvParam:
-            text << "degree/sec";
-            break;
-
-
         case ElevationSetParam:
-            text << "degree";
-            break;
-
         case ElevationSetRelParam:
-            text << "degree";
-            break;
-
+            return "degree";
+        case AzimuthMvParam:
         case ElevationMvParam:
-            text << "degree/sec";
-            break;
-
         case SpeedParam:
-            text << "degree/sec";
-            break;
-
+            return "degree/sec";
         default:
-            break;
+            return "";
     }
-
-	return text;
 }
 
 #if WITH_ADVANCED_CONTROL
 void Ambix_encoderAudioProcessor::calcNewParameters(double SampleRate, int BufferLength)
 {
-    // calculate moving parameters
+    const double factor = (double)BufferLength/SampleRate;
+    const float speed_fact2 = (float)factor * 0.002777777f;
+    const float deg_sec     = speed_param*360.f;
 
-    double factor = (double)BufferLength/SampleRate;
-    float speed_fact2 = (float)factor * 0.002777777f; // (1/360)
+    // Compute az/el deltas in [0,1] param-space units. The dead-zone around
+    // the centre detents (0.48..0.52 az / 0.45..0.55 el) is kept identical
+    // to the original linked-mode behaviour.
+    float dAz = 0.f;
+    bool  moveAz = false;
+    if (azimuth_mv_param < 0.48f)
+    {
+        dAz = -powf (deg_sec, (0.48f - azimuth_mv_param) * 2.0833333f) * speed_fact2;
+        moveAz = true;
+    }
+    else if (azimuth_mv_param > 0.52f)
+    {
+        dAz =  powf (deg_sec, (azimuth_mv_param - 0.52f) * 2.0833333f) * speed_fact2;
+        moveAz = true;
+    }
 
-    float deg_sec = speed_param*360.f;
+    float dEl = 0.f;
+    bool  moveEl = false;
+    if (elevation_mv_param <= 0.45f)
+    {
+        dEl = -powf (deg_sec, (0.45f - elevation_mv_param) * 2.22222f) * speed_fact2;
+        moveEl = true;
+    }
+    else if (elevation_mv_param >= 0.55f)
+    {
+        dEl =  powf (deg_sec, (elevation_mv_param - 0.55f) * 2.22222f) * speed_fact2;
+        moveEl = true;
+    }
 
-    float newval = 0.f;
+    auto wrap01 = [] (float v)
+    {
+        if (v < 0.f) v += 1.f;
+        if (v > 1.f) v -= 1.f;
+        return v;
+    };
 
-    if ((azimuth_mv_param < 0.48f) || (azimuth_mv_param > 0.52f))
-	{
-        if (azimuth_mv_param < 0.48f)
-            newval = azimuth_param - powf(deg_sec, (0.48f - azimuth_mv_param)*2.0833333f) * speed_fact2;
-
-        if (azimuth_mv_param > 0.52f)
-            newval = azimuth_param + powf(deg_sec, (azimuth_mv_param - 0.52f)*2.0833333f) * speed_fact2;
-
-		if (newval < 0.f)
-			newval = 1.f;
-		if (newval > 1.f)
-			newval = 0.f;
-		setParameterNotifyingHost(this, AzimuthParam, newval);
-	}
-
-    if ((elevation_mv_param <= 0.45f) || (elevation_mv_param >= 0.55f))
-	{
-        if (elevation_mv_param <= 0.45f)
-            newval = elevation_param - powf(deg_sec, (0.45f - elevation_mv_param)*2.22222f) * speed_fact2;
-
-        if (elevation_mv_param >= 0.55f)
-            newval = elevation_param + powf(deg_sec, (elevation_mv_param - 0.55f)*2.22222f) * speed_fact2;
-
-		if (newval < 0.f)
-			newval = 1.f;
-		if (newval > 1.f)
-			newval = 0.f;
-		setParameterNotifyingHost(this, ElevationParam, newval);
-	}
-
+    if (isLinked())
+    {
+        // Original behaviour: drive global az/el so the linked-mode auto-
+        // spread rotates as a whole.
+        if (moveAz)
+            setParameterNotifyingHost (this, AzimuthParam,   wrap01 (azimuth_param   + dAz));
+        if (moveEl)
+            setParameterNotifyingHost (this, ElevationParam, wrap01 (elevation_param + dEl));
+    }
+    else
+    {
+        // Unlinked: apply the same delta to every active source so the
+        // group translates as a constellation, preserving the relative
+        // positions the user set up.
+        const int active = getActiveSources();
+        for (int i = 0; i < active; ++i)
+        {
+            if (moveAz)
+                setParameterNotifyingHost (this, sourceParamIndex (i, SrcAz),
+                                           wrap01 (source_params[i].az + dAz));
+            if (moveEl)
+                setParameterNotifyingHost (this, sourceParamIndex (i, SrcEl),
+                                           wrap01 (source_params[i].el + dEl));
+        }
+    }
 }
 #endif

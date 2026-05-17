@@ -62,6 +62,19 @@ set_target_properties (ambix_visualizer PROPERTIES
     XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT[variant=Release] "dwarf-with-dsym"
     XCODE_ATTRIBUTE_DEPLOYMENT_POSTPROCESSING[variant=Release] YES)
 
+# Replace the linker-only adhoc signature with a full adhoc signature that
+# seals Info.plist + every bundle resource. macOS's Local Network privacy
+# gate keys off the sealed plist — without this, the app never appears in
+# System Settings → Privacy & Security → Local Network and broadcasts are
+# silently blocked. Matches the post-build behaviour JUCE applies to the
+# VST3/AU plugin bundles.
+if (APPLE AND NOT IOS)
+    add_custom_command (TARGET ambix_visualizer POST_BUILD
+        COMMAND codesign --force --sign - --timestamp=none --options=runtime
+                "$<TARGET_BUNDLE_DIR:ambix_visualizer>"
+        COMMENT "Resealing ambix Visualizer.app with adhoc signature (binds Info.plist)")
+endif()
+
 juce_generate_juce_header (ambix_visualizer)
 
 file (GLOB_RECURSE VISUALIZER_SOURCES

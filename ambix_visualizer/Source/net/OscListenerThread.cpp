@@ -76,6 +76,10 @@ void OscListenerThread::run()
         {
             msg.kind = Kind::Ambix;
         }
+        else if (AmbixSourceParser::parse (buffer.getData(), static_cast<size_t> (bytes), msg.ambixSource))
+        {
+            msg.kind = Kind::AmbixSource;
+        }
         else if (MultiEncoderParser::parse (buffer.getData(), static_cast<size_t> (bytes), msg.multiEncoder))
         {
             msg.kind = Kind::MultiEncoder;

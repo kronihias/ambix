@@ -105,9 +105,40 @@ IF(WITH_LegendreU)
 	LIST ( APPEND HEADER ${SRC_DIR}/common/LegendreU/LegendreU.h)
 ENDIF(WITH_LegendreU)
 
+# DiscoveryHub: process-wide NSD AvailableServiceList singleton so multiple
+# plugin instances in the same DAW share one broadcast listener. Required
+# for reliable peer discovery on macOS, where SO_REUSEADDR doesn't actually
+# split inbound broadcasts across all bound sockets in the same process.
+IF(WITH_DISCOVERY_HUB)
+	LIST ( APPEND SOURCE ${SRC_DIR}/common/DiscoveryHub.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/DiscoveryHub.h)
+ENDIF(WITH_DISCOVERY_HUB)
+
+# PresetManager: shared helper for per-user JSON preset folders. Ported
+# from mcfx (mcfx_graph / mcfx_mimoeq) — pure I/O, no UI, so each plugin
+# editor builds its own PopupMenu and load/save logic on top.
+IF(WITH_PRESET_MANAGER)
+	LIST ( APPEND SOURCE ${SRC_DIR}/common/Presets/PresetManager.cpp)
+	LIST ( APPEND HEADER ${SRC_DIR}/common/Presets/PresetManager.h)
+ENDIF(WITH_PRESET_MANAGER)
+
 
 #SORT IT
 LIST ( SORT SOURCE )
+
+# Local Network permission for plugins that talk to other ambix tools over
+# UDP / NSD (currently only ambix_encoder ↔ ambix_visualizer). Set the flag
+# before INCLUDE(Subproject.cmake) to opt the target into the macOS Local
+# Network privacy prompt — required for NSD broadcasts on macOS 14+ when
+# the plugin is run standalone. Inside a DAW host (Reaper/Logic) the host's
+# own NSLocalNetworkUsageDescription + granted permission is what matters,
+# but adding it here doesn't hurt and helps the BUILD_STANDALONE variant.
+if (WITH_LOCAL_NETWORK)
+    set (_LOCAL_NETWORK_ARGS
+        LOCAL_NETWORK_PERMISSION_ENABLED  TRUE
+        LOCAL_NETWORK_PERMISSION_TEXT     "Used to discover and stream OSC to other ambix tools (e.g. ambix Visualizer) on the local network."
+        PLIST_TO_MERGE                    "<key>NSBonjourServices</key><array><string>_ambix.encoder.v1._udp</string><string>_ambix.visualizer.v1._udp</string></array>")
+endif()
 
 juce_add_plugin (${SUBPROJECT_NAME}
     PLUGIN_MANUFACTURER_CODE Kron
@@ -116,7 +147,8 @@ juce_add_plugin (${SUBPROJECT_NAME}
     PRODUCT_NAME ${SUBPROJECT_NAME}
     FORMATS ${_FORMATS}
     VERSION ${VERSION}
-    LV2URI http://www.matthiaskronlachner.com/${SUBPROJECT_NAME})
+    LV2URI http://www.matthiaskronlachner.com/${SUBPROJECT_NAME}
+    ${_LOCAL_NETWORK_ARGS})
 
 juce_generate_juce_header(${SUBPROJECT_NAME})
 

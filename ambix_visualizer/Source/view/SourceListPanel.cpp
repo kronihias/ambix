@@ -27,7 +27,10 @@ public:
         key = src.key();
         origin = src.origin;
 
-        const bool readOnly = (origin == EncoderOrigin::Ambix);
+        // ambix_encoder advertises its reply port itself (via /ambi_enc) so
+        // the user shouldn't edit it. Same for the new per-source pucks.
+        const bool readOnly = (origin == EncoderOrigin::Ambix
+                             || origin == EncoderOrigin::AmbixSource);
         editor.setReadOnly (readOnly);
         editor.setInterceptsMouseClicks (! readOnly, ! readOnly);
         editor.setColour (juce::TextEditor::textColourId,
@@ -475,23 +478,39 @@ void SourceListPanel::timerCallback()
 juce::String SourceListPanel::lookupProjectFor (const EncoderSource& s) const
 {
     // Only ambix_encoder sources carry a project name via NSD; MultiEncoder
-    // doesn't advertise at all.
-    if (s.origin != EncoderOrigin::Ambix)
+    // doesn't advertise at all. Both Ambix variants share NSD records, so
+    // include AmbixSource too.
+    if (s.origin != EncoderOrigin::Ambix && s.origin != EncoderOrigin::AmbixSource)
         return {};
 
-    // Match on (senderIp, encoder's advertised listen port). The NSD record
-    // carries the encoder's OSC listen port as `enc.port`, which matches the
-    // visualizer's `replyPort` for the same plugin instance. Matching on
-    // encoderId alone would fail whenever two DAWs each assign id=1 to their
-    // first encoder on the same host — port is genuinely unique per instance.
-    // Fall back to id-matching for rows with replyPort==0 (legacy 8-arg
-    // /ambi_enc broadcasters that never advertise a port).
+    // Primary: match on (senderIp, encoder's listen port). Robust against
+    // multi-instance hosts where port disambiguates plugins on the same IP.
     for (const auto& enc : encoderCache)
     {
-        if (enc.ip.toString() != s.senderIp)
-            continue;
-        if (s.replyPort > 0 ? (enc.port == s.replyPort)
-                            : (enc.encoderId == s.id))
+        if (enc.ip.toString() == s.senderIp
+            && s.replyPort > 0
+            && enc.port == s.replyPort)
+            return enc.project;
+    }
+
+    // Fallback for multi-interface same-host setups: the encoder may
+    // broadcast NSD from one local interface (e.g. a VM bridge at
+    // 192.168.64.1) but send OSC unicast from another (192.168.1.14, the
+    // user's actual LAN). senderIp won't match enc.ip then. The listen
+    // port is still unique per plugin instance, so port-only match is the
+    // next-best signal — match on it for any encoder with the same port.
+    if (s.replyPort > 0)
+    {
+        for (const auto& enc : encoderCache)
+            if (enc.port == s.replyPort)
+                return enc.project;
+    }
+
+    // Final fallback for legacy 8-arg /ambi_enc broadcasters that never
+    // advertise a port: match by (senderIp, encoder id).
+    for (const auto& enc : encoderCache)
+    {
+        if (enc.ip.toString() == s.senderIp && enc.encoderId == s.id)
             return enc.project;
     }
     return {};
@@ -560,7 +579,8 @@ void SourceListPanel::paintCell (juce::Graphics& g, int rowNumber, int columnId,
             g.drawText (s.senderIp, area, juce::Justification::centredLeft, true);
             break;
         case ColLevel:
-            if (s.origin == EncoderOrigin::Ambix)
+            if (s.origin == EncoderOrigin::Ambix
+                || s.origin == EncoderOrigin::AmbixSource)
                 drawLevelMeter (g, s, area);
             break;
         case ColIcon:
