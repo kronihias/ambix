@@ -130,6 +130,9 @@ private:
     juce::TextButton btn_view_hammer    { "Hammer-Aitoff" };
     juce::TextButton btn_popout         { juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x97")) }; // ↗
     juce::TextButton btn_linked_toggle  { "Linked" };
+    juce::TextButton btn_import         { "Import" };
+    juce::TextButton btn_export         { "Export" };
+    std::unique_ptr<juce::FileChooser> fileChooser; // kept alive across async picker
 
     // Owned popout — non-null while the detached panner window is open.
     // Created on demand from the popout-button handler, reset when the

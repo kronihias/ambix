@@ -416,6 +416,16 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     btn_popout.setTooltip ("Open a detached panner window (drag to a second screen, fullscreen via title bar)");
     btn_popout.addListener (this);
 
+    // Import / Export source layout (JSON, format-compatible with
+    // SPARTA AmbiENC and IEM MultiEncoder).
+    addAndMakeVisible (btn_import);
+    btn_import.setTooltip ("Import source layout from JSON (SPARTA / IEM compatible). Switches to unlinked mode.");
+    btn_import.addListener (this);
+
+    addAndMakeVisible (btn_export);
+    btn_export.setTooltip ("Export current source layout to JSON (SPARTA / IEM compatible)");
+    btn_export.addListener (this);
+
     // Linked toggle
     addAndMakeVisible (btn_linked_toggle);
     btn_linked_toggle.setClickingTogglesState (true);
@@ -614,6 +624,11 @@ void Ambix_encoderAudioProcessorEditor::resized()
     btn_linked_toggle.setBounds (W - 220, 32, 80, 22);
     lbl_sources.setBounds       (W - 138, 32, 56, 22);
     cmb_active_sources.setBounds (W -  80, 32, 60, 22);
+
+    // Import / Export sit left of the Linked toggle. Compact so they don't
+    // squeeze the Sources combo on narrow windows.
+    btn_export.setBounds (W - 280, 32, 56, 22);
+    btn_import.setBounds (W - 340, 32, 56, 22);
 
     // --- Bottom controls (fixed height) --------------------------------------
     const int bottomY = H - 90;
@@ -865,6 +880,58 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
             launchOptions.useBottomRightCornerResizer = false;
             _settingsDialogWindow = launchOptions.launchAsync();
         }
+    }
+    else if (buttonThatWasClicked == &btn_import)
+    {
+        // Async file picker. Keep the chooser alive via the editor-owned
+        // unique_ptr so it doesn't die before the user picks.
+        auto startDir = ourProcessor->lastConfigDir.isDirectory()
+                            ? ourProcessor->lastConfigDir
+                            : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Import source layout (JSON, SPARTA/IEM compatible)",
+            startDir, "*.json");
+        fileChooser->launchAsync (juce::FileBrowserComponent::openMode
+                                  | juce::FileBrowserComponent::canSelectFiles,
+            [this] (const juce::FileChooser& fc) {
+                const auto f = fc.getResult();
+                if (f.existsAsFile())
+                {
+                    auto r = getProcessor()->loadConfigurationFromFile (f);
+                    if (r.failed())
+                        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                            .withIconType (juce::MessageBoxIconType::WarningIcon)
+                            .withTitle ("Import failed")
+                            .withMessage (r.getErrorMessage())
+                            .withButton ("OK"), nullptr);
+                }
+            });
+    }
+    else if (buttonThatWasClicked == &btn_export)
+    {
+        auto startDir = ourProcessor->lastConfigDir.isDirectory()
+                            ? ourProcessor->lastConfigDir
+                            : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+        fileChooser = std::make_unique<juce::FileChooser> (
+            "Export source layout (JSON, SPARTA/IEM compatible)",
+            startDir.getChildFile ("ambix_encoder_layout.json"),
+            "*.json");
+        fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
+                                  | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::warnAboutOverwriting,
+            [this] (const juce::FileChooser& fc) {
+                auto f = fc.getResult();
+                if (f.getFullPathName().isEmpty()) return;
+                if (! f.hasFileExtension ("json"))
+                    f = f.withFileExtension ("json");
+                auto r = getProcessor()->saveConfigurationToFile (f);
+                if (r.failed())
+                    juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                        .withIconType (juce::MessageBoxIconType::WarningIcon)
+                        .withTitle ("Export failed")
+                        .withMessage (r.getErrorMessage())
+                        .withButton ("OK"), nullptr);
+            });
     }
     else if (buttonThatWasClicked == &btn_popout)
     {

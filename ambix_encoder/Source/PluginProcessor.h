@@ -156,6 +156,24 @@ public:
 
     bool isLinked() const { return linked_param >= 0.5f; }
 
+    // Source-layout import / export. JSON format follows SPARTA's
+    // GenericLayout / IEM MultiEncoder convention:
+    //   { "Name": "...", "Description": "...",
+    //     "GenericLayout": { "Name": "Source Directions",
+    //                        "Elements": [ { "Azimuth", "Elevation",
+    //                                        "Radius", "IsImaginary",
+    //                                        "Channel", "Gain" }, ... ] } }
+    // So a file written by one tool can be loaded into any of the three.
+    // Loading auto-switches to unlinked mode and sets the active source
+    // count from the highest non-imaginary Channel in the file.
+    juce::Result saveConfigurationToFile   (const juce::File& file);
+    juce::Result loadConfigurationFromFile (const juce::File& file);
+    juce::Result loadConfigurationFromString (const juce::String& jsonText);
+
+    // Last-used directory for the file picker. Stored in plugin state so
+    // the user lands back where they left off across sessions.
+    juce::File lastConfigDir;
+
     // Snapshot of per-source positions for the editor / Hammer-Aitoff view.
     // Returns degrees in (-180..180, -90..90) for convenience.
     struct SourcePos { float azDeg, elDeg, size, rms, peak; };

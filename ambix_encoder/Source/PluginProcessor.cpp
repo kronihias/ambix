@@ -240,6 +240,144 @@ Ambix_encoderAudioProcessor::getSourceDisplayPos (int idx) const
     return p;
 }
 
+//==============================================================================
+// Source-layout JSON import / export — format-compatible with SPARTA
+// AmbiENC and IEM MultiEncoder so configurations move freely between the
+// three tools.
+
+juce::Result Ambix_encoderAudioProcessor::saveConfigurationToFile (const juce::File& file)
+{
+    juce::DynamicObject::Ptr layout (new juce::DynamicObject());
+    layout->setProperty ("Name", juce::var ("Source Directions"));
+
+    juce::Array<juce::var> elements;
+    const int active = getActiveSources();
+    for (int i = 0; i < active; ++i)
+    {
+        // Read effective positions via getSourceDisplayPos so the export
+        // captures the auto-spread layout in linked mode just as well as
+        // explicit per-source positions in unlinked mode.
+        const auto pos = getSourceDisplayPos (i);
+        const bool muted = source_params[i].mute >= 0.5f;
+
+        juce::DynamicObject::Ptr el (new juce::DynamicObject());
+        el->setProperty ("Azimuth",     pos.azDeg);
+        el->setProperty ("Elevation",   pos.elDeg);
+        el->setProperty ("Radius",      1.0);
+        el->setProperty ("IsImaginary", false);
+        el->setProperty ("Channel",     i + 1);
+        // Encode mute as Gain=0; otherwise full unity. Per-source size isn't
+        // part of the SPARTA/IEM format so it's not round-tripped.
+        el->setProperty ("Gain",        muted ? 0.0 : 1.0);
+        elements.add (juce::var (el.get()));
+    }
+    layout->setProperty ("Elements", elements);
+
+    juce::DynamicObject::Ptr root (new juce::DynamicObject());
+    root->setProperty ("Name", juce::var ("ambix_encoder source directions"));
+    root->setProperty ("Description",
+        juce::var ("Created by ambix_encoder. Format compatible with SPARTA "
+                   "AmbiENC and IEM MultiEncoder.  Saved " +
+                   juce::Time::getCurrentTime().toString (true, true)));
+    root->setProperty ("GenericLayout", juce::var (layout.get()));
+
+    const auto jsonStr = juce::JSON::toString (juce::var (root.get()), false);
+    if (! file.replaceWithText (jsonStr))
+        return juce::Result::fail ("Failed to write " + file.getFullPathName());
+
+    lastConfigDir = file.getParentDirectory();
+    return juce::Result::ok();
+}
+
+juce::Result Ambix_encoderAudioProcessor::loadConfigurationFromFile (const juce::File& file)
+{
+    if (! file.exists())
+        return juce::Result::fail ("File does not exist: " + file.getFullPathName());
+    lastConfigDir = file.getParentDirectory();
+    return loadConfigurationFromString (file.loadFileAsString());
+}
+
+juce::Result Ambix_encoderAudioProcessor::loadConfigurationFromString (const juce::String& jsonText)
+{
+    if (jsonText.isEmpty())
+        return juce::Result::fail ("Empty configuration string");
+
+    juce::var parsed;
+    auto parseResult = juce::JSON::parse (jsonText, parsed);
+    if (parseResult.failed())
+        return parseResult;
+
+    // SPARTA writes a "GenericLayout" with "Elements"; IEM MultiEncoder
+    // accepts loudspeaker layouts via "LoudspeakerLayout" / "Loudspeakers"
+    // too. Try both so we can ingest either tool's exports.
+    juce::var elementsVar;
+    if (parsed.hasProperty ("GenericLayout"))
+        elementsVar = parsed["GenericLayout"]["Elements"];
+    if (! elementsVar.isArray() && parsed.hasProperty ("LoudspeakerLayout"))
+        elementsVar = parsed["LoudspeakerLayout"]["Loudspeakers"];
+
+    if (! elementsVar.isArray())
+        return juce::Result::fail ("No 'Elements' array found "
+                                    "(expected SPARTA/IEM JSON format)");
+
+    auto* elements = elementsVar.getArray();
+
+    // First pass: highest non-imaginary Channel index → active source count.
+    auto isImaginary = [] (const juce::var& el) -> bool {
+        // SPARTA uses "IsImaginary"; IEM also reads it back as "Imaginary".
+        return (bool) el.getProperty ("IsImaginary", el.getProperty ("Imaginary", false));
+    };
+
+    int maxCh = 0;
+    for (int i = 0; i < elements->size(); ++i)
+    {
+        const auto& el = (*elements)[i];
+        if (isImaginary (el)) continue;
+        const int ch = (int) el.getProperty ("Channel", 0);
+        if (ch > maxCh) maxCh = ch;
+    }
+    if (maxCh < 1)
+        return juce::Result::fail ("Configuration has no real (non-imaginary) channels");
+
+    const int newActiveSources = juce::jmin (maxCh, kMaxSources);
+
+    // Switch to unlinked mode — per-source positions only mean something
+    // when each source has its own params — and set the active count via
+    // the host so DAW automation lanes stay in sync.
+    setParameterNotifyingHost (this, LinkedParam,           0.f);
+    setParameterNotifyingHost (this, NumActiveSourcesParam, countToNorm (newActiveSources, kMaxSources));
+
+    // Default-mute every active source first; channels referenced in the
+    // file unmute themselves below. Channels absent from the file (gaps)
+    // stay muted, matching IEM MultiEncoder's behaviour.
+    for (int i = 0; i < newActiveSources; ++i)
+        setParameterNotifyingHost (this, sourceParamIndex (i, SrcMute), 1.f);
+
+    for (int i = 0; i < elements->size(); ++i)
+    {
+        const auto& el = (*elements)[i];
+        if (isImaginary (el)) continue;
+        const int ch = (int) el.getProperty ("Channel", 0) - 1;
+        if (ch < 0 || ch >= newActiveSources) continue;
+
+        float az = (float) (double) el.getProperty ("Azimuth",   0.0);
+        float ele = (float) (double) el.getProperty ("Elevation", 0.0);
+        wrapAzEl (az, ele); // tolerate out-of-range values like IEM does
+
+        const float gain = (float) (double) el.getProperty ("Gain", 1.0);
+        const bool muteFromGain = gain <= 0.001f;
+
+        setParameterNotifyingHost (this, sourceParamIndex (ch, SrcAz),
+                                   juce::jlimit (0.f, 1.f, (az  + 180.f) / 360.f));
+        setParameterNotifyingHost (this, sourceParamIndex (ch, SrcEl),
+                                   juce::jlimit (0.f, 1.f, (ele + 180.f) / 360.f));
+        setParameterNotifyingHost (this, sourceParamIndex (ch, SrcMute),
+                                   muteFromGain ? 1.f : 0.f);
+    }
+
+    return juce::Result::ok();
+}
+
 void Ambix_encoderAudioProcessor::applyParamsToEncoders()
 {
     const int active = getActiveSources();
@@ -1133,6 +1271,7 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("editor_w",       editor_width);
     xml.setAttribute ("editor_h",       editor_height);
     xml.setAttribute ("editor_hammer",  editor_hammer_view);
+    xml.setAttribute ("last_config_dir", lastConfigDir.getFullPathName());
     xml.setAttribute ("popout_open",    popout_open);
     xml.setAttribute ("popout_w",         popout_width);
     xml.setAttribute ("popout_h",         popout_height);
@@ -1187,6 +1326,9 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
         popout_width       = xmlState->getIntAttribute  ("popout_w",      popout_width);
         popout_height      = xmlState->getIntAttribute  ("popout_h",      popout_height);
         popout_hammer_view = xmlState->getBoolAttribute ("popout_hammer", popout_hammer_view);
+        const auto savedDir = xmlState->getStringAttribute ("last_config_dir", {});
+        if (savedDir.isNotEmpty())
+            lastConfigDir = juce::File (savedDir);
         // Older per-view-pair attributes — fold the active-view pair into
         // the single slot so saved projects don't reset to defaults.
         if (xmlState->hasAttribute ("editor_w_sphere") || xmlState->hasAttribute ("editor_w_hammer"))
