@@ -584,7 +584,7 @@ void Ambix_encoderAudioProcessorEditor::paint (juce::Graphics& g)
     }
     g.drawText ("azimuth move",   135, bottomY + 4,  100, 14, juce::Justification::centredLeft, true);
     g.drawText ("elevation move", 135, bottomY + 38, 100, 14, juce::Justification::centredLeft, true);
-    g.drawText ("max speed",      getWidth() - 230, bottomY + 64, 100, 14, juce::Justification::centred, true);
+    g.drawText ("max speed",      280, bottomY + 64, 130, 14, juce::Justification::centred, true);
 
     // Version
     g.setColour (juce::Colours::white);
@@ -625,13 +625,14 @@ void Ambix_encoderAudioProcessorEditor::resized()
     lbl_sources.setBounds       (W - 138, 32, 56, 22);
     cmb_active_sources.setBounds (W -  80, 32, 60, 22);
 
-    // Import / Export sit left of the Linked toggle. Compact so they don't
-    // squeeze the Sources combo on narrow windows.
-    btn_export.setBounds (W - 280, 32, 56, 22);
-    btn_import.setBounds (W - 340, 32, 56, 22);
-
     // --- Bottom controls (fixed height) --------------------------------------
     const int bottomY = H - 90;
+
+    // Import / Export live at the right edge of the bottom (blue) panel —
+    // out of the way of the Linked toggle and Sources combo in the header.
+    // The blue panel inset is 24 px on each side; keep a small gap.
+    btn_export.setBounds (W - 100, bottomY + 26, 70, 28);
+    btn_import.setBounds (W - 174, bottomY + 26, 70, 28);
     // Global size + width only apply in linked mode (where they drive the
     // auto-spread for all sources). Hide them in unlinked mode — each
     // source has its own size column in the table, and width is meaningless
@@ -648,7 +649,7 @@ void Ambix_encoderAudioProcessorEditor::resized()
     txt_el_move.setBounds (135, bottomY + 52, 100, 18);
     sld_el_move.setBounds (238, bottomY + 48, 26, 26);
 
-    sld_speed.setBounds  (W - 235, bottomY + 30, 110, 30);
+    sld_speed.setBounds  (280, bottomY + 30, 130, 30);
 
     // --- Main work area: panner | table -------------------------------------
     const int contentTop    = 60;

@@ -261,7 +261,10 @@ juce::Result Ambix_encoderAudioProcessor::saveConfigurationToFile (const juce::F
         const bool muted = source_params[i].mute >= 0.5f;
 
         juce::DynamicObject::Ptr el (new juce::DynamicObject());
-        el->setProperty ("Azimuth",     pos.azDeg);
+        // SPARTA / IEM use math-positive azimuth (counter-clockwise from
+        // front, looking down). ambix uses clockwise-positive. Negate on the
+        // way out so the file is interoperable.
+        el->setProperty ("Azimuth",     -pos.azDeg);
         el->setProperty ("Elevation",   pos.elDeg);
         el->setProperty ("Radius",      1.0);
         el->setProperty ("IsImaginary", false);
@@ -360,7 +363,9 @@ juce::Result Ambix_encoderAudioProcessor::loadConfigurationFromString (const juc
         const int ch = (int) el.getProperty ("Channel", 0) - 1;
         if (ch < 0 || ch >= newActiveSources) continue;
 
-        float az = (float) (double) el.getProperty ("Azimuth",   0.0);
+        // Flip sign: SPARTA/IEM store math-positive (counter-clockwise)
+        // azimuth; ambix is clockwise-positive internally.
+        float az = -(float) (double) el.getProperty ("Azimuth",   0.0);
         float ele = (float) (double) el.getProperty ("Elevation", 0.0);
         wrapAzEl (az, ele); // tolerate out-of-range values like IEM does
 
