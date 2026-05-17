@@ -271,6 +271,18 @@ Use **cmake-gui** or **cmake/ccmake** from the terminal.
 
 ## Changelog
 
+### v0.4.3 (2026-05-17) <!-- omit in toc -->
+
+- major overhaul of `ambix_encoder`
+- only have a single ambix_encoder that can handle multiple sources
+- linked/unlinked mode
+- popup window with panning view
+- sphere view add labels
+- hammer-aitoff 2d projection mode
+- preset factory (compatible with iem multiencoder and sparta)
+- solo/mute per source
+- ambix visualizer compatible with new multi-source encoder functions
+
 ### v0.4.2 (2026-05-05) <!-- omit in toc -->
 
 - `ambix_directional_loudness`: add energy visualizer pre/post modification, add hammer-aitoff projection view, low/high-pass for visualizer signal
