@@ -984,6 +984,27 @@ namespace
         if (lastConfigDir.isDirectory()) return lastConfigDir;
         return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
     }
+
+    // After an AlertWindow with a text-editor field enters its modal state,
+    // focus that text editor and select its contents so the user can start
+    // typing immediately. Has to be posted via callAsync because
+    // grabKeyboardFocus() only takes effect once the AlertWindow is on
+    // screen, and the modal-state machinery may still be settling when
+    // enterModalState() returns. SafePointer protects against the user
+    // dismissing the popup before the async callback runs.
+    void focusAlertTextEditor (juce::AlertWindow* aw, const juce::String& editorName)
+    {
+        juce::Component::SafePointer<juce::AlertWindow> safe (aw);
+        juce::MessageManager::callAsync ([safe, editorName]
+        {
+            if (auto* w = safe.getComponent())
+                if (auto* ed = w->getTextEditor (editorName))
+                {
+                    ed->grabKeyboardFocus();
+                    ed->selectAll();
+                }
+        });
+    }
 }
 
 void Ambix_encoderAudioProcessorEditor::savePresetFile (const juce::File& file)
@@ -1154,6 +1175,8 @@ void Ambix_encoderAudioProcessorEditor::promptSaveAsNamedPreset()
 
             savePresetFile (file);
         }), false);
+
+    focusAlertTextEditor (alertWindow_.get(), "name");
 }
 
 void Ambix_encoderAudioProcessorEditor::promptRenamePreset (const juce::File& file)
@@ -1198,6 +1221,8 @@ void Ambix_encoderAudioProcessorEditor::promptRenamePreset (const juce::File& fi
                     .withMessage ("Rename failed.")
                     .withButton ("OK"), nullptr);
         }), false);
+
+    focusAlertTextEditor (alertWindow_.get(), "name");
 }
 
 void Ambix_encoderAudioProcessorEditor::confirmDeletePreset (const juce::File& file)
