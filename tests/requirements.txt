@@ -1,0 +1,6 @@
+# Python dependencies for ambix plugin test suite
+pedalboard>=0.9   # tier 1: VST3 host for square-bus plugins
+pytest>=7.0
+numpy>=1.24
+scipy>=1.10
+soundfile>=0.12   # tier 2: WAV I/O for the ambix_testhost subprocess host
