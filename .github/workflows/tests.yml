@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            name: macOS
+          - os: windows-2022
+            name: Windows
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Build plugins + testhost and run tests
+        run: python scripts/run_tests.py
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-${{ matrix.name }}
+          path: |
+            _build/CMakeFiles/CMakeOutput.log
+            _build/CMakeFiles/CMakeError.log
+          if-no-files-found: ignore
+          retention-days: 14

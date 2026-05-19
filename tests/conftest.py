@@ -31,7 +31,8 @@ import pytest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VST3_DIR  = os.path.join(REPO_ROOT, "_build", "vst3")
-TESTHOST_BIN = os.path.join(REPO_ROOT, "_build", "testhost", "ambix_testhost")
+_TESTHOST_EXE = "ambix_testhost.exe" if os.name == "nt" else "ambix_testhost"
+TESTHOST_BIN = os.path.join(REPO_ROOT, "_build", "testhost", _TESTHOST_EXE)
 
 GOLDEN_DIR = os.path.join(os.path.dirname(__file__), "golden")
 
