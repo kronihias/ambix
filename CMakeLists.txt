@@ -25,6 +25,7 @@ SET(BUILD_AU FALSE CACHE BOOL "build AudioUnit plugins (macOS only, universal or
 SET(BUILD_STANDALONE FALSE CACHE BOOL "build standalone application (for those with editor)")
 SET(BUILD_LV2 FALSE CACHE BOOL "build LV2 plugins")
 SET(BUILD_VISUALIZER TRUE CACHE BOOL "build the cross-platform ambix_visualizer GUI app (companion to ambix_encoder)")
+SET(BUILD_TESTHOST FALSE CACHE BOOL "build the ambix_testhost CLI used by tests/ to host VST3s with asymmetric main buses")
 SET(MAX_AMBI_ORDER 7 CACHE STRING "Maximum ambisonic order for universal (VST3/AU) builds")
 
 
@@ -267,5 +268,10 @@ ADD_SUBDIRECTORY ( ambix_widening )
 IF (BUILD_VISUALIZER)
 	message ("-- Building ambix_visualizer (standalone GUI app)")
 	ADD_SUBDIRECTORY ( ambix_visualizer )
+ENDIF()
+
+IF (BUILD_TESTHOST)
+	message ("-- Building ambix_testhost (CLI test harness)")
+	ADD_SUBDIRECTORY ( ambix_testhost )
 ENDIF()
 
