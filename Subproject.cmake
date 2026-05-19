@@ -177,6 +177,16 @@ ELSE()
         AMBI_ORDER=${AMBI_ORDER})
 ENDIF()
 
+# Standalone variants open a real audio device, so expose ASIO drivers on
+# Windows. The ASIO headers are bundled in JUCE itself (since 8.0.11), so
+# no external SDK path is needed.
+if (WIN32 AND BUILD_STANDALONE)
+    list (FIND _FORMATS "Standalone" _has_standalone_asio)
+    if (NOT _has_standalone_asio EQUAL -1)
+        target_compile_definitions (${SUBPROJECT_NAME} PRIVATE JUCE_ASIO=1)
+    endif()
+endif()
+
 target_link_libraries (${SUBPROJECT_NAME} PRIVATE
     juce::juce_audio_utils
     juce::juce_audio_plugin_client
