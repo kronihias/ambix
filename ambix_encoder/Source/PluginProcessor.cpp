@@ -1292,10 +1292,60 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
 
     if (xmlState != nullptr && xmlState->hasTagName ("MYPLUGINSETTINGS"))
     {
-        for (int i = 0; i < getNumParameters(); ++i)
+        // Legacy-layout detection. The pre-rework single-input ambix_encoder
+        // built without WidthParam (it was gated behind `INPUT_CHANNELS > 1`),
+        // so its persisted enum was:
+        //   0 Az  1 El  2 Size  3 AzSet  4 AzSetRel  5 AzMv
+        //   6 ElSet  7 ElSetRel  8 ElMv  9 Speed   (10 attributes total).
+        // The new layout inserts WidthParam at index 3 and adds LinkedParam +
+        // NumActiveSourcesParam at 11/12, so the highest legacy index "9"
+        // (Speed) collides with the new ElevationMvParam slot. Reading those
+        // attributes without remapping would shift everything from idx 3
+        // upward by one slot — most visibly, the old SpeedParam value
+        // (default 0.25 = 90 deg/s) would land in ElevationMvParam, kicking
+        // off an unwanted elevation auto-rotation on session reload.
+        //
+        // Detection: the new code always writes an attribute "10" (SpeedParam
+        // in the new layout); the legacy 1-input plugin never wrote one. So
+        // if "10" is absent we apply the index remap below. Old `_iN` (N>1)
+        // sessions can't even reach this code path because their plugin
+        // codes (AE2U..AE8U) no longer exist on disk.
+        const bool legacy_single_input =
+              xmlState->hasAttribute ("0")
+           && ! xmlState->hasAttribute ("10");
+
+        if (legacy_single_input)
         {
-            if (xmlState->hasAttribute (String(i)))
-                setParameter (i, xmlState->getDoubleAttribute (String(i)));
+            static constexpr int kLegacyRemap[10] = {
+                AzimuthParam,         // 0 → 0
+                ElevationParam,       // 1 → 1
+                SizeParam,            // 2 → 2
+                AzimuthSetParam,      // 3 → 4   (WidthParam inserted at new 3)
+                AzimuthSetRelParam,   // 4 → 5
+                AzimuthMvParam,       // 5 → 6
+                ElevationSetParam,    // 6 → 7
+                ElevationSetRelParam, // 7 → 8
+                ElevationMvParam,     // 8 → 9
+                SpeedParam            // 9 → 10
+            };
+            for (int oldIdx = 0; oldIdx < 10; ++oldIdx)
+            {
+                if (xmlState->hasAttribute (String (oldIdx)))
+                    setParameter (kLegacyRemap[oldIdx],
+                                  xmlState->getDoubleAttribute (String (oldIdx)));
+            }
+            // WidthParam, LinkedParam, NumActiveSourcesParam and all per-source
+            // slots stay at their constructor defaults (linked mode, 1 active
+            // source spread auto-derived from master Az/El) — i.e. exactly
+            // what the old 1-input binary did.
+        }
+        else
+        {
+            for (int i = 0; i < getNumParameters(); ++i)
+            {
+                if (xmlState->hasAttribute (String(i)))
+                    setParameter (i, xmlState->getDoubleAttribute (String(i)));
+            }
         }
         if (xmlState->hasAttribute ("mID"))
             m_id = xmlState->getIntAttribute ("mID", m_id);
