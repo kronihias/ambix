@@ -1,0 +1,93 @@
+diff --git a/modules/juce_core/native/juce_Network_windows.cpp b/modules/juce_core/native/juce_Network_windows.cpp
+index b22468b504..2748be9a18 100644
+--- a/modules/juce_core/native/juce_Network_windows.cpp
++++ b/modules/juce_core/native/juce_Network_windows.cpp
+@@ -609,10 +609,46 @@ void IPAddress::findAllAddresses (Array<IPAddress>& result, bool includeIPv6)
+     }
+ }
+ 
+-IPAddress IPAddress::getInterfaceBroadcastAddress (const IPAddress&)
++IPAddress IPAddress::getInterfaceBroadcastAddress (const IPAddress& interfaceAddress)
+ {
+-    // TODO
+-    return {};
++    if (interfaceAddress.isIPv6)
++        return {};
++
++    // Loopback: 127/8 broadcasts to 127.255.255.255 so same-host listeners
++    // still see advertisements when no routable interface is up.
++    if (interfaceAddress.address[0] == 127)
++        return IPAddress (127, 255, 255, 255);
++
++    GetAdaptersAddressesHelper helper;
++
++    if (helper.callGetAdaptersAddresses())
++    {
++        for (PIP_ADAPTER_ADDRESSES adapter = helper.adaptersAddresses; adapter != nullptr; adapter = adapter->Next)
++        {
++            for (auto* unicast = adapter->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next)
++            {
++                if (unicast->Address.lpSockaddr == nullptr
++                    || unicast->Address.lpSockaddr->sa_family != AF_INET)
++                    continue;
++
++                auto* sin = unalignedPointerCast<sockaddr_in*> (unicast->Address.lpSockaddr);
++
++                if (! (MACAddressHelpers::createAddress (sin) == interfaceAddress))
++                    continue;
++
++                const auto prefix = unicast->OnLinkPrefixLength;
++                const uint32 hostAddr = ntohl (sin->sin_addr.s_addr);
++                const uint32 mask = prefix == 0  ? 0u
++                                  : prefix >= 32 ? 0xFFFFFFFFu
++                                                 : (0xFFFFFFFFu << (32 - prefix));
++                return IPAddress (hostAddr | ~mask);
++            }
++        }
++    }
++
++    // Couldn't resolve a per-interface mask — fall back to limited broadcast
++    // so the advertisement still goes somewhere useful on the local link.
++    return IPAddress (255, 255, 255, 255);
+ }
+ 
+ 
+diff --git a/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp b/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp
+index 4ab805b912..1c0acd9bab 100644
+--- a/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp
++++ b/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp
+@@ -81,11 +81,16 @@ void NetworkServiceDiscovery::Advertiser::sendBroadcast()
+ {
+     static IPAddress local = IPAddress::local();
+ 
++    IPAddress preferredAddress;
++
+     for (auto& address : IPAddress::getAllAddresses())
+     {
+         if (address == local)
+             continue;
+ 
++        if (preferredAddress.isNull())
++            preferredAddress = address;
++
+         message.setAttribute ("address", address.toString());
+ 
+         auto broadcastAddress = IPAddress::getInterfaceBroadcastAddress (address);
+@@ -93,6 +98,17 @@ void NetworkServiceDiscovery::Advertiser::sendBroadcast()
+ 
+         socket.write (broadcastAddress.toString(), broadcastPort, data.toRawUTF8(), (int) data.getNumBytesAsUTF8());
+     }
++
++    // Also advertise on the loopback interface so same-host listeners receive
++    // us even when no routable interface is up. Reuse the first real
++    // interface's address when there is one, so this extra packet carries the
++    // same "address" attribute as the others — otherwise same-host receivers
++    // would see the address field flap between each broadcast tick.
++    const auto loopbackSource = preferredAddress.isNull() ? local : preferredAddress;
++    message.setAttribute ("address", loopbackSource.toString());
++    const auto loopbackData = message.toString (XmlElement::TextFormat().singleLine().withoutHeader());
++    socket.write (IPAddress (127, 255, 255, 255).toString(), broadcastPort,
++                  loopbackData.toRawUTF8(), (int) loopbackData.getNumBytesAsUTF8());
+ }
+ 
+ //==============================================================================

@@ -58,11 +58,13 @@ if (NOT PATCH_EXECUTABLE)
 endif()
 
 # Apply a patch idempotently: dry-run first so an already-applied patch on a
-# re-configure is reported as a no-op instead of a hard failure.
-function(apply_juce_patch target_file patch_file)
+# re-configure is reported as a no-op instead of a hard failure. Applies with
+# -p1 rooted at the JUCE submodule so a single patch can touch multiple files.
+function(apply_juce_patch patch_file)
+    set(juce_root "${CMAKE_CURRENT_SOURCE_DIR}/JUCE")
     execute_process(
         COMMAND "${PATCH_EXECUTABLE}" --binary --forward --dry-run --silent
-                "${target_file}" "${patch_file}"
+                -p1 -d "${juce_root}" -i "${patch_file}"
         RESULT_VARIABLE dry_result
         OUTPUT_VARIABLE dry_output
         ERROR_VARIABLE  dry_error)
@@ -70,7 +72,7 @@ function(apply_juce_patch target_file patch_file)
     if (dry_result EQUAL 0)
         execute_process(
             COMMAND "${PATCH_EXECUTABLE}" --binary --forward
-                    "${target_file}" "${patch_file}"
+                    -p1 -d "${juce_root}" -i "${patch_file}"
             RESULT_VARIABLE apply_result
             OUTPUT_VARIABLE apply_output
             ERROR_VARIABLE  apply_error)
@@ -95,20 +97,19 @@ function(apply_juce_patch target_file patch_file)
             message(STATUS "Patch already applied: ${patch_file}")
         else()
             message(FATAL_ERROR
-                "Patch ${patch_file} cannot be applied to ${target_file}:\n"
+                "Patch ${patch_file} cannot be applied under ${juce_root}:\n"
                 "${dry_output}\n${dry_error}")
         endif()
     endif()
 endfunction()
 
 # Implement IPAddress::getInterfaceBroadcastAddress on Windows (upstream JUCE
-# leaves it as a TODO that returns 0.0.0.0). Without this, the
-# NetworkServiceDiscovery::Advertiser silently sends to 0.0.0.0 and Windows
-# peers never appear on remote machines (ambix_encoder ↔ ambix_visualizer
-# discovery).
+# leaves it as a TODO that returns 0.0.0.0) and add an explicit loopback
+# broadcast in NetworkServiceDiscovery::Advertiser. Without this, Windows peers
+# never appear on remote machines and same-host listeners miss advertisements
+# (ambix_encoder ↔ ambix_visualizer discovery).
 apply_juce_patch(
-    "${CMAKE_CURRENT_SOURCE_DIR}/JUCE/modules/juce_core/native/juce_Network_windows.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_Network_windows.cpp.patch")
+    "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_network_discovery.patch")
 
 #########
 # preprocessor flags
