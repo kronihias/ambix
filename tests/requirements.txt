@@ -1,5 +1,5 @@
 # Python dependencies for ambix plugin test suite
-pedalboard>=0.9   # tier 1: VST3 host for square-bus plugins
+pedalboard>=0.9.16   # tier 1: VST3 host for square-bus plugins (JUCE 8 manifest support)
 pytest>=7.0
 numpy>=1.24
 scipy>=1.10

@@ -17,6 +17,7 @@ Usage:
 import argparse
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +28,15 @@ TESTS_DIR = ROOT / "tests"
 REQ_FILE = TESTS_DIR / "requirements.txt"
 
 IS_WINDOWS = platform.system() == "Windows"
+
+# Runtime dependencies the test build needs next to the binaries.
+# The release installer drops libfftw3f-3.dll into System32 for users; the
+# test build has no installer step, so we stage the DLL ourselves into each
+# VST3 bundle and next to ambix_testhost.exe. Only ambix_binaural actually
+# links to it, but a missing dependency for *one* plugin is enough to make
+# pedalboard's scanner choke for all of them in the same session, so the
+# safe move is to make the DLL findable for every host process.
+WIN_RUNTIME_DLLS = [ROOT / "win-libs" / "x64" / "libfftw3f-3.dll"]
 
 
 def run(cmd, cwd=None):
@@ -65,6 +75,58 @@ def cmake_build():
     if IS_WINDOWS:
         args += ["--config", "Release"]
     run(args)
+    if IS_WINDOWS:
+        stage_windows_runtime_dlls()
+
+
+def stage_windows_runtime_dlls():
+    """Place runtime DLLs next to the binaries that need them.
+
+    JUCE produces VST3 bundles laid out as <name>.vst3/Contents/x86_64-win/<name>.vst3
+    on Windows; Windows loads dependent DLLs from the directory of the
+    DLL being loaded, so we drop runtime libs there. The testhost is a
+    plain .exe so the same DLLs go next to it too.
+    """
+    vst3_dir = BUILD_DIR / "vst3"
+    testhost_dir = BUILD_DIR / "testhost"
+
+    targets = [testhost_dir]
+    if vst3_dir.is_dir():
+        for bundle in vst3_dir.glob("*.vst3"):
+            bin_dir = bundle / "Contents" / "x86_64-win"
+            if bin_dir.is_dir():
+                targets.append(bin_dir)
+
+    for dll in WIN_RUNTIME_DLLS:
+        if not dll.is_file():
+            print(f"! missing runtime DLL: {dll}", flush=True)
+            continue
+        for dst_dir in targets:
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            dst = dst_dir / dll.name
+            shutil.copy2(dll, dst)
+            print(f"  staged {dll.name} -> {dst}", flush=True)
+
+
+def diagnose_build():
+    """List built artefacts so CI logs show what's actually on disk."""
+    print("\n--- _build/vst3 ---", flush=True)
+    vst3_dir = BUILD_DIR / "vst3"
+    if vst3_dir.is_dir():
+        for p in sorted(vst3_dir.rglob("*")):
+            if p.is_file():
+                print(f"  {p.relative_to(BUILD_DIR)}", flush=True)
+    else:
+        print("  (missing)", flush=True)
+
+    print("\n--- _build/testhost ---", flush=True)
+    th_dir = BUILD_DIR / "testhost"
+    if th_dir.is_dir():
+        for p in sorted(th_dir.iterdir()):
+            print(f"  {p.relative_to(BUILD_DIR)}", flush=True)
+    else:
+        print("  (missing)", flush=True)
+    print("", flush=True)
 
 
 def install_python_deps():
@@ -94,6 +156,8 @@ def main():
     if not opts.no_build:
         cmake_configure()
         cmake_build()
+
+    diagnose_build()
 
     if not opts.no_test:
         if not opts.no_deps:
