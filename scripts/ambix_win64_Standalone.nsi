@@ -71,8 +71,8 @@ Section /o "Desktop shortcut (ambix Visualizer)" SecDesktop
     CreateShortCut "$DESKTOP\ambix Visualizer.lnk" "$INSTDIR\ambix Visualizer.exe"
 SectionEnd
 
-; libfftw3f-3.dll
-Section "FFTW3f library"
+; libfftw3f-3.dll (hidden, always installed — Visualizer links against it at runtime)
+Section "-FFTW3f library"
     SetOutPath "$SYSDIR"
     File "..\win-libs\x64\libfftw3f-3.dll"
 SectionEnd

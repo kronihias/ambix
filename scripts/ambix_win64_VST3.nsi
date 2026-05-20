@@ -78,8 +78,8 @@ Section /o "Desktop shortcut (ambix Visualizer)" SecDesktop
     CreateShortCut "$DESKTOP\ambix Visualizer.lnk" "$PROGRAMFILES64\ambix\ambix Visualizer.exe"
 SectionEnd
 
-; libfftw3f-3.dll
-Section "FFTW3f library"
+; libfftw3f-3.dll (hidden, always installed — plugins link against it at runtime)
+Section "-FFTW3f library"
     SetOutPath "$SYSDIR"
     File "..\win-libs\x64\libfftw3f-3.dll"
 SectionEnd
