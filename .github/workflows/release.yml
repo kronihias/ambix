@@ -30,8 +30,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+        # Init submodules manually below. actions/checkout shallow-clones
+        # submodules at --depth=1, which misses our JUCE pin (8.0.13 is a
+        # few commits behind upstream's default-branch tip). Its fallback
+        # direct-SHA fetch then fails with a credential prompt because the
+        # github.com extraheader doesn't propagate to that second fetch.
+
+      - name: Init submodules
+        shell: bash
+        run: |
+          # Full (non-shallow) clone so any pinned-but-not-tip JUCE commit
+          # is always reachable. Retry to absorb transient github.com flakes.
+          for i in 1 2 3; do
+            git submodule update --init --recursive && exit 0
+            echo "submodule update failed (attempt $i/3), retrying in 10s..."
+            sleep 10
+          done
+          exit 1
 
       - name: Read version
         id: version
@@ -125,8 +140,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+        # Init submodules manually below. actions/checkout shallow-clones
+        # submodules at --depth=1, which misses our JUCE pin (8.0.13 is a
+        # few commits behind upstream's default-branch tip). Its fallback
+        # direct-SHA fetch then fails with a credential prompt because the
+        # github.com extraheader doesn't propagate to that second fetch.
+
+      - name: Init submodules
+        shell: bash
+        run: |
+          # Full (non-shallow) clone so any pinned-but-not-tip JUCE commit
+          # is always reachable. Retry to absorb transient github.com flakes.
+          for i in 1 2 3; do
+            git submodule update --init --recursive && exit 0
+            echo "submodule update failed (attempt $i/3), retrying in 10s..."
+            sleep 10
+          done
+          exit 1
 
       - name: Read version
         id: version
