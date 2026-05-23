@@ -1,0 +1,6 @@
+# JUCE upstream ships its source files with CRLF line terminators. Our JUCE
+# patches must match that, and we apply them with `patch --binary` (see
+# CMakeLists.txt), which compares bytes exactly. Force CRLF on checkout so the
+# patches keep matching even if someone edits or regenerates one on a platform
+# whose tools default to LF.
+JUCE_patches/*.patch text eol=crlf

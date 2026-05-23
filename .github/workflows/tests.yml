@@ -14,10 +14,18 @@ jobs:
         include:
           - os: macos-14
             name: macOS
+            continue-on-error: false
           - os: windows-2022
             name: Windows
+            continue-on-error: false
+          - os: ubuntu-22.04
+            name: Linux
+            # First-pass Linux CI: don't gate PRs on it while we shake out
+            # platform-specific issues. Flip to false once it's reliably green.
+            continue-on-error: true
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
+    continue-on-error: ${{ matrix.continue-on-error }}
     timeout-minutes: 90
 
     steps:
@@ -35,8 +43,52 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ninja
 
+      # JUCE on Linux needs ALSA/X11/freetype/etc even for plugins that are
+      # never opened in a GUI host — juce_gui_basics is pulled in transitively
+      # and the link step references these. FFTW3 comes from the distro here
+      # rather than vcpkg (faster, and ubuntu ships a recent-enough fftw3f).
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build \
+            libfftw3-dev \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            libfreetype6-dev \
+            libx11-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libglu1-mesa-dev \
+            mesa-common-dev \
+            libcurl4-openssl-dev \
+            libwebkit2gtk-4.1-dev \
+            xvfb
+
+      # vcpkg manifest mode pulls in FFTW3 on Windows (see vcpkg.json). The
+      # GH Actions Windows runner has vcpkg preinstalled at
+      # VCPKG_INSTALLATION_ROOT; using its built-in GHA binary cache backend
+      # means FFTW3 is rebuilt only when the manifest changes.
+      - name: Export GitHub Actions cache env (for vcpkg binary cache)
+        if: runner.os == 'Windows'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Build plugins + testhost and run tests
-        run: python scripts/run_tests.py
+        env:
+          VCPKG_BINARY_SOURCES: ${{ runner.os == 'Windows' && 'clear;x-gha,readwrite' || '' }}
+        # xvfb on Linux: pedalboard's VST3 loader and some JUCE init paths
+        # touch the display server even for "headless" use, so give them a
+        # virtual one rather than chasing per-plugin skips.
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a python scripts/run_tests.py' || 'python scripts/run_tests.py' }}
 
       - name: Upload test logs on failure
         if: failure()

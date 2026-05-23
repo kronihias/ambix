@@ -45,17 +45,4 @@ Section "" ;No components page, name is not important
   ; Put file there
   File /r "..\build\vst_o${ORDER}\*.dll"
 
-   ${DisableX64FSRedirection}
-
-  SetOutPath "$SYSDIR"
-
-  File ..\win-libs\x64\libfftw3f-3.dll
-
-  ;Microsoft Visual C++ 2012 Redistributable
-
-  ; SetOutPath "$Temp"
-  ; File ..\..\win-libs\x64\vcredist_x64.exe
-
-  ; Execwait '"$Temp\vcredist_x64.exe" /q' ; '/q' to install silently
-  
 SectionEnd ; end the section

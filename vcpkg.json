@@ -1,0 +1,19 @@
+{
+    "name": "ambix",
+    "version-string": "0.4.3",
+    "description": "ambiX ambisonic plug-in suite — Windows third-party deps (FFTW3). macOS uses Accelerate, Linux uses system FFTW3; vcpkg is only consulted when configuring with its toolchain file (typical on Windows CI / dev boxes).",
+    "builtin-baseline": "f7f94113c3b629c01df3d49d5edebae6d598c78c",
+    "dependencies": [
+        {
+            "name": "fftw3",
+            "default-features": false,
+            "features": [
+                "sse2",
+                "avx",
+                "avx2",
+                "threads"
+            ],
+            "platform": "windows"
+        }
+    ]
+}

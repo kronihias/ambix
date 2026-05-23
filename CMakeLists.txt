@@ -238,12 +238,16 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/eigen" CACHE PATH "Eigen3 include directory" FORCE)
 find_package(Eigen3 REQUIRED)
 
+# Force MODULE mode so our cmake/FindFFTW3.cmake is used (sets FFTW3F_LIBRARY
+# and FFTW3F_THREADS_LIBRARY). vcpkg installs FFTW3Config.cmake files which
+# would otherwise win CONFIG-mode resolution and our targets would see empty
+# library variables.
 IF (WITH_ZITA_CONVOLVER OR WIN32)
-	find_package(FFTW3 COMPONENTS single)
+	find_package(FFTW3 MODULE COMPONENTS single)
 ENDIF (WITH_ZITA_CONVOLVER OR WIN32)
 
 IF(UNIX AND NOT APPLE AND NOT ANDROID)
-	find_package(FFTW3 COMPONENTS single threads)
+	find_package(FFTW3 MODULE COMPONENTS single threads)
 ENDIF(UNIX AND NOT APPLE AND NOT ANDROID)
 
 include_directories(${EIGEN3_INCLUDE_DIR} ${FFTW3_INCLUDE_DIR})

@@ -6,7 +6,41 @@ set BUILD_DIR=..\build
 if not defined MSBUILD set MSBUILD="C:\Program Files\Microsoft Visual Studio\2022\Community\Msbuild\Current\Bin\MSBuild.exe"
 if not defined MAKENSIS set MAKENSIS="C:\Program Files (x86)\NSIS\makensis.exe"
 set MSBUILD_FLAGS=/t:Build /p:Configuration=Release /p:PreBuildEvent= /p:PostBuildEvent=
-set CMAKE_COMMON=-DNUM_OUTPUTS_DECODER=64 -DFFTW3_INCLUDE_DIR="../win-libs/" -DFFTW3F_LIBRARY="../win-libs/x64/libfftw3f-3.lib"
+
+REM ── vcpkg setup ──────────────────────────────────────────────────────────────
+REM FFTW3 is provided by vcpkg in manifest mode (see ../vcpkg.json and
+REM ../vcpkg-triplets/x64-windows-static-md-release.cmake — static lib, dynamic
+REM CRT, release-only). Prefer VCPKG_ROOT, then GH-Actions-style
+REM VCPKG_INSTALLATION_ROOT; otherwise auto-bootstrap into %USERPROFILE%\vcpkg.
+if not defined VCPKG_ROOT if defined VCPKG_INSTALLATION_ROOT set VCPKG_ROOT=%VCPKG_INSTALLATION_ROOT%
+if not defined VCPKG_ROOT (
+    set VCPKG_ROOT=%USERPROFILE%\vcpkg
+    if not exist "%USERPROFILE%\vcpkg\bootstrap-vcpkg.bat" (
+        echo Bootstrapping vcpkg into %USERPROFILE%\vcpkg ...
+        git clone https://github.com/microsoft/vcpkg "%USERPROFILE%\vcpkg" || exit /b 1
+        call "%USERPROFILE%\vcpkg\bootstrap-vcpkg.bat" -disableMetrics || exit /b 1
+    )
+)
+if not exist "%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" (
+    echo ERROR: VCPKG_ROOT=%VCPKG_ROOT% does not contain scripts\buildsystems\vcpkg.cmake
+    exit /b 1
+)
+
+REM Make sure the manifest baseline commit is reachable in the vcpkg checkout
+REM — the pre-installed vcpkg on GH runners often lags ..\vcpkg.json. Use `||`
+REM rather than `if errorlevel` so the exit code is checked at execution time
+REM (batch otherwise evaluates errorlevel at parse time inside `if` blocks).
+for /f "tokens=2 delims=:," %%a in ('findstr /c:"builtin-baseline" "..\vcpkg.json"') do set "VCPKG_BASELINE=%%~a"
+set "VCPKG_BASELINE=%VCPKG_BASELINE: =%"
+set "VCPKG_BASELINE=%VCPKG_BASELINE:"=%"
+if not defined VCPKG_BASELINE goto :skip_baseline
+git -C "%VCPKG_ROOT%" cat-file -e %VCPKG_BASELINE% >nul 2>&1 || (
+    echo Fetching vcpkg baseline %VCPKG_BASELINE% ...
+    git -C "%VCPKG_ROOT%" fetch --depth 1 origin %VCPKG_BASELINE% 2>nul || git -C "%VCPKG_ROOT%" fetch origin || exit /b 1
+)
+:skip_baseline
+
+set CMAKE_COMMON=-DNUM_OUTPUTS_DECODER=64 -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake" -DVCPKG_OVERLAY_TRIPLETS="../vcpkg-triplets" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md-release
 
 REM ── Code signing configuration ───────────────────────────────────────────────
 REM   Set SIGN_CERT to the .p12 certificate file and SIGN_PASS to its password.

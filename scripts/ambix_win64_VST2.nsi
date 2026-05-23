@@ -83,12 +83,6 @@ Section /o "Desktop shortcut (ambix Visualizer)" SecDesktop
     CreateShortCut "$DESKTOP\ambix Visualizer.lnk" "$PROGRAMFILES64\ambix\ambix Visualizer.exe"
 SectionEnd
 
-; libfftw3f-3.dll (hidden, always installed — plugins link against it at runtime)
-Section "-FFTW3f library"
-    SetOutPath "$SYSDIR"
-    File "..\win-libs\x64\libfftw3f-3.dll"
-SectionEnd
-
 ; Write uninstaller + Programs-and-Features registration (hidden, always runs)
 Section "-Uninstaller"
     SetOutPath "$INSTDIR"
@@ -118,8 +112,6 @@ Section "Uninstall"
     Delete "$SMPROGRAMS\ambix\ambix Visualizer.lnk"
     RMDir  "$SMPROGRAMS\ambix"
     Delete "$DESKTOP\ambix Visualizer.lnk"
-
-    ; Note: libfftw3f-3.dll in $SYSDIR is intentionally left in place (shared system DLL)
 
     DeleteRegKey HKLM "${UNINST_KEY}"
 SectionEnd

@@ -15,9 +15,9 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -29,19 +29,58 @@ REQ_FILE = TESTS_DIR / "requirements.txt"
 
 IS_WINDOWS = platform.system() == "Windows"
 
-# Runtime dependencies the test build needs next to the binaries.
-# The release installer drops libfftw3f-3.dll into System32 for users; the
-# test build has no installer step, so we stage the DLL ourselves into each
-# VST3 bundle and next to ambix_testhost.exe. Only ambix_binaural actually
-# links to it, but a missing dependency for *one* plugin is enough to make
-# pedalboard's scanner choke for all of them in the same session, so the
-# safe move is to make the DLL findable for every host process.
-WIN_RUNTIME_DLLS = [ROOT / "win-libs" / "x64" / "libfftw3f-3.dll"]
-
 
 def run(cmd, cwd=None):
     print(f"+ {' '.join(str(c) for c in cmd)}", flush=True)
     subprocess.run([str(c) for c in cmd], cwd=cwd, check=True)
+
+
+def ensure_vcpkg_baseline(vcpkg_root):
+    # The preinstalled vcpkg on GH Actions runners often predates the
+    # builtin-baseline pinned in vcpkg.json, and `vcpkg install` then aborts
+    # with "failed to git show versions/baseline.json". Fetch the missing
+    # commit before invoking cmake.
+    manifest = ROOT / "vcpkg.json"
+    try:
+        baseline = json.loads(manifest.read_text())["builtin-baseline"]
+    except (FileNotFoundError, KeyError, json.JSONDecodeError):
+        return
+    if not (vcpkg_root / ".git").exists():
+        return
+    have = subprocess.run(
+        ["git", "-C", str(vcpkg_root), "cat-file", "-e", f"{baseline}^{{commit}}"],
+        capture_output=True,
+    )
+    if have.returncode == 0:
+        return
+    print(f"\n[vcpkg] baseline {baseline[:12]} missing in {vcpkg_root}, fetching", flush=True)
+    fetch = subprocess.run(
+        ["git", "-C", str(vcpkg_root), "fetch", "--depth", "1", "origin", baseline],
+    )
+    if fetch.returncode != 0:
+        # Fetch-by-sha can be refused (uploadpack.allowReachableSHA1InWant);
+        # fall back to a full fetch from origin.
+        run(["git", "-C", str(vcpkg_root), "fetch", "origin"])
+
+
+def ensure_vcpkg_root():
+    # Resolve a usable vcpkg checkout. Honors VCPKG_ROOT, then GH-Actions'
+    # VCPKG_INSTALLATION_ROOT; otherwise clones + bootstraps into
+    # ~/vcpkg. FFTW3 (manifest-declared in vcpkg.json) is required on
+    # Windows since the prebuilt fallback under win-libs/ was removed.
+    for env_var in ("VCPKG_ROOT", "VCPKG_INSTALLATION_ROOT"):
+        v = os.environ.get(env_var)
+        if v and (Path(v) / "scripts" / "buildsystems" / "vcpkg.cmake").is_file():
+            return Path(v)
+
+    home_vcpkg = Path.home() / "vcpkg"
+    if not (home_vcpkg / "scripts" / "buildsystems" / "vcpkg.cmake").is_file():
+        print(f"\n[vcpkg] bootstrapping into {home_vcpkg}", flush=True)
+        if not home_vcpkg.exists():
+            run(["git", "clone", "https://github.com/microsoft/vcpkg", str(home_vcpkg)])
+        bootstrap = home_vcpkg / ("bootstrap-vcpkg.bat" if IS_WINDOWS else "bootstrap-vcpkg.sh")
+        run([str(bootstrap), "-disableMetrics"])
+    return home_vcpkg
 
 
 def cmake_configure():
@@ -60,10 +99,21 @@ def cmake_configure():
         "-DMAX_AMBI_ORDER=7",
     ]
     if IS_WINDOWS:
+        # FFTW3 comes from vcpkg manifest mode (see vcpkg.json — static lib
+        # with SSE2/AVX/AVX2/threads). GH Actions runners expose
+        # VCPKG_INSTALLATION_ROOT; local dev boxes set VCPKG_ROOT; otherwise
+        # we bootstrap into ~/vcpkg.
+        vcpkg_root = ensure_vcpkg_root()
+        ensure_vcpkg_baseline(vcpkg_root)
+        # In-tree overlay triplet so vcpkg only builds the Release variant of
+        # FFTW3 (we don't link a debug fftw3f.lib). Halves the first-time
+        # vcpkg build cost.
+        overlay = (ROOT / "vcpkg-triplets").as_posix()
         args += [
             "-A", "x64",
-            f"-DFFTW3_INCLUDE_DIR={ROOT / 'win-libs'}",
-            f"-DFFTW3F_LIBRARY={ROOT / 'win-libs' / 'x64' / 'libfftw3f-3.lib'}",
+            f"-DCMAKE_TOOLCHAIN_FILE={vcpkg_root.as_posix()}/scripts/buildsystems/vcpkg.cmake",
+            f"-DVCPKG_OVERLAY_TRIPLETS={overlay}",
+            "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md-release",
         ]
     else:
         args += ["-G", "Ninja"]
@@ -75,37 +125,6 @@ def cmake_build():
     if IS_WINDOWS:
         args += ["--config", "Release"]
     run(args)
-    if IS_WINDOWS:
-        stage_windows_runtime_dlls()
-
-
-def stage_windows_runtime_dlls():
-    """Place runtime DLLs next to the binaries that need them.
-
-    JUCE produces VST3 bundles laid out as <name>.vst3/Contents/x86_64-win/<name>.vst3
-    on Windows; Windows loads dependent DLLs from the directory of the
-    DLL being loaded, so we drop runtime libs there. The testhost is a
-    plain .exe so the same DLLs go next to it too.
-    """
-    vst3_dir = BUILD_DIR / "vst3"
-    testhost_dir = BUILD_DIR / "testhost"
-
-    targets = [testhost_dir]
-    if vst3_dir.is_dir():
-        for bundle in vst3_dir.glob("*.vst3"):
-            bin_dir = bundle / "Contents" / "x86_64-win"
-            if bin_dir.is_dir():
-                targets.append(bin_dir)
-
-    for dll in WIN_RUNTIME_DLLS:
-        if not dll.is_file():
-            print(f"! missing runtime DLL: {dll}", flush=True)
-            continue
-        for dst_dir in targets:
-            dst_dir.mkdir(parents=True, exist_ok=True)
-            dst = dst_dir / dll.name
-            shutil.copy2(dll, dst)
-            print(f"  staged {dll.name} -> {dst}", flush=True)
 
 
 def diagnose_build():
