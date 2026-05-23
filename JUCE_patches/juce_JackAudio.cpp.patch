@@ -1,0 +1,66 @@
+diff --git a/modules/juce_audio_devices/native/juce_JackAudio.cpp b/modules/juce_audio_devices/native/juce_JackAudio.cpp
+index 34f5a6aceb..eef8a7ee33 100644
+--- a/modules/juce_audio_devices/native/juce_JackAudio.cpp
++++ b/modules/juce_audio_devices/native/juce_JackAudio.cpp
+@@ -298,6 +298,29 @@ public:
+         lastError.clear();
+         close();
+ 
++        // open input ports
++        for (int i = 0; i < inputChannels.getHighestBit()+1; ++i)
++        {
++            String inputPortName;
++            inputPortName << "in_" << ++totalNumberOfInputChannels;
++
++            inputPorts.add (juce::jack_port_register (client, inputPortName.toUTF8(),
++                                                        JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0));
++        }
++
++        // open output ports
++        for (int i = 0; i < outputChannels.getHighestBit()+1; ++i)
++        {
++            String outputPortName;
++            outputPortName << "out_" << ++totalNumberOfOutputChannels;
++
++            outputPorts.add (juce::jack_port_register (client, outputPortName.toUTF8(),
++                                                        JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0));
++        }
++
++        inChans.calloc (totalNumberOfInputChannels + 2);
++        outChans.calloc (totalNumberOfOutputChannels + 2);
++
+         xruns.store (0, std::memory_order_relaxed);
+         juce::jack_set_process_callback (client, processCallback, this);
+         juce::jack_set_port_connect_callback (client, portConnectCallback, this);
+@@ -307,6 +330,8 @@ public:
+         juce::jack_activate (client);
+         deviceIsOpen = true;
+ 
++        // do not auto connect inputs
++        /*
+         if (! inputChannels.isZero())
+         {
+             forEachClientChannel (inputName, false, [&] (const char* portName, int index)
+@@ -327,6 +352,7 @@ public:
+                     JUCE_JACK_LOG ("Cannot connect input port " + String (index) + " (" + portName + "), error " + String (error));
+             });
+         }
++        */
+ 
+         if (! outputChannels.isZero())
+         {
+@@ -511,12 +537,10 @@ private:
+         BigInteger newOutputChannels, newInputChannels;
+ 
+         for (int i = 0; i < outputPorts.size(); ++i)
+-            if (juce::jack_port_connected (outputPorts.getUnchecked (i)))
+-                newOutputChannels.setBit (i);
++            newOutputChannels.setBit (i);
+ 
+         for (int i = 0; i < inputPorts.size(); ++i)
+-            if (juce::jack_port_connected (inputPorts.getUnchecked (i)))
+-                newInputChannels.setBit (i);
++            newInputChannels.setBit (i);
+ 
+         if (newOutputChannels != activeOutputChannels
+              || newInputChannels != activeInputChannels)

@@ -31,7 +31,17 @@ SET(MAX_AMBI_ORDER 7 CACHE STRING "Maximum ambisonic order for universal (VST3/A
 
 IF(UNIX AND NOT APPLE AND NOT ANDROID)
 	SET(WITH_ZITA_CONVOLVER FALSE CACHE BOOL "build with zita-convolver (better performance under linux)")
+	# JACK is the natural audio backend for multichannel ambisonic standalones
+	# on Linux; the patch (juce_JackAudio.cpp.patch) opens N ports up front and
+	# disables auto-connect of inputs so the plugin always sees its full
+	# channel count regardless of the audio interface channel count.
+	SET(JUCE_JACK TRUE CACHE BOOL "build standalone apps with Jack support (Linux)")
 ENDIF(UNIX AND NOT APPLE AND NOT ANDROID)
+
+################################################
+# additional cmake find packages
+# Set early — find_package(Jack) below uses our cmake/FindJack.cmake.
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ################################################
 # add JUCE
@@ -110,6 +120,18 @@ endfunction()
 # (ambix_encoder ↔ ambix_visualizer discovery).
 apply_juce_patch(
     "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_network_discovery.patch")
+
+# Linux JACK backend: open N input/output ports up front (sized to the
+# requested channel count, not whatever happens to be connected) and stop
+# auto-connecting inputs. Without this, multichannel ambix standalones only
+# see the channels JACK had wired at startup. Header is needed at compile
+# time; libjack is loaded at runtime via dlopen by JUCE itself, so no link.
+IF (JUCE_JACK)
+    find_package(Jack REQUIRED)
+    apply_juce_patch(
+        "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_JackAudio.cpp.patch")
+    ADD_DEFINITIONS(-DJUCE_JACK=1)
+ENDIF (JUCE_JACK)
 
 #########
 # preprocessor flags
@@ -230,7 +252,8 @@ INCLUDE_DIRECTORIES ( BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/common/LegendreU )
 
 ################################################
 # additional cmake find packages
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+# (CMAKE_MODULE_PATH was set earlier so find_package(Jack) could see our
+# cmake/FindJack.cmake during the patch-apply block.)
 
 # Eigen3 ships as a git submodule under eigen/ pinned to 3.4.0. Forcing
 # EIGEN3_INCLUDE_DIR up front bypasses any ambient/system installs (including
@@ -250,7 +273,7 @@ IF(UNIX AND NOT APPLE AND NOT ANDROID)
 	find_package(FFTW3 MODULE COMPONENTS single threads)
 ENDIF(UNIX AND NOT APPLE AND NOT ANDROID)
 
-include_directories(${EIGEN3_INCLUDE_DIR} ${FFTW3_INCLUDE_DIR})
+include_directories(${EIGEN3_INCLUDE_DIR} ${FFTW3_INCLUDE_DIR} ${JACK_INCLUDE_DIRS})
 
 
 ################################################

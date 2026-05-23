@@ -208,6 +208,8 @@ sudo apt install libasound2-dev libjack-jackd2-dev \
 ```
 
 > On older Ubuntu/Debian where `libwebkit2gtk-4.1-dev` is not available, substitute `libwebkit2gtk-4.0-dev` — JUCE 8 loads whichever is present at runtime. Likewise, fall back to `libfreetype6-dev` if `libfreetype-dev` is unavailable. If you intend to enable `WITH_ZITA_CONVOLVER` (off by default), also install `libzita-convolver-dev`.
+>
+> Standalone apps on Linux use JACK (`libjack-jackd2-dev`) and apply a patch to JUCE's JACK backend so all requested channels are exposed as ports up front, regardless of the audio interface channel count. Disable with `-DJUCE_JACK=OFF` if you want a build without JACK.
 
 **Windows x64** — FFTW3 is fetched and built by **vcpkg** (declared in [`vcpkg.json`](vcpkg.json) with SSE2/AVX/AVX2/threads features, statically linked into each plug-in — no DLL to ship). Both `scripts/build_all_win64.bat` and `scripts/run_tests.py` auto-bootstrap vcpkg into `%USERPROFILE%\vcpkg` if neither `VCPKG_ROOT` nor (GH Actions') `VCPKG_INSTALLATION_ROOT` is set, so no manual setup is required.
 
