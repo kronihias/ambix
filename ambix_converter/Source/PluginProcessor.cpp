@@ -533,8 +533,14 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
         ACNtoLM(i, l, m);
 
 
-        int _in_ch_seq = in_2d ? in_2d_ch_seq[ACN3DtoACN2D(i)] : in_ch_seq[i];
-        int _out_ch_seq = out_2d ? out_2d_ch_seq[ACN3DtoACN2D(i)] : out_ch_seq[i];
+        // 3D-only channels (l != |m|) have no 2D equivalent; ACN3DtoACN2D
+        // returns -1 for them. Skip — indexing the 2D map with -1 is UB.
+        int acn_2d_idx = (in_2d || out_2d) ? ACN3DtoACN2D(i) : 0;
+        if ((in_2d || out_2d) && acn_2d_idx < 0)
+            continue;
+
+        int _in_ch_seq = in_2d ? in_2d_ch_seq[acn_2d_idx] : in_ch_seq[i];
+        int _out_ch_seq = out_2d ? out_2d_ch_seq[acn_2d_idx] : out_ch_seq[i];
 
         // std::cout << "InputCh: " << i << " IN_CHANNEL: " << _in_ch_seq << " OUT_CHANNEL: " << _out_ch_seq << std::endl;
 
