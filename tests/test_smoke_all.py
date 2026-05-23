@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from conftest import SR, N_AMBI_CH, ALL_PLUGINS, vst3, PluginWrapper, run_testhost
+from conftest import SR, N_AMBI_CH, ALL_PLUGINS, vst3, vst3_load_path, PluginWrapper, run_testhost
 
 
 BLOCK = 4096   # short buffer — smoke tests don't need a full second of audio
@@ -45,7 +45,7 @@ def _load_or_skip_pedalboard(name: str):
     path = vst3(name)
     if not os.path.exists(path):
         pytest.skip(f"Plugin not built: {path}")
-    return PluginWrapper(pedalboard.load_plugin(path))
+    return PluginWrapper(pedalboard.load_plugin(vst3_load_path(path)))
 
 
 # ---------------------------------------------------------------------------

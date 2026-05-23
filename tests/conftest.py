@@ -20,6 +20,7 @@ VST3s are expected at `<repo>/_build/vst3/` and the testhost at
 """
 
 import os
+import sys
 from typing import Optional
 
 import numpy as np
@@ -39,6 +40,17 @@ GOLDEN_DIR = os.path.join(os.path.dirname(__file__), "golden")
 
 def vst3(name: str) -> str:
     return os.path.join(VST3_DIR, f"{name}.vst3")
+
+
+def vst3_load_path(bundle_path: str) -> str:
+    # Pedalboard on Windows fails to recognise a JUCE-built VST3 bundle dir
+    # (no desktop.ini marker), but loads the inner DLL fine. Resolve to it.
+    if sys.platform == "win32" and os.path.isdir(bundle_path):
+        inner = os.path.join(bundle_path, "Contents", "x86_64-win",
+                             os.path.basename(bundle_path))
+        if os.path.isfile(inner):
+            return inner
+    return bundle_path
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +102,7 @@ def _load(name: str):
     if not os.path.exists(path):
         pytest.skip(f"Plugin not built: {path}")
     try:
-        return PluginWrapper(pedalboard.load_plugin(path))
+        return PluginWrapper(pedalboard.load_plugin(vst3_load_path(path)))
     except ValueError as e:
         # pedalboard requires plugins to support num_inputs == num_outputs.
         # ambix_binaural (4→2), ambix_decoder (4→64) and the universal
