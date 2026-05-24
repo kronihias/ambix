@@ -290,6 +290,14 @@ Use **cmake-gui** or **cmake/ccmake** from the terminal.
 
 ## Changelog
 
+### v0.4.4 (2026-05-24) <!-- omit in toc -->
+
+- testsuite for Mac, Win, Linux
+- Win: statically link to custom built fftw via vcpkg
+- `ambix_encoder`/`ambix Visualizer` network discovery improvements
+- update to JUCE 8.0.13
+- `ambix_encoder` - add backward compatibility to projects saved before the large overhaul in v0.4.3
+
 ### v0.4.3 (2026-05-17) <!-- omit in toc -->
 
 - major overhaul of `ambix_encoder`
