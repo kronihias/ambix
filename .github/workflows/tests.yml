@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         # Init submodules manually below. actions/checkout shallow-clones
         # submodules at --depth=1, which misses our JUCE pin (8.0.13 is a
         # few commits behind upstream's default-branch tip). Its fallback
@@ -50,7 +50,7 @@ jobs:
           exit 1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -91,7 +91,7 @@ jobs:
       # means FFTW3 is rebuilt only when the manifest changes.
       - name: Export GitHub Actions cache env (for vcpkg binary cache)
         if: runner.os == 'Windows'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
@@ -107,7 +107,7 @@ jobs:
 
       - name: Upload test logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: pytest-${{ matrix.name }}
           path: |
