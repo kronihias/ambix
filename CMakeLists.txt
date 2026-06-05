@@ -31,11 +31,6 @@ SET(MAX_AMBI_ORDER 7 CACHE STRING "Maximum ambisonic order for universal (VST3/A
 
 IF(UNIX AND NOT APPLE AND NOT ANDROID)
 	SET(WITH_ZITA_CONVOLVER FALSE CACHE BOOL "build with zita-convolver (better performance under linux)")
-	# JACK is the natural audio backend for multichannel ambisonic standalones
-	# on Linux; the patch (juce_JackAudio.cpp.patch) opens N ports up front and
-	# disables auto-connect of inputs so the plugin always sees its full
-	# channel count regardless of the audio interface channel count.
-	SET(JUCE_JACK TRUE CACHE BOOL "build standalone apps with Jack support (Linux)")
 ENDIF(UNIX AND NOT APPLE AND NOT ANDROID)
 
 ################################################
@@ -121,17 +116,26 @@ endfunction()
 apply_juce_patch(
     "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_network_discovery.patch")
 
-# Linux JACK backend: open N input/output ports up front (sized to the
-# requested channel count, not whatever happens to be connected) and stop
-# auto-connecting inputs. Without this, multichannel ambix standalones only
-# see the channels JACK had wired at startup. Header is needed at compile
-# time; libjack is loaded at runtime via dlopen by JUCE itself, so no link.
-IF (JUCE_JACK)
+# Linux standalone host is vendored under common/standalone instead of patching
+# JUCE. ambix owns the standalone window, the audio-settings UI (a "how many
+# channels" selector instead of JUCE's stereo-pair list) and its own JACK device
+# (ports sized to the plugin's channel count, no auto-connect, all ports active).
+# Wired per Standalone target in Subproject.cmake via
+# JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1 (JUCE keeps JUCE_JACK=0, so there is no
+# duplicate JACK type). Other platforms keep JUCE's stock standalone.
+IF (UNIX AND NOT APPLE AND NOT ANDROID)
     find_package(Jack REQUIRED)
-    apply_juce_patch(
-        "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_JackAudio.cpp.patch")
-    ADD_DEFINITIONS(-DJUCE_JACK=1)
-ENDIF (JUCE_JACK)
+    set (AMBIX_VENDOR_STANDALONE TRUE)
+    # The shared host (StandaloneFilterWindow.h) and channel-count selector
+    # (AudioDeviceSelectorComponent.h) are header-only; only the app entry and
+    # the JACK device are compiled units.
+    set (AMBIX_STANDALONE_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/common/standalone/StandaloneApp.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/common/standalone/JackAudioDevice.cpp")
+    # Channel ceiling for the standalone device re-open + settings dialog. The
+    # universal standalone exposes a full ambisonic(MAX_AMBI_ORDER) bus.
+    math (EXPR AMBIX_STANDALONE_MAX_CHANNELS "(${MAX_AMBI_ORDER} + 1) * (${MAX_AMBI_ORDER} + 1)")
+ENDIF ()
 
 #########
 # preprocessor flags
