@@ -514,6 +514,12 @@ void Ambix_mirrorAudioProcessorEditor::getParamsFromHost()
 void Ambix_mirrorAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
     getParamsFromHost();
+    // sendChangeMessage() also fires on every parameter change, so repaint only
+    // when the channel count (ambisonic order) actually changes - otherwise we
+    // would redraw the whole editor on every automation step.
+    const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
+                      |  getAudioProcessor()->getTotalNumOutputChannels();
+    if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }
 }
 
 void Ambix_mirrorAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxThatHasChanged)

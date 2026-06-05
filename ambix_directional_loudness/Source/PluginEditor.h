@@ -203,6 +203,7 @@ private:
     bool _meshIsHA   = false;     // tracks which mesh is currently in PanningGraph
 
     TooltipWindow tooltipWindow;
+    int lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
 
     Ambix_directional_loudnessAudioProcessor* getProcessor() const
     {

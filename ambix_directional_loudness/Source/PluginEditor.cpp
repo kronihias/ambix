@@ -545,6 +545,14 @@ void Ambix_directional_loudnessAudioProcessorEditor::resized()
 
 void Ambix_directional_loudnessAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
+    // sendChangeMessage() also fires on every parameter change, so repaint only
+    // when the channel count (ambisonic order) actually changes - otherwise we
+    // would redraw the whole editor on every automation step.
+    {
+        const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
+                          |  getAudioProcessor()->getTotalNumOutputChannels();
+        if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }
+    }
     Ambix_directional_loudnessAudioProcessor* ourProcessor = getProcessor();
 
     if (source == &panninggraph)

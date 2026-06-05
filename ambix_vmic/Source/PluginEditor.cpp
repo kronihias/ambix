@@ -130,6 +130,14 @@ void Ambix_vmicAudioProcessorEditor::resized()
 
 void Ambix_vmicAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
+    // sendChangeMessage() also fires on every parameter change, so repaint only
+    // when the channel count (ambisonic order) actually changes - otherwise we
+    // would redraw the whole editor on every automation step.
+    {
+        const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
+                          |  getAudioProcessor()->getTotalNumOutputChannels();
+        if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }
+    }
     Ambix_vmicAudioProcessor* ourProcessor = getProcessor();
 
     if (source == &panninggraph)
