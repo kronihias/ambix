@@ -441,9 +441,8 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
     lbl_sources.setJustificationType (juce::Justification::centredRight);
 
     addAndMakeVisible (cmb_active_sources);
-    for (int i = 1; i <= Ambix_encoderAudioProcessor::kMaxSources; ++i)
-        cmb_active_sources.addItem (juce::String (i), i);
-    cmb_active_sources.setSelectedId (ownerFilter->getActiveSources(), juce::dontSendNotification);
+    cmb_active_sources.setEditableText (true);   // type a source count directly
+    refreshSourcesComboRange();
     cmb_active_sources.addListener (this);
 
     // Source table
@@ -507,11 +506,36 @@ Ambix_encoderAudioProcessorEditor::~Ambix_encoderAudioProcessorEditor()
     setLookAndFeel (nullptr);
 }
 
+void Ambix_encoderAudioProcessorEditor::refreshSourcesComboRange()
+{
+    // Populate the "Sources" selector up to the number of available input
+    // channels (capped at the compiled maximum). The active-sources parameter
+    // range is intentionally NOT changed - this is a display-only clamp, so
+    // VST automation lanes and saved sessions remain valid.
+    auto* p = getProcessor();
+    const int maxSel = juce::jmax (1, juce::jmin (Ambix_encoderAudioProcessor::kMaxSources,
+                                                  p->getTotalNumInputChannels()));
+
+    if (cmb_active_sources.getNumItems() != maxSel)
+    {
+        cmb_active_sources.clear (juce::dontSendNotification);
+        for (int i = 1; i <= maxSel; ++i)
+            cmb_active_sources.addItem (juce::String (i), i);
+    }
+
+    cmb_active_sources.setSelectedId (juce::jmin (p->getActiveSources(), maxSel),
+                                      juce::dontSendNotification);
+}
+
 void Ambix_encoderAudioProcessorEditor::rebuildTable()
 {
     table_rows.clear();
     Ambix_encoderAudioProcessor* p = getProcessor();
-    const int active = p ? p->getActiveSources() : 1;
+    // Clamp displayed rows to the available input channels (the parameter may
+    // hold a larger value that only takes effect once more inputs exist).
+    const int maxSel = p ? juce::jmax (1, juce::jmin (Ambix_encoderAudioProcessor::kMaxSources,
+                                                      p->getTotalNumInputChannels())) : 1;
+    const int active = p ? juce::jmin (p->getActiveSources(), maxSel) : 1;
     const bool linked = p ? p->isLinked() : true;
 
     for (int i = 0; i < active; ++i)
@@ -748,7 +772,18 @@ void Ambix_encoderAudioProcessorEditor::comboBoxChanged (juce::ComboBox* box)
 {
     if (box == &cmb_active_sources)
     {
-        const int n = juce::jmax (1, cmb_active_sources.getSelectedId());
+        // Editable combo: take the typed (or selected) number and clamp it to
+        // [1, available input channels].
+        auto* p = getProcessor();
+        const int maxSel = juce::jmax (1, juce::jmin (Ambix_encoderAudioProcessor::kMaxSources,
+                                                      p->getTotalNumInputChannels()));
+        int n = cmb_active_sources.getText().getIntValue();
+        if (n <= 0)
+            n = cmb_active_sources.getSelectedId();
+        n = juce::jlimit (1, maxSel, n);
+
+        cmb_active_sources.setSelectedId (n, juce::dontSendNotification);   // reflect clamp
+
         const float norm = (float)(n - 1) / (float)(Ambix_encoderAudioProcessor::kMaxSources - 1);
         setParameterNotifyingHost (getProcessor(),
                                    Ambix_encoderAudioProcessor::NumActiveSourcesParam, norm);
@@ -810,8 +845,29 @@ void Ambix_encoderAudioProcessorEditor::timerCallback()
             if (! linkedWasMirrored)
                 resized();
 
-            // Active sources combo + table rebuild on change
-            const int active = ourProcessor->getActiveSources();
+            // The channel count can change at runtime in the standalone when
+            // the user picks a different number of in/out channels. Only react
+            // when it actually changes - sendChangeMessage() also fires on
+            // every parameter change, so an unconditional repaint here would
+            // redraw the whole editor (incl. the sphere) on every automation
+            // step. React only on a real change: refresh the source-selector
+            // range and repaint the "O<n>" order title.
+            const int chanKey = (ourProcessor->getTotalNumInputChannels() << 16)
+                              |  ourProcessor->getTotalNumOutputChannels();
+            if (chanKey != lastChanKey_)
+            {
+                lastChanKey_ = chanKey;
+                refreshSourcesComboRange();
+                repaint();
+            }
+
+            // Active sources combo + table rebuild on change. The selector and
+            // table are clamped to the available input channels for display;
+            // the parameter itself is left untouched so DAW automation and
+            // saved sessions stay valid.
+            const int maxSel = juce::jmax (1, juce::jmin (Ambix_encoderAudioProcessor::kMaxSources,
+                                                          ourProcessor->getTotalNumInputChannels()));
+            const int active = juce::jmin (ourProcessor->getActiveSources(), maxSel);
             if (cmb_active_sources.getSelectedId() != active
                 || (int) table_rows.size() != active)
             {
