@@ -205,6 +205,23 @@ IF(WITH_FFTW3)
 	)
 ENDIF(WITH_FFTW3)
 
+# Vendored standalone host (Linux): supply our own application, JACK device and
+# audio-settings UI instead of patching JUCE. See common/standalone. JUCE keeps
+# JUCE_JACK=0; we register our JACK device ourselves.
+IF (AMBIX_VENDOR_STANDALONE)
+	list (FIND _FORMATS "Standalone" _has_vendor_sa)
+	IF (NOT _has_vendor_sa EQUAL -1)
+		target_sources (${SUBPROJECT_NAME}_Standalone PRIVATE ${AMBIX_STANDALONE_SOURCES})
+		target_compile_definitions (${SUBPROJECT_NAME}_Standalone PRIVATE
+			JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1
+			JSA_VENDORED_JACK=1
+			JSA_STANDALONE_MAX_CHANNELS=${AMBIX_STANDALONE_MAX_CHANNELS})
+		target_include_directories (${SUBPROJECT_NAME}_Standalone PRIVATE
+			"${CMAKE_SOURCE_DIR}/common/standalone"
+			${JACK_INCLUDE_DIRS})
+	ENDIF ()
+ENDIF ()
+
 # Copy Standalone app to standalone output directory
 IF(BUILD_STANDALONE)
 	list (FIND _FORMATS "Standalone" _has_standalone)
