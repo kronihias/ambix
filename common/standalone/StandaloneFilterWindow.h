@@ -330,6 +330,38 @@ public:
         so the user can pick multichannel devices in the Audio Settings dialog.
         JUCE's StandalonePluginHolder only opens as many channels as the
         processor's default bus layout advertises (2 in the MC build). */
+    // Standalone in/out channel ceilings. Input uses the universal max; output
+    // can be lowered (decoder / vmic) or fixed (binaural) per plug-in via the
+    // JSA_STANDALONE_MAX_OUTPUT_CHANNELS / JSA_STANDALONE_FIXED_OUTPUT defines.
+    static int standaloneInChannels()
+    {
+       #ifdef JSA_STANDALONE_MAX_CHANNELS
+        return (int) JSA_STANDALONE_MAX_CHANNELS;
+       #else
+        return 0;
+       #endif
+    }
+
+    static int standaloneOutChannels()
+    {
+       #if defined (JSA_STANDALONE_MAX_OUTPUT_CHANNELS)
+        return (int) JSA_STANDALONE_MAX_OUTPUT_CHANNELS;
+       #elif defined (JSA_STANDALONE_MAX_CHANNELS)
+        return (int) JSA_STANDALONE_MAX_CHANNELS;
+       #else
+        return 0;
+       #endif
+    }
+
+    static bool standaloneOutFixed()
+    {
+       #if defined (JSA_STANDALONE_FIXED_OUTPUT)
+        return true;
+       #else
+        return false;
+       #endif
+    }
+
     void reopenDeviceManagerForMaxChannels()
     {
        #ifdef JSA_STANDALONE_MAX_CHANNELS
@@ -342,13 +374,11 @@ public:
         if (auto* props = pluginHolder->settings.get())
             savedState = props->getXmlValue ("audioSetup");
 
-        const int maxCh = (int) JSA_STANDALONE_MAX_CHANNELS;  // == JSA_STANDALONE_MAX_CHANNELS
-
-        // Initialise the device manager with the full max channel count.
-        // Actual channel count opened on the device is still negotiated from
-        // the user's device choice; this just raises the ceiling.
-        pluginHolder->deviceManager.initialise (maxCh,        // numInputChannels
-                                                maxCh,        // numOutputChannels
+        // Initialise with the per-direction channel ceiling. The actual count
+        // opened is still negotiated from the user's choice; this raises the
+        // ceiling (and pins the output for fixed-output plug-ins like binaural).
+        pluginHolder->deviceManager.initialise (standaloneInChannels(),
+                                                standaloneOutChannels(),
                                                 savedState.get(),
                                                 true);        // selectDefaultDeviceOnFailure
 
@@ -363,8 +393,6 @@ public:
     void showAudioSettingsDialogMC()
     {
        #ifdef JSA_STANDALONE_MAX_CHANNELS
-        const int maxCh = (int) JSA_STANDALONE_MAX_CHANNELS;
-
         // For a bus whose AudioChannelSet is ambisonic, only offer valid
         // ambisonic channel counts (1, 4, 9, 16, ...). Channel-based plug-ins
         // (mcfx, or e.g. a discrete source/loudspeaker bus) keep the full range.
@@ -396,9 +424,14 @@ public:
         // on/off list with a plain input/output channel-count selector, which is
         // what multichannel plug-ins actually want. The stereo-pairs argument
         // is therefore irrelevant here.
+        // Output may be fixed (binaural) or capped (decoder/vmic); a fixed output
+        // makes min == max so the selector shows a single, unchangeable count.
+        const int outMax = standaloneOutChannels();
+        const int outMin = standaloneOutFixed() ? outMax : 0;
+
         auto* selector = new jsa::AudioDeviceSelectorComponent (pluginHolder->deviceManager,
-                                                           0, maxCh,   // min/max inputs
-                                                           0, maxCh,   // min/max outputs
+                                                           0, standaloneInChannels(),  // min/max inputs
+                                                           outMin, outMax,             // min/max outputs
                                                            true,       // show MIDI inputs
                                                            getAudioProcessor() != nullptr
                                                                && getAudioProcessor()->producesMidi(),

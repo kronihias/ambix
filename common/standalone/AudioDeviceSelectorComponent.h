@@ -938,6 +938,10 @@ private:
         }
 
         const int maxCh = maxChannelsForDevice (isInput);
+        // A plug-in can pin a direction (e.g. binaural's stereo output) by setting
+        // min == max; the box then offers that single, unchangeable count.
+        const int minCh = jlimit (1, jmax (1, maxCh),
+                                  isInput ? setup.minNumInputChannels : setup.minNumOutputChannels);
         const bool ambisonicOnly = isInput ? setup.restrictInputToAmbisonic
                                            : setup.restrictOutputToAmbisonic;
 
@@ -949,12 +953,13 @@ private:
             for (int order = 1; (order + 1) * (order + 1) <= maxCh; ++order)
             {
                 const int n = (order + 1) * (order + 1);
-                box->addItem (String (n), n);
+                if (n >= minCh)
+                    box->addItem (String (n), n);
             }
         }
         else
         {
-            for (int i = 1; i <= maxCh; ++i)
+            for (int i = minCh; i <= maxCh; ++i)
                 box->addItem (String (i), i);
         }
 
@@ -980,19 +985,21 @@ private:
     }
 
     // Resolve a typed/selected channel count to an allowed value: clamp to
-    // [1, maxCh], and for an ambisonic bus snap to the nearest valid count
+    // [minCh, maxCh], and for an ambisonic bus snap to the nearest valid count
     // (1st order and up: 4, 9, 16, 25, ...).
-    int resolveChannelCount (int n, int maxCh, bool ambisonicOnly) const
+    int resolveChannelCount (int n, int minCh, int maxCh, bool ambisonicOnly) const
     {
-        n = jlimit (1, jmax (1, maxCh), n);
+        const int lo = jlimit (1, jmax (1, maxCh), minCh);
+        n = jlimit (lo, jmax (lo, maxCh), n);
 
         if (ambisonicOnly)
         {
-            int best = jmin (4, maxCh), bestDist = maxCh + 1;
+            int best = jmax (lo, jmin (4, maxCh)), bestDist = maxCh + 1;
             for (int order = 1; (order + 1) * (order + 1) <= maxCh; ++order)
             {
                 const int sq = (order + 1) * (order + 1);
-                const int d  = sq > n ? sq - n : n - sq;
+                if (sq < lo) continue;
+                const int d = sq > n ? sq - n : n - sq;
                 if (d < bestDist) { bestDist = d; best = sq; }
             }
             n = best;
@@ -1012,9 +1019,10 @@ private:
             return;
 
         const int maxCh = maxChannelsForDevice (isInput);
+        const int minCh = isInput ? setup.minNumInputChannels : setup.minNumOutputChannels;
         const bool ambisonicOnly = isInput ? setup.restrictInputToAmbisonic
                                            : setup.restrictOutputToAmbisonic;
-        const int n = resolveChannelCount (requested, maxCh, ambisonicOnly);
+        const int n = resolveChannelCount (requested, minCh, maxCh, ambisonicOnly);
 
         // Reflect the clamped / snapped value back in the box.
         box->setSelectedId (n, dontSendNotification);

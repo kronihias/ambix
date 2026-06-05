@@ -27,7 +27,9 @@
 Ambix_vmicAudioProcessor::Ambix_vmicAudioProcessor() :
     AudioProcessor (BusesProperties()
         .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
-        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
+        // Output is NUM_FILTERS_VMIC virtual-mic signals (not ambisonic), so the
+        // count is independent of the input order.
+        .withOutput ("Output", juce::AudioChannelSet::discreteChannels (NUM_FILTERS_VMIC), true)
     ),
     filter_sel_id_1(0),
     filter_sel_id_2(0),
