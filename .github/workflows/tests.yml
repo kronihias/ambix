@@ -105,6 +105,25 @@ jobs:
         # virtual one rather than chasing per-plugin skips.
         run: ${{ runner.os == 'Linux' && 'xvfb-run -a python scripts/run_tests.py' || 'python scripts/run_tests.py' }}
 
+      # The Linux/JACK standalone uses the vendored host in common/standalone.
+      # run_tests.py configures with -DBUILD_STANDALONE=OFF, so the standalone is
+      # never compiled there - build a couple of targets here as a smoke test of
+      # the JACK path. Compile only (no JACK server or display needed);
+      # libjack-jackd2-dev is installed above. rotator exercises the linked /
+      # ambisonic-count selector, encoder the independent in/out path.
+      - name: Build JACK standalone (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          # The universal build (which creates the *_Standalone targets) is gated
+          # on BUILD_VST3 OR BUILD_AU per plugin, so VST3 stays ON; --target only
+          # builds the Standalone, not the VST3.
+          cmake -S . -B _build_standalone -G Ninja \
+            -DBUILD_VST=OFF -DBUILD_VST3=ON -DBUILD_AU=OFF \
+            -DBUILD_STANDALONE=ON -DBUILD_VISUALIZER=OFF -DBUILD_TESTHOST=OFF \
+            -DNUM_OUTPUTS_DECODER=64 -DMAX_AMBI_ORDER=7
+          cmake --build _build_standalone --parallel \
+            --target ambix_rotator_Standalone ambix_encoder_Standalone
+
       - name: Upload test logs on failure
         if: failure()
         uses: actions/upload-artifact@v6
