@@ -110,6 +110,7 @@ private:
     void rebuildTable();
     void updateActivePanner();
     void layoutTableRows (int viewportWidth);
+    void refreshSourcesComboRange();
 
     // Presets menu plumbing — mirrors the mcfx_mimoeq toolbar Presets button.
     // One button replaces the old Load + Save pair; named presets live as
@@ -171,6 +172,7 @@ private:
     juce::ComponentBoundsConstrainer resizeLimits;
 
     bool changed_;
+    int  lastChanKey_ = -1; // cached (in<<16|out) channel count; refresh order title / source range only on change
     bool _hammerView = false;
 
     juce::CriticalSection lock_;
