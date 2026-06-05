@@ -87,6 +87,7 @@ private:
     ComponentBoundsConstrainer constrainer;
 
     bool _changed;
+    int  lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
 
     // Undo / redo state
     struct ParamSnapshot

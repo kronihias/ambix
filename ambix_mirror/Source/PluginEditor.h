@@ -64,6 +64,7 @@ private:
         return static_cast <Ambix_mirrorAudioProcessor*> (getAudioProcessor());
     }
     TooltipWindow tooltipWindow;
+    int lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
 
     //==============================================================================
     ComboBox box_presets;

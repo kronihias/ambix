@@ -71,6 +71,7 @@ private:
     PanningGraph panninggraph;
 
     TooltipWindow tooltipWindow;
+    int lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
 
     Ambix_vmicAudioProcessor* getProcessor() const
     {

@@ -717,6 +717,12 @@ void Ambix_converterAudioProcessorEditor::buttonClicked (Button* buttonThatWasCl
 void Ambix_converterAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
     getParamsFromHost();
+    // sendChangeMessage() also fires on every parameter change, so repaint only
+    // when the channel count (ambisonic order) actually changes - otherwise we
+    // would redraw the whole editor on every automation step.
+    const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
+                      |  getAudioProcessor()->getTotalNumOutputChannels();
+    if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }
 }
 
 //[MiscUserCode] You can add your own definitions of your custom methods or any other code here...
