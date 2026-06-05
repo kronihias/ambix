@@ -12,6 +12,9 @@ SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_binaural )
 SET ( IGNORE_SRC_FILES MtxConv.cpp
     ConvolverData.cpp)
 
+# Standalone: decoder output is a variable number of loudspeakers (up to NUM_OUTPUTS).
+SET (AMBIX_STANDALONE_EXTRA_DEFS JSA_STANDALONE_MAX_OUTPUT_CHANNELS=${NUM_OUTPUTS_DECODER})
+
 # VST2 fixed-order
 IF(BUILD_VST)
 	SET(UNIVERSAL_BUILD FALSE)
