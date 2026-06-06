@@ -270,13 +270,15 @@ Use **cmake-gui** or **cmake/ccmake** from the terminal.
 
 ## LV2 Plug-ins
 
-1. Enable the `BUILD_LV2` CMake flag before building.
-2. In the `lv2-ttl-generator/` folder, run `make` to compile the `lv2_ttl_generator` tool.
-3. From the `_bin` folder (e.g. `ambix/BUILD/_bin`), run:
+LV2 plug-ins are fixed-order (like VST2), using the `AMBI_ORDER` CMake variable and the `_oX` naming suffix. They can be built on their own or alongside VST2.
+
+1. Enable the `BUILD_LV2` CMake flag (e.g. `-DBUILD_LV2=ON`) and build as usual:
     ```bash
-    ./../../lv2-ttl-generator/generate-ttl.sh
+    cmake -B build -DBUILD_LV2=ON -DBUILD_VST=OFF
+    cmake --build build -j$(nproc)
     ```
-    This generates all required `.ttl` files. Copy the `.lv2` folders from `ambix/BUILD/_bin/lv2` to `/usr/lib/lv2`.
+    JUCE 8 generates all `.ttl` files automatically during the build (via the bundled `juce_lv2_helper`) — no separate TTL-generator step is needed.
+2. The finished `.lv2` bundles are written to `build/lv2_o<AMBI_ORDER>/` (e.g. `build/lv2_o5/ambix_rotator_o5.lv2/`), each containing the `.so`, `manifest.ttl`, `dsp.ttl`, and `ui.ttl`. Copy the `.lv2` folders to `~/.lv2` (per-user) or `/usr/lib/lv2` (system-wide).
 
 ---
 
@@ -284,11 +286,17 @@ Use **cmake-gui** or **cmake/ccmake** from the terminal.
 
 - Documentation is sparse — refer to the papers linked above for background.
 - GUI-less plug-ins cannot be used as standalones.
-- Linux: LV2 plug-ins don't show the GUI; VST plug-in GUIs may crash — use the host's built-in GUI or the standalone version via Jack.
+- Linux: LV2 plug-ins now ship an X11 GUI (JUCE 8), but it may not work in every host; VST plug-in GUIs may crash — if in doubt, use the host's built-in generic UI or the standalone version via JACK.
 
 ---
 
 ## Changelog
+
+### v0.4.6 (2026-06-06) <!-- omit in toc -->
+
+- LV2: `BUILD_LV2` now builds LV2 plug-ins independently — previously they were only produced when `BUILD_VST` was also enabled, which required the (proprietary) VST2 SDK
+- LV2: rely on JUCE 8's automatic `.ttl` generation; the obsolete `lv2-ttl-generator` / `generate-ttl.sh` step has been removed from the build instructions
+- LV2 plug-ins are fixed-order (`_oX`, like VST2): each `AMBI_ORDER` produces its own bundle. Runtime order-switching as in VST3 is not possible because LV2 audio ports are statically declared in the `.ttl`
 
 ### v0.4.5 (2026-06-06) <!-- omit in toc -->
 

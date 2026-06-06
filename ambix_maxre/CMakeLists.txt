@@ -1,8 +1,8 @@
 SET( WITH_EIGEN TRUE )
 SET( WITH_LegendreU TRUE )
 
-# VST2 fixed-order
-IF(BUILD_VST)
+# VST2 + LV2 fixed-order (both share the _oX naming)
+IF(BUILD_VST OR BUILD_LV2)
 	SET(UNIVERSAL_BUILD FALSE)
 	SET( PLUGIN_CODE AMr${AMBI_ORDER})
 	INCLUDE(${SRC_DIR}/Subproject.cmake)

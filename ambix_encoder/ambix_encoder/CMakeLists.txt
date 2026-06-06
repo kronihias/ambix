@@ -16,8 +16,8 @@ ENDIF()
 
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_encoder )
 
-# VST2 fixed-order
-IF(BUILD_VST)
+# VST2 + LV2 fixed-order (both share the _oX naming)
+IF(BUILD_VST OR BUILD_LV2)
 	SET(UNIVERSAL_BUILD FALSE)
 	SET( PLUGIN_CODE AE1${AMBI_ORDER})
 	INCLUDE(${SRC_DIR}/Subproject.cmake)

@@ -15,8 +15,8 @@ SET ( IGNORE_SRC_FILES MtxConv.cpp
 # Standalone: decoder output is a variable number of loudspeakers (up to NUM_OUTPUTS).
 SET (AMBIX_STANDALONE_EXTRA_DEFS JSA_STANDALONE_MAX_OUTPUT_CHANNELS=${NUM_OUTPUTS_DECODER})
 
-# VST2 fixed-order
-IF(BUILD_VST)
+# VST2 + LV2 fixed-order (both share the _oX naming)
+IF(BUILD_VST OR BUILD_LV2)
 	SET(UNIVERSAL_BUILD FALSE)
 	SET( PLUGIN_CODE ADe${AMBI_ORDER})
 	INCLUDE(${SRC_DIR}/Subproject.cmake)

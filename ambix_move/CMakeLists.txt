@@ -2,8 +2,8 @@ SET( WITH_EIGEN TRUE )
 SET( WITH_SphericalHarmonic TRUE )
 SET( WITH_T_DESIGN TRUE )
 
-# VST2 fixed-order
-IF(BUILD_VST)
+# VST2 + LV2 fixed-order (both share the _oX naming)
+IF(BUILD_VST OR BUILD_LV2)
 	SET(UNIVERSAL_BUILD FALSE)
 	SET( PLUGIN_CODE AMo${AMBI_ORDER})
 	INCLUDE(${SRC_DIR}/Subproject.cmake)

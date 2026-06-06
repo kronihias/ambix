@@ -1,7 +1,7 @@
 SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_converter )
 
-# VST2 fixed-order
-IF(BUILD_VST)
+# VST2 + LV2 fixed-order (both share the _oX naming)
+IF(BUILD_VST OR BUILD_LV2)
 	SET(UNIVERSAL_BUILD FALSE)
 	SET( PLUGIN_CODE ACo${AMBI_ORDER})
 	INCLUDE(${SRC_DIR}/Subproject.cmake)

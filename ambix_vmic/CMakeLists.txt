@@ -9,8 +9,8 @@ SET ( SPECIFIC_SOURE_DIR ${SRC_DIR}/ambix_vmic )
 # NUM_FILTERS_VMIC), independent of the ambisonic input order.
 SET (AMBIX_STANDALONE_EXTRA_DEFS JSA_STANDALONE_MAX_OUTPUT_CHANNELS=${NUM_FILTERS_VMIC})
 
-# VST2 fixed-order
-IF(BUILD_VST)
+# VST2 + LV2 fixed-order (both share the _oX naming)
+IF(BUILD_VST OR BUILD_LV2)
 	SET(UNIVERSAL_BUILD FALSE)
 	SET( PLUGIN_CODE AVm${AMBI_ORDER})
 	INCLUDE(${SRC_DIR}/Subproject.cmake)
