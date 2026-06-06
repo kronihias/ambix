@@ -335,7 +335,10 @@ public:
     // JSA_STANDALONE_MAX_OUTPUT_CHANNELS / JSA_STANDALONE_FIXED_OUTPUT defines.
     static int standaloneInChannels()
     {
-       #ifdef JSA_STANDALONE_MAX_CHANNELS
+       #if defined (JSA_STANDALONE_NO_INPUT)
+        // Output-only tool (e.g. mcfx_receive): expose no input ports at all.
+        return 0;
+       #elif defined (JSA_STANDALONE_MAX_CHANNELS)
         return (int) JSA_STANDALONE_MAX_CHANNELS;
        #else
         return 0;
@@ -381,6 +384,40 @@ public:
                                                 standaloneOutChannels(),
                                                 savedState.get(),
                                                 true);        // selectDefaultDeviceOnFailure
+
+       #ifdef JSA_STANDALONE_NO_INPUT
+        // A restored setup (or the device default) may still request input
+        // ports; force inputs off so the JACK client registers output ports
+        // only — initialise()'s numInputChannels is just a fallback that a
+        // saved input-channel mask would otherwise override.
+        {
+            auto setup = pluginHolder->deviceManager.getAudioDeviceSetup();
+            setup.inputChannels.clear();
+            setup.useDefaultInputChannels = false;
+            pluginHolder->deviceManager.setAudioDeviceSetup (setup, true);
+        }
+       #endif
+
+       #ifdef JSA_STANDALONE_SYMMETRIC_IO
+        // Input-driven tool (e.g. mcfx_send): only the input count matters, but
+        // JUCE's host only grows the processor's input bus when the device opens
+        // symmetrically (findMostSuitableLayout has no input-only fallback), and
+        // the processor requires in == out. Mirror the input port count onto the
+        // output so the device opens N-in/N-out — the processor then negotiates
+        // N/N and every input channel reaches it. The output ports are unused.
+        {
+            auto setup = pluginHolder->deviceManager.getAudioDeviceSetup();
+            setup.outputChannels           = setup.inputChannels;
+            setup.useDefaultOutputChannels = setup.useDefaultInputChannels;
+            // Ensure the output side is actually opened: a saved sender setup
+            // tends to leave the output device empty (the sender never wires its
+            // outputs). The JACK backend never auto-connects, so naming the same
+            // device is harmless — it just registers the unused output ports.
+            if (setup.outputDeviceName.isEmpty())
+                setup.outputDeviceName = setup.inputDeviceName;
+            pluginHolder->deviceManager.setAudioDeviceSetup (setup, true);
+        }
+       #endif
 
         pluginHolder->startPlaying();
        #endif
