@@ -290,6 +290,15 @@ Use **cmake-gui** or **cmake/ccmake** from the terminal.
 
 ## Changelog
 
+### v0.4.5 (2026-06-06) <!-- omit in toc -->
+
+This release focuses on improved Linux support.
+
+- Linux: JACK standalone application, with its own device and channel-count settings UI (no longer relies on a patched JUCE JACK backend)
+- Standalone: per-plug-in output channel count — fixed stereo for binaural, variable for the decoder/virtual-mic — plus `NO_INPUT` (output-only) and `SYMMETRIC_IO` (input-driven) opt-ins
+- `ambix_encoder`: input-clamped, editable source selector
+- editors: refresh the Ambisonic-order title when the channel count changes
+
 ### v0.4.4 (2026-05-24) <!-- omit in toc -->
 
 - testsuite for Mac, Win, Linux
