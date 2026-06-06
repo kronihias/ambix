@@ -34,6 +34,9 @@ ASYMMETRIC_BUSES = {
     "ambix_encoder":  (1, 4),
     "ambix_binaural": (4, 2),
     "ambix_decoder":  (4, 64),
+    # vmic outputs NUM_FILTERS_VMIC discrete virtual-mic channels (default 8
+    # in the root CMakeLists.txt); input is 1st-order ambisonic (4).
+    "ambix_vmic":     (4, 8),
 }
 
 

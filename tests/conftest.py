@@ -105,9 +105,9 @@ def _load(name: str):
         return PluginWrapper(pedalboard.load_plugin(vst3_load_path(path)))
     except ValueError as e:
         # pedalboard requires plugins to support num_inputs == num_outputs.
-        # ambix_binaural (4→2), ambix_decoder (4→64) and the universal
-        # ambix_encoder (mono→ambi) all advertise asymmetric main buses
-        # and fail at instantiation with this error.
+        # ambix_binaural (4→2), ambix_decoder (4→64), ambix_vmic (4→8) and the
+        # universal ambix_encoder (mono→ambi) all advertise asymmetric main
+        # buses and fail at instantiation with this error.
         if "does not support" in str(e) and "channel output" in str(e):
             pytest.skip(f"{name}: pedalboard cannot host asymmetric I/O — {e}")
         raise
@@ -190,11 +190,6 @@ def plugin_decoder():
 @pytest.fixture(scope="session")
 def plugin_directional_loudness():
     return _load("ambix_directional_loudness")
-
-
-@pytest.fixture(scope="session")
-def plugin_vmic():
-    return _load("ambix_vmic")
 
 
 # ---------------------------------------------------------------------------
