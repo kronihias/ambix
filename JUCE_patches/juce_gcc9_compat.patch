@@ -1,0 +1,39 @@
+diff --git a/modules/juce_audio_devices/native/juce_Midi_linux.cpp b/modules/juce_audio_devices/native/juce_Midi_linux.cpp
+index 515fdc2a5b..893b2a2509 100644
+--- a/modules/juce_audio_devices/native/juce_Midi_linux.cpp
++++ b/modules/juce_audio_devices/native/juce_Midi_linux.cpp
+@@ -276,7 +276,9 @@ struct AlsaMidiHelpers
+ 
+         for (size_t i = 0; i != N; ++i)
+         {
+-            result[i] = std::byte { (uint8_t) b };
++            // mcfx patch (GCC 9 compat): C-style cast in braced-init inside a
++            // constexpr template ICEs GCC 9; static_cast compiles everywhere.
++            result[i] = static_cast<std::byte> (b & 0xffu);
+             b >>= 8;
+         }
+ 
+diff --git a/modules/juce_graphics/juce_graphics_Harfbuzz.cpp b/modules/juce_graphics/juce_graphics_Harfbuzz.cpp
+index f15733e6a8..618db82032 100644
+--- a/modules/juce_graphics/juce_graphics_Harfbuzz.cpp
++++ b/modules/juce_graphics/juce_graphics_Harfbuzz.cpp
+@@ -85,11 +85,17 @@ JUCE_BEGIN_IGNORE_DEPRECATION_WARNINGS
+ // expand to a macro that includes a 'defines' expression, which triggers
+ // -Wexpansion-to-defined on gcc 7. There's no way to turn that warning off
+ // locally, so we sidestep it.
++// mcfx patch (GCC 9 compat): include <utility> before faking __has_builtin.
++// libstdc++ 9 decides whether to use the Clang-only __make_integer_seq
++// builtin by evaluating __has_builtin(__make_integer_seq) inside <utility>;
++// with the macro forced to 1 it takes the Clang path and GCC 9 fails.
++// Including it first (include guards make later includes no-ops) keeps the
++// GCC code path.
++#include <utility>
++
+ #if ! defined(__has_builtin) && defined(__GNUC__) && __GNUC__ >= 5
+  #define __has_builtin(x) 1
+ #endif
+-
+-#include <utility>
+ #include <juce_graphics/fonts/harfbuzz/hb.hh>
+ #include <juce_graphics/fonts/harfbuzz/harfbuzz.cc>
+ 

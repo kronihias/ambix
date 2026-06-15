@@ -39,12 +39,12 @@ ENDIF(UNIX AND NOT APPLE AND NOT ANDROID)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 ################################################
-# add JUCE
-
-ADD_SUBDIRECTORY ( JUCE )
-
-################################################
 # Apply local patches to the JUCE submodule.
+#
+# Patches must be applied before ADD_SUBDIRECTORY(JUCE): configuring JUCE
+# compiles juceaide (which pulls in juce_graphics and other modules), so any
+# patch that affects module sources has to be in place by then.
+#
 # Locate GNU patch. On Windows it ships with Git for Windows under usr/bin but
 # isn't on PowerShell's PATH by default, so probe the usual install locations.
 find_program(PATCH_EXECUTABLE
@@ -115,6 +115,24 @@ endfunction()
 # (ambix_encoder ↔ ambix_visualizer discovery).
 apply_juce_patch(
     "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_network_discovery.patch")
+
+# GCC 9 compatibility (e.g. Ubuntu 20.04): two source-level fixes for JUCE 8.
+#  1. juce_graphics_Harfbuzz.cpp fakes __has_builtin(x)=1 on GCC < 10, which
+#     makes libstdc++ 9's <utility> take a Clang-only builtin path. Include
+#     <utility> before the fake.
+#  2. A C-style cast in a braced initializer inside a constexpr template in
+#     juce_Midi_linux.cpp ICEs GCC 9; use static_cast instead.
+# Both changes are semantically neutral, but only apply them where they are
+# needed so other configurations keep a pristine JUCE tree.
+IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10)
+    apply_juce_patch(
+        "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_gcc9_compat.patch")
+ENDIF ()
+
+################################################
+# add JUCE
+
+ADD_SUBDIRECTORY ( JUCE )
 
 # Linux standalone host is vendored under common/standalone instead of patching
 # JUCE. ambix owns the standalone window, the audio-settings UI (a "how many
