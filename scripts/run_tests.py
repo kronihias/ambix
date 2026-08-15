@@ -153,6 +153,20 @@ def install_python_deps():
     run([sys.executable, "-m", "pip", "install", "-r", REQ_FILE])
 
 
+def install_pluginval():
+    # tests/test_pluginval.py needs the Tracktion pluginval binary; fetch it
+    # here (cached under _build/tools/) so it's just another test dependency.
+    # A download failure is not fatal here — the tests then skip, unless
+    # PLUGINVAL_REQUIRED is set (CI does), in which case they fail loudly.
+    sys.path.insert(0, str(ROOT / "scripts"))
+    try:
+        from get_pluginval import ensure_pluginval
+        ensure_pluginval()
+    except Exception as e:
+        print(f"\n[pluginval] not available ({e}); "
+              f"tests/test_pluginval.py will skip\n", flush=True)
+
+
 def run_pytest(extra_args):
     args = [sys.executable, "-m", "pytest", TESTS_DIR, "-v"]
     args += extra_args
@@ -168,6 +182,9 @@ def main():
                         help="Skip pytest (build only)")
     parser.add_argument("--no-deps", action="store_true",
                         help="Skip pip install of test requirements")
+    parser.add_argument("--no-pluginval", action="store_true",
+                        help="Skip downloading the pluginval validator "
+                             "(tests/test_pluginval.py then skips)")
     parser.add_argument("pytest_args", nargs=argparse.REMAINDER,
                         help="Extra args forwarded to pytest (prefix with --)")
     opts = parser.parse_args()
@@ -181,6 +198,8 @@ def main():
     if not opts.no_test:
         if not opts.no_deps:
             install_python_deps()
+        if not opts.no_pluginval:
+            install_pluginval()
         # argparse REMAINDER keeps the leading '--' if the user passed one;
         # strip it so it doesn't reach pytest as a positional arg.
         extra = opts.pytest_args

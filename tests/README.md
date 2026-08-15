@@ -39,6 +39,16 @@ Build other plugin targets (`ambix_mirror_VST3`, `ambix_encoder_VST3`,
 `ambix_binaural_VST3`, `ambix_decoder_VST3`, etc.) as the corresponding
 test files require them. Tests skip cleanly if a plugin isn't built.
 
+### 4. Fetch pluginval (optional)
+
+```bash
+python scripts/get_pluginval.py
+```
+
+Downloads Tracktion's validator into `_build/tools/`; see
+[Tier 3 — pluginval](#tier-3--pluginval). `scripts/run_tests.py` does this
+for you, and `test_pluginval.py` skips if the binary is absent.
+
 ---
 
 ## Running tests
@@ -81,6 +91,7 @@ tests/
 ├── test_directional_loudness.py  # smoke only (config-heavy)
 ├── test_vmic.py                  # smoke only (config-heavy)
 ├── test_smoke_all.py             # load + silence + finite over every built VST3
+├── test_pluginval.py             # Tracktion pluginval host-compatibility run over every built VST3
 ├── requirements.txt
 └── pytest.ini
 ```
@@ -113,6 +124,51 @@ The testhost negotiates the bus layout by trying
 (order+1)² and falling back to `discreteChannels(N)` otherwise. That
 matters because JUCE's VST3 wrapper rejects `discreteChannels` for
 ambisonic widths.
+
+### Tier 3 — pluginval
+
+`test_pluginval.py` runs [Tracktion's pluginval](https://github.com/Tracktion/pluginval)
+over every VST3 in `_build/vst3/` (including the fixed-input
+`ambix_encoder_i2/i4/i6/i8` variants) — one parametrized test per plugin,
+failing on a non-zero exit code. Where the tests above check *what the DSP
+computes*, pluginval checks *how the plugin behaves in a host*: repeated
+cold/warm instantiation, bus-layout negotiation, sample-rate and block-size
+changes mid-stream, `processBlock` without `prepareToPlay`, parameter
+thread-safety, state save/restore round-trips, editor open/close, and (at
+strictness 10) parameter fuzzing.
+
+The validator binary is fetched once from the pinned GitHub release into
+`_build/tools/pluginval-<version>/`:
+
+```bash
+python scripts/get_pluginval.py
+```
+
+`scripts/run_tests.py` does this automatically, so CI needs no extra step.
+If the binary is missing (e.g. no network), the pluginval tests skip.
+
+Environment knobs:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PLUGINVAL` | — | Use this validator binary instead of downloading |
+| `PLUGINVAL_VERSION` | `v1.0.4` | Release tag to download |
+| `PLUGINVAL_STRICTNESS` | `10` | 1–10; 5 is pluginval's own default |
+| `PLUGINVAL_SKIP_GUI` | `1` | Set to `0` to include editor tests |
+| `PLUGINVAL_TIMEOUT_MS` | `300000` | Per-test inactivity timeout (`-1` disables) |
+| `PLUGINVAL_RANDOM_SEED` | — | Fix the seed to replay a fuzz failure |
+| `PLUGINVAL_REQUIRED` | — | Fail instead of skipping if the binary is missing (set in CI) |
+
+Editor tests are off by default because `ambix_encoder`'s editor creates an
+OpenGL context (`ambix_encoder/Source/SphereOpenGL.cpp`), which hosted CI
+runners don't reliably provide. On a machine with a real display:
+
+```bash
+PLUGINVAL_SKIP_GUI=0 pytest tests/test_pluginval.py -v
+```
+
+Full validator logs land in `_build/pluginval-logs/`; CI uploads that
+directory as an artifact when the job fails.
 
 ### Golden files
 

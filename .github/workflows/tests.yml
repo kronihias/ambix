@@ -100,6 +100,15 @@ jobs:
       - name: Build plugins + testhost and run tests
         env:
           VCPKG_BINARY_SOURCES: ${{ runner.os == 'Windows' && 'clear;x-gha,readwrite' || '' }}
+          # tests/test_pluginval.py runs Tracktion's pluginval over every built
+          # VST3 (run_tests.py downloads the pinned release into _build/tools).
+          # Editor tests stay off: ambix_encoder's editor needs an OpenGL
+          # context, which hosted runners don't reliably provide.
+          PLUGINVAL_SKIP_GUI: '1'
+          PLUGINVAL_STRICTNESS: '10'
+          # Fail rather than skip if the validator couldn't be fetched, so a
+          # bad download never silently drops this layer of coverage.
+          PLUGINVAL_REQUIRED: '1'
         # xvfb on Linux: pedalboard's VST3 loader and some JUCE init paths
         # touch the display server even for "headless" use, so give them a
         # virtual one rather than chasing per-plugin skips.
@@ -132,5 +141,6 @@ jobs:
           path: |
             _build/CMakeFiles/CMakeOutput.log
             _build/CMakeFiles/CMakeError.log
+            _build/pluginval-logs/
           if-no-files-found: ignore
           retention-days: 14
