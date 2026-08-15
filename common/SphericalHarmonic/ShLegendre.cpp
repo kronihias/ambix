@@ -20,9 +20,9 @@
 #include "ShLegendre.h"
 
 
-ShLegendre::ShLegendre() : _n(-1), _arg(-4)
+ShLegendre::ShLegendre() : _n(-1), _arg(-4), _arg_2(-4)
 {
-    
+
 }
 
 
@@ -35,7 +35,12 @@ ShLegendre::~ShLegendre()
 void ShLegendre::Calc(int n_max, double arg, double arg_2)
 {
     
-    if (_n != n_max || _arg != arg)
+    // arg_2 takes part in the recursion (it seeds every P_n^n), so it has to
+    // take part in the change detection too - arg alone does not identify the
+    // input. sin(theta) is equal for theta and pi-theta while cos(theta) flips
+    // sign, and a caller feeding those in turn used to get the stale
+    // coefficients of the previous hemisphere back.
+    if (_n != n_max || _arg != arg || _arg_2 != arg_2)
     {
         Legendre.resize((n_max+1)*(n_max+1));
         
@@ -80,6 +85,7 @@ void ShLegendre::Calc(int n_max, double arg, double arg_2)
         
         // std::cout << "Legendre vector size: " << Legendre.size() << std::endl << "Vector: " << std::endl << Legendre << std::endl;
         _arg = arg;
+        _arg_2 = arg_2;
         _n = n_max;
     }
     

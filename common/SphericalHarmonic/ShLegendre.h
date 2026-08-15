@@ -41,7 +41,8 @@ public:
 private:
     int _n;
     double _arg; // in case of ambix this would be sin(theta) because of using elevation (zero degree at equator)
-    
+    double _arg_2; // cached alongside _arg: arg alone does not identify the input
+
 };
 
 #endif /* defined(__ambix_matrix_test__ShLegendre__) */
