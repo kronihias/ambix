@@ -61,6 +61,29 @@ def test_max_re_attenuates_higher_orders(plugin_maxre, noise_ambi):
         )
 
 
+def test_order_zero(plugin_maxre, noise_ambi):
+    """order = 0 keeps W and mutes every l >= 1 band.
+
+    Regression guard: order 0 asks LegendreU for a 1-element P_n, and the
+    unconditional `Pn(1) = arg` used to write one double past it. That
+    corrupted the heap and crashed hosts on Windows (pluginval's Automation
+    test, which sweeps `order` down to its minimum, died with
+    STATUS_HEAP_CORRUPTION); elsewhere the stray write landed in malloc
+    slack and went unnoticed.
+    """
+    plugin_maxre["apply"] = 1.0          # max-rE bucket
+    plugin_maxre["order"] = 0.0
+
+    out = plugin_maxre(noise_ambi, SR)
+
+    assert np.all(np.isfinite(out)), "order=0 produced non-finite output"
+    np.testing.assert_allclose(out[0], noise_ambi[0], atol=1e-4,
+        err_msg="W (l=0) must pass through unweighted at order 0")
+    for ch in range(1, N_AMBI_CH):
+        np.testing.assert_allclose(out[ch], 0.0, atol=1e-6,
+            err_msg=f"ACN ch{ch} (l>=1) must be muted at order 0")
+
+
 # ===========================================================================
 # Golden regression: max-rE at 1st order
 # ===========================================================================
