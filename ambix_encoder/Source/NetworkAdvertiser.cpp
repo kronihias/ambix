@@ -104,16 +104,24 @@ void NetworkAdvertiser::setAdvertising (bool enabled,
 
 void NetworkAdvertiser::rebuildAdvertiser()
 {
-    advertiser.reset();
-
     if (! wantsAdvertising || currentConnectionPort <= 0)
+    {
+        advertiser.reset();
+        liveDescription = {};
+        livePort = 0;
         return;
+    }
 
     // Suppress broadcast until the startup-delay window has elapsed — the
     // timer below keeps trying every 500 ms, so we'll come back through here
     // automatically once the gate opens.
     if (juce::Time::getCurrentTime() < advertiseAfter)
+    {
+        advertiser.reset();
+        liveDescription = {};
+        livePort = 0;
         return;
+    }
 
     juce::StringPairArray fields;
     // Stable per-plugin-load UUID. The visualizer's Discover tab keys the
@@ -129,8 +137,21 @@ void NetworkAdvertiser::rebuildAdvertiser()
     if (currentProject.isNotEmpty())
         fields.set ("proj", currentProject);
 
+    const auto description = buildDescription (fields);
+
+    // Nothing the wire would notice changed — keep the running broadcast
+    // thread instead of tearing it down and starting another one. Fewer
+    // rebuilds also means fewer chances to hit a teardown race, and the
+    // advertisement keeps its instance id (see the euid comment above).
+    if (advertiser != nullptr && description == liveDescription
+        && currentConnectionPort == livePort)
+        return;
+
+    advertiser.reset();
     advertiser = std::make_unique<juce::NetworkServiceDiscovery::Advertiser> (
-        kEncoderUID, buildDescription (fields), kBroadcastPort, currentConnectionPort);
+        kEncoderUID, description, kBroadcastPort, currentConnectionPort);
+    liveDescription = description;
+    livePort = currentConnectionPort;
 }
 
 bool NetworkAdvertiser::addSubscriber (const juce::String& uuid,

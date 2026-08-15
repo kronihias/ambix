@@ -171,8 +171,15 @@ Ambix_encoderAudioProcessor::~Ambix_encoderAudioProcessor()
     Ambix_encoderAudioProcessor::s_ID--;
 
 #if WITH_OSC
+    // Destroy the advertiser first, while every object and static it touches
+    // is still alive: it owns a broadcast thread that binds a socket, and
+    // letting it die with the rest of the members leaves that thread running
+    // through the remainder of teardown.
     if (networkAdvertiser != nullptr)
+    {
         networkAdvertiser->removeChangeListener (this);
+        networkAdvertiser.reset();
+    }
 
     stopTimer();
     reaperPollTimer.stopTimer();

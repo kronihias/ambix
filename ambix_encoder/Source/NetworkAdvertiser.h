@@ -103,5 +103,12 @@ private:
     // plugin invisible during those short-lived lifecycles.
     juce::Time   advertiseAfter;
 
+    // What the live advertiser was built from. juce's Advertiser has no way
+    // to change its description, so every change means destroying one
+    // broadcast thread and starting another; this skips the rebuild when the
+    // result would be identical.
+    juce::String liveDescription;
+    int          livePort { 0 };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NetworkAdvertiser)
 };
