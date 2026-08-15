@@ -261,6 +261,7 @@ void Ambix_wideningAudioProcessor::prepareToPlay (double sampleRate, int samples
     calcParams();
 
     ring_buffer.clear();
+    _buf_write_pos = 0;
 }
 
 void Ambix_wideningAudioProcessor::releaseResources()
@@ -375,6 +376,12 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
 
     // calc new coefficients
     calcParams();
+
+    // _buf_size follows the sample rate and the mod-period parameter, so it
+    // can shrink below the current write position — the wrap arithmetic
+    // below would then go negative and copy off the end of the ring.
+    if (_buf_write_pos >= _buf_size)
+        _buf_write_pos = 0;
 
     //////////////////////
     // write to the buffer
