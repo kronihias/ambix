@@ -127,6 +127,50 @@ inline juce::AudioChannelSet discreteBusDefault (int numChannels)
              : juce::AudioChannelSet::discreteChannels (numChannels);
 }
 
+/** Default layout for a bus of N independent channels whose width the host
+    cannot negotiate away - vmic's virtual microphones, which are fixed at
+    build time.
+
+    Same VST3 problem as discreteBusDefault(): a discrete default cannot be
+    reported back. But starting at mono and negotiating upward is not an
+    option here, because a host that never negotiates would be left with one
+    virtual mic instead of N.
+
+    So take the N channel types whose VST3 speaker bits ascend in step with
+    JUCE's ChannelType enum. Over that prefix - left..LFE2 against bits 0..18
+    - the two orders agree, so JUCE's reorder table comes out as the
+    identity, and the set still maps to a VST3 arrangement: the plain N-bit
+    mask a host sends when it asks by channel count. (JUCE consults a table
+    of named arrangements first; the entries a contiguous mask can hit -
+    stereo, 3.0 cine, 5.1, 7.1 cine - are listed in enum order there too.)
+    Past LFE2 the orders diverge, so wider buses keep the discrete layout and
+    stay unreportable. */
+inline juce::AudioChannelSet fixedWidthBusDefault (int numChannels)
+{
+    using CS = juce::AudioChannelSet;
+
+    static const CS::ChannelType alignedOrder[]
+    {
+        CS::left,          CS::right,             CS::centre,         CS::LFE,
+        CS::leftSurround,  CS::rightSurround,     CS::leftCentre,     CS::rightCentre,
+        CS::centreSurround, CS::leftSurroundSide, CS::rightSurroundSide,
+        CS::topMiddle,     CS::topFrontLeft,      CS::topFrontCentre, CS::topFrontRight,
+        CS::topRearLeft,   CS::topRearCentre,     CS::topRearRight,   CS::LFE2
+    };
+
+    if (juce::PluginHostType::getPluginLoadedAs() != juce::AudioProcessor::wrapperType_VST3
+        || numChannels < 1
+        || numChannels > (int) juce::numElementsInArray (alignedOrder))
+        return CS::discreteChannels (numChannels);
+
+    juce::Array<CS::ChannelType> types;
+
+    for (int i = 0; i < numChannels; ++i)
+        types.add (alignedOrder[i]);
+
+    return CS::channelSetWithChannels (types);
+}
+
 } // namespace ambix
 
 /** applyBusLayouts override that rewrites any named multichannel layout
