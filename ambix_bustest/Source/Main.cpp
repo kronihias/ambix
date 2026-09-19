@@ -259,6 +259,13 @@ int countReorderedChannels (IComponent& component, IAudioProcessor& proc,
 //==============================================================================
 int main (int argc, char** argv)
 {
+    // Plugins bring their own threads along (ambix_encoder starts a network
+    // discovery hub as it constructs), and on Windows those have been enough
+    // to lose whatever was still sitting in stdout's buffer when the process
+    // exits — the JSON below went missing while the exit code stayed 0.
+    // Unbuffered from the start, so nothing depends on a clean teardown.
+    setvbuf (stdout, nullptr, _IONBF, 0);
+
     std::string pluginPath;
     SpeakerArrangement inArr = 0, outArr = 0;
     bool negotiate = false, checkOrder = false;
@@ -345,6 +352,7 @@ int main (int argc, char** argv)
     }
 
     printf ("\n}\n");
+    fflush (stdout);
 
     component->terminate();
     return 0;

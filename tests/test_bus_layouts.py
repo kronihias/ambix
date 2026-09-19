@@ -101,10 +101,20 @@ def probe(binary, plugin, in_arr=None, out_arr=None, check_order=False):
     run = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     assert run.returncode == 0, f"{plugin}: ambix_bustest failed: {run.stderr.strip()}"
 
-    # Plugins chatter on stdout while loading (preset scans); the JSON object
-    # is the last thing printed.
-    brace = run.stdout.rindex("{\n")
-    return json.loads(run.stdout[brace:])
+    # Plugins chatter on stdout while loading (preset scans, discovery), so
+    # find where the report starts: the last line that is a bare "{".
+    lines = run.stdout.splitlines()
+    starts = [i for i, line in enumerate(lines) if line.strip() == "{"]
+
+    assert starts, (
+        f"{plugin}: ambix_bustest printed no report.\n"
+        f"  command: {' '.join(cmd)}\n"
+        f"  exit code: {run.returncode}\n"
+        f"  stdout: {run.stdout[-2000:]!r}\n"
+        f"  stderr: {run.stderr[-2000:]!r}"
+    )
+
+    return json.loads("\n".join(lines[starts[-1]:]))
 
 
 def buses(result, stage):
