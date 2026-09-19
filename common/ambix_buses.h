@@ -15,10 +15,12 @@
  both JUCE and VST3, so the reorder is a no-op at those counts. But because
  the universal build also accepts non-ambisonic counts (a user might load
  an ambix plugin on a generic multichannel track), we protect against the
- bug in applyBusLayouts by rewriting any named layout with >= 3 channels:
- an ambisonic bus at an ambisonic width becomes ambisonic(order), anything
- else becomes discreteChannels(N). Neither has a named VST3 arrangement to
- reorder against, so the table falls back to identity bit-position order.
+ bug in applyBusLayouts by rewriting any named layout with >= 3 channels
+ to one JUCE's reorder table leaves alone: an ambisonic bus at an ambisonic
+ width becomes ambisonic(order), a bus of plain channels becomes the
+ identity-ordered speaker prefix under VST3 and discreteChannels(N)
+ everywhere else. See identityOrderedChannelSet() and toReorderSafeLayout()
+ below for which layout is picked when, and why.
 
  Usage:
    - Include this header in PluginProcessor.h
@@ -38,6 +40,40 @@
 
 namespace ambix
 {
+
+/** The first `numChannels` channel types whose VST3 speaker bits ascend in
+    step with JUCE's ChannelType enum — left..LFE2 against bits 0..18. Over
+    that prefix the two orders agree, so JUCE's reorder table comes out as
+    the identity, and the set still maps to a VST3 arrangement: the plain
+    N-bit mask a host sends when it asks by channel count. (JUCE consults a
+    table of named arrangements first; the entries a contiguous mask can hit
+    — stereo, 3.0 cine, 5.1, 7.1 cine — are listed in enum order there too.)
+
+    Past LFE2 the orders diverge, so a wider request returns an empty set;
+    callers check the size and fall back to a discrete layout. */
+inline juce::AudioChannelSet identityOrderedChannelSet (int numChannels)
+{
+    using CS = juce::AudioChannelSet;
+
+    static const CS::ChannelType alignedOrder[]
+    {
+        CS::left,           CS::right,            CS::centre,         CS::LFE,
+        CS::leftSurround,   CS::rightSurround,    CS::leftCentre,     CS::rightCentre,
+        CS::centreSurround, CS::leftSurroundSide, CS::rightSurroundSide,
+        CS::topMiddle,      CS::topFrontLeft,     CS::topFrontCentre, CS::topFrontRight,
+        CS::topRearLeft,    CS::topRearCentre,    CS::topRearRight,   CS::LFE2
+    };
+
+    if (numChannels < 1 || numChannels > (int) juce::numElementsInArray (alignedOrder))
+        return {};
+
+    juce::Array<CS::ChannelType> types;
+
+    for (int i = 0; i < numChannels; ++i)
+        types.add (alignedOrder[i]);
+
+    return CS::channelSetWithChannels (types);
+}
 
 /** Rewrite any named multichannel layout so JUCE's VST3 wrapper skips its
     channel-reorder table.
@@ -61,10 +97,14 @@ namespace ambix
     unable to describe its own buses.
 
     Buses that are not ambisonic to begin with — the encoder's sources, the
-    decoder's loudspeakers — have no such identity to fall back on and stay
-    discrete. Picking a speaker layout for them would keep them reportable
-    too, but only for widths whose JUCE and VST3 orders happen to agree, and
-    JUCE owns that table; a copy of it here would rot silently. */
+    decoder's loudspeakers, vmic's virtual mics — have no such identity to
+    fall back on. Under VST3 they take identityOrderedChannelSet() instead,
+    which is reportable and equally reorder-proof; the speaker names it
+    carries mean nothing here, but they beat a bus the plugin cannot
+    describe. That trade only makes sense where VST3 forces it — AU and VST2
+    have no trouble with a discrete bus, and a surround tag on a bus of
+    virtual mics would be a plain lie to those hosts — so elsewhere, and
+    beyond the width the prefix covers, the layout stays discrete. */
 inline juce::AudioProcessor::BusesLayout
 toReorderSafeLayout (const juce::AudioProcessor& processor,
                   const juce::AudioProcessor::BusesLayout& in,
@@ -91,6 +131,17 @@ toReorderSafeLayout (const juce::AudioProcessor& processor,
                     cs = juce::AudioChannelSet::ambisonic (order);
                     return;
                 }
+            }
+        }
+
+        if (juce::PluginHostType::getPluginLoadedAs() == juce::AudioProcessor::wrapperType_VST3)
+        {
+            const auto identityOrdered = identityOrderedChannelSet (n);
+
+            if (identityOrdered.size() == n)
+            {
+                cs = identityOrdered;
+                return;
             }
         }
 
@@ -136,39 +187,20 @@ inline juce::AudioChannelSet discreteBusDefault (int numChannels)
     option here, because a host that never negotiates would be left with one
     virtual mic instead of N.
 
-    So take the N channel types whose VST3 speaker bits ascend in step with
-    JUCE's ChannelType enum. Over that prefix - left..LFE2 against bits 0..18
-    - the two orders agree, so JUCE's reorder table comes out as the
-    identity, and the set still maps to a VST3 arrangement: the plain N-bit
-    mask a host sends when it asks by channel count. (JUCE consults a table
-    of named arrangements first; the entries a contiguous mask can hit -
-    stereo, 3.0 cine, 5.1, 7.1 cine - are listed in enum order there too.)
-    Past LFE2 the orders diverge, so wider buses keep the discrete layout and
-    stay unreportable. */
+    So default to identityOrderedChannelSet() instead — reportable, and the
+    wrapper leaves its channel order alone. Other wrappers keep the discrete
+    layout, which describes the bus honestly and costs them nothing. */
 inline juce::AudioChannelSet fixedWidthBusDefault (int numChannels)
 {
-    using CS = juce::AudioChannelSet;
-
-    static const CS::ChannelType alignedOrder[]
+    if (juce::PluginHostType::getPluginLoadedAs() == juce::AudioProcessor::wrapperType_VST3)
     {
-        CS::left,          CS::right,             CS::centre,         CS::LFE,
-        CS::leftSurround,  CS::rightSurround,     CS::leftCentre,     CS::rightCentre,
-        CS::centreSurround, CS::leftSurroundSide, CS::rightSurroundSide,
-        CS::topMiddle,     CS::topFrontLeft,      CS::topFrontCentre, CS::topFrontRight,
-        CS::topRearLeft,   CS::topRearCentre,     CS::topRearRight,   CS::LFE2
-    };
+        const auto identityOrdered = identityOrderedChannelSet (numChannels);
 
-    if (juce::PluginHostType::getPluginLoadedAs() != juce::AudioProcessor::wrapperType_VST3
-        || numChannels < 1
-        || numChannels > (int) juce::numElementsInArray (alignedOrder))
-        return CS::discreteChannels (numChannels);
+        if (identityOrdered.size() == numChannels)
+            return identityOrdered;
+    }
 
-    juce::Array<CS::ChannelType> types;
-
-    for (int i = 0; i < numChannels; ++i)
-        types.add (alignedOrder[i]);
-
-    return CS::channelSetWithChannels (types);
+    return juce::AudioChannelSet::discreteChannels (numChannels);
 }
 
 } // namespace ambix
