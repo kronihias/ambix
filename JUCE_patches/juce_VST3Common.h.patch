@@ -1,0 +1,28 @@
+--- a/modules/juce_audio_processors_headless/format_types/juce_VST3Common.h
++++ b/modules/juce_audio_processors_headless/format_types/juce_VST3Common.h
+@@ -432,6 +432,25 @@
+     if (getChannelCount (result) == channels.size())
+         return result;
+ 
++    // mcfx patch: fallback for arbitrary AudioChannelSet::discreteChannels(N).
++    // The named-speaker mapping above only knows the well-known canonical and
++    // ambisonic layouts plus discreteChannel0. discreteChannel1..63 have no
++    // mapping, so getVst3SpeakerArrangement(discreteChannels(N)) returns
++    // nullopt for any N != 1 and the host wrapper rejects setBusesLayout
++    // before it can even call setBusArrangements. Synthesise an arrangement
++    // with the lowest N speaker bits set so the call goes through with the
++    // right total channel count. Plug-ins that translate the incoming layout
++    // to discreteChannels(N) internally (mcfx-style) accept any layout with
++    // the right size; plug-ins that need specific named speakers won't, but
++    // they wouldn't have accepted discreteChannels(N) anyway.
++    if (channels.size() > 0 && channels.size() <= 64
++        && channels == AudioChannelSet::discreteChannels (channels.size()))
++    {
++        return (Steinberg::Vst::SpeakerArrangement) (channels.size() < 64
++            ? (((Steinberg::Vst::SpeakerArrangement) 1 << channels.size()) - 1)
++            : ~(Steinberg::Vst::SpeakerArrangement) 0);
++    }
++
+     return {};
+ }
+ 

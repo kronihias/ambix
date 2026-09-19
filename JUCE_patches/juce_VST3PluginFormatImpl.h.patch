@@ -1,0 +1,39 @@
+diff --git a/modules/juce_audio_processors_headless/format_types/juce_VST3PluginFormatImpl.h b/modules/juce_audio_processors_headless/format_types/juce_VST3PluginFormatImpl.h
+index 7e22310..5b95085 100644
+--- a/modules/juce_audio_processors_headless/format_types/juce_VST3PluginFormatImpl.h
++++ b/modules/juce_audio_processors_headless/format_types/juce_VST3PluginFormatImpl.h
+@@ -2594,11 +2594,29 @@ public:
+                                            outputArrangementData, static_cast<int32> (outputArrangements.size())) != kResultTrue)
+             return false;
+ 
+-        // check if the layout matches the request
+-        const auto inArrActual  = getActualArrangements (true);
+-        const auto outArrActual = getActualArrangements (false);
+-
+-        return (inArrActual == inputArrangements && outArrActual == outputArrangements);
++        // mcfx patch: trust setBusArrangements' return value and skip the
++        // SpeakerArrangement readback verification entirely.
++        //
++        // The original code did:
++        //   inArrActual  = getActualArrangements (true);
++        //   outArrActual = getActualArrangements (false);
++        //   return (inArrActual == inputArrangements && outArrActual == outputArrangements);
++        //
++        // That readback check breaks plug-ins that rewrite their bus layout
++        // internally — mcfx-style multichannel plug-ins translate the incoming
++        // AudioChannelSet to discreteChannels(N) inside applyBusLayouts (to
++        // defeat the VST3 wrapper's channel-reorder table). Their VST3 wrapper
++        // then reports kResultFalse from getBusArrangement because there is no
++        // VST3 SpeakerArrangement that maps cleanly back from discreteChannels(N).
++        // The host reads kEmpty (0) and compares against the requested
++        // arrangement, finds a mismatch, and rejects the change — even though
++        // the plug-in actually applied the requested channel count.
++        //
++        // Reaper and other native VST3 hosts simply trust setBusArrangements'
++        // success/failure and skip the readback check entirely. Doing the same
++        // here lets every plug-in that JUCE's host can address (via
++        // getVst3SpeakerArrangement) be resized as expected.
++        return true;
+     }
+ 
+     bool canApplyBusesLayout (const BusesLayout& layouts) const override

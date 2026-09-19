@@ -108,6 +108,31 @@ function(apply_juce_patch patch_file)
     endif()
 endfunction()
 
+# VST3 SpeakerArrangement <-> AudioChannelSet round-tripping, in two places.
+#
+# 1. Plugin side: JUCE maps only discreteChannel0 to a VST3 speaker bit, so
+#    getVst3SpeakerArrangement(discreteChannels(N)) comes back empty for every
+#    N > 1 and the wrapper cannot answer IAudioProcessor::getBusArrangement()
+#    for such a bus. Hosts that read a bus before negotiating (Max/MSP among
+#    them) take that as "not negotiable". The patch synthesises an arrangement
+#    with the lowest N speaker bits set — exactly what a host asking by channel
+#    count sends. common/ambix_buses.h works around the same limitation for the
+#    widths it can cover; this lifts the restriction for all of them.
+#
+# 2. Host side: after setBusArrangements succeeds, JUCE's VST3 host reads the
+#    arrangements back and rejects the layout unless they match the request.
+#    A plugin that rewrites its layout internally (which every ambix plugin
+#    does, to defeat the wrapper's channel-reorder table) therefore looks like
+#    it refused a layout it actually applied — ambix_testhost silently falls
+#    back to plugin defaults at non-ambisonic widths. Reaper and other native
+#    VST3 hosts trust the return value; so do we.
+#
+# Both patches come from the sibling mcfx project, which hit this first.
+apply_juce_patch(
+    "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_VST3Common.h.patch")
+apply_juce_patch(
+    "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_VST3PluginFormatImpl.h.patch")
+
 # Implement IPAddress::getInterfaceBroadcastAddress on Windows (upstream JUCE
 # leaves it as a TODO that returns 0.0.0.0) and add an explicit loopback
 # broadcast in NetworkServiceDiscovery::Advertiser. Without this, Windows peers

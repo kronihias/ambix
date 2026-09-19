@@ -104,7 +104,13 @@ inline juce::AudioChannelSet identityOrderedChannelSet (int numChannels)
     describe. That trade only makes sense where VST3 forces it — AU and VST2
     have no trouble with a discrete bus, and a surround tag on a bus of
     virtual mics would be a plain lie to those hosts — so elsewhere, and
-    beyond the width the prefix covers, the layout stays discrete. */
+    beyond the width the prefix covers, the layout stays discrete.
+
+    JUCE_patches/juce_VST3Common.h.patch now covers that last case too, by
+    giving discreteChannels(N) an arrangement of its own for any N up to 64,
+    so the prefix here is belt and braces rather than the only thing holding
+    a plain-channel bus together. Both produce the same N-bit mask where they
+    overlap. */
 inline juce::AudioProcessor::BusesLayout
 toReorderSafeLayout (const juce::AudioProcessor& processor,
                   const juce::AudioProcessor::BusesLayout& in,

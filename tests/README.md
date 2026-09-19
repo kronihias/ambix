@@ -210,12 +210,16 @@ arrive as different kinds of layout, which is why the test sweeps every order
 rather than trusting one.
 
 The tests assert that every bus is describable on the plugin's default layout
-and after negotiation, and that negotiating never permutes channels — the last
-being what the `applyBusLayouts` guard in `common/ambix_buses.h` exists to
-prevent, including the two layouts JUCE's reorder table would shuffle
-(`k71Music` and `k71_4`). One documented exception: a bus of plain channels
-wider than `MAX_DESCRIBABLE_PLAIN_WIDTH` (19) keeps a discrete layout, which
-is order-safe but cannot be reported.
+and after negotiation, at every width each plugin accepts, and that negotiating
+never permutes channels — the last being what the `applyBusLayouts` guard in
+`common/ambix_buses.h` exists to prevent, including the two layouts JUCE's
+reorder table would shuffle (`k71Music` and `k71_4`).
+
+Describability comes from two places, and the tests do not care which: the
+guard keeps an ambisonic bus ambisonic and gives a plain-channel bus an
+identity-ordered speaker set, while `JUCE_patches/juce_VST3Common.h.patch`
+gives `discreteChannels(N)` an arrangement of its own for any N up to 64.
+Where they overlap they produce the same N-bit mask.
 
 ### Golden files
 

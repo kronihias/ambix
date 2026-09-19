@@ -44,16 +44,11 @@ BUSTEST_BIN = os.path.join(REPO_ROOT, "_build", "testhost", _BUSTEST_EXE)
 AMBISONIC_WIDTHS = [4, 9, 16, 25, 36, 49, 64]
 
 # Widths for the buses that carry plain channels rather than an ambisonic
-# signal: encoder sources, decoder loudspeakers, vmic virtual mics.
-PLAIN_WIDTHS = [1, 2, 3, 8, 12, 19, 20, 24]
-
-# A plain-channel bus can only be described up to here. Above it JUCE's
-# ChannelType enum and the VST3 speaker bits stop ascending together, so
-# identityOrderedChannelSet() runs out of prefix and common/ambix_buses.h
-# falls back to a discrete layout — which keeps the channel order safe but
-# cannot be reported. Ambisonic buses have no such ceiling: they keep their
-# ACN identity at every order. Raise this if the fallback ever improves.
-MAX_DESCRIBABLE_PLAIN_WIDTH = 19
+# signal: encoder sources, decoder loudspeakers, vmic virtual mics. Every one
+# of these has to be describable — a discrete layout is made reportable by
+# JUCE_patches/juce_VST3Common.h.patch, on top of what common/ambix_buses.h
+# does for the widths it covers on its own.
+PLAIN_WIDTHS = [1, 2, 3, 8, 12, 19, 20, 24, 32]
 
 # Layouts JUCE's reorder table would shuffle if applyBusLayouts let them
 # through: 7.1 music (rear pair before side pair) and 7.1.4.
@@ -136,20 +131,6 @@ def widths_for(plugin):
     return [(other, n) for n in widths]
 
 
-def should_be_describable(plugin, direction, width):
-    """Whether this bus, at this width, is one the plugin can name.
-
-    Ambisonic buses always can. A plain-channel bus can up to the width the
-    aligned prefix covers, and above that keeps a discrete layout instead.
-    """
-    plain = PLAIN_BUS.get(plugin)
-
-    if plain is not None and plain[0] == direction:
-        return width <= MAX_DESCRIBABLE_PLAIN_WIDTH
-
-    return True
-
-
 @pytest.mark.parametrize("plugin", ALL_PLUGINS)
 def test_default_layout_is_describable(bustest_bin, plugin):
     """A host inspecting the plugin before negotiating must get an answer.
@@ -176,7 +157,10 @@ def test_negotiated_layout_is_describable(bustest_bin, plugin):
     """...and still get one after negotiating, at every width the plugin takes.
 
     Orders 1-4 used to fail here: the guard rewrote the host's layout to
-    discreteChannels(N), which cannot be reported back.
+    discreteChannels(N), which stock JUCE cannot report back. Both halves of
+    that are now covered — the guard keeps an ambisonic identity where it can,
+    and JUCE_patches/juce_VST3Common.h.patch gives a discrete layout an
+    arrangement for every width up to 64.
     """
     for in_width, out_width in widths_for(plugin):
         result = probe(bustest_bin, plugin, mask(in_width), mask(out_width))
@@ -193,11 +177,10 @@ def test_negotiated_layout_is_describable(bustest_bin, plugin):
                 f"got {bus['channels']}"
             )
 
-            if should_be_describable(plugin, bus["dir"], width):
-                assert bus["arrangement_named"], (
-                    f"{plugin}: after negotiating {in_width} in / {out_width} out, "
-                    f"the {bus['dir']} bus has no VST3 arrangement"
-                )
+            assert bus["arrangement_named"], (
+                f"{plugin}: after negotiating {in_width} in / {out_width} out, "
+                f"the {bus['dir']} bus has no VST3 arrangement"
+            )
 
 
 @pytest.mark.parametrize("plugin", ["ambix_mirror", "ambix_rotator", "ambix_converter"])
