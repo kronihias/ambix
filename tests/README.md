@@ -11,6 +11,11 @@ pedalboard + scipy + golden `.npy` files), with the same two-tier host strategy:
    decoder 4→N, binaural 4→2) or for testing at orders >= 2 (9, 16, … channels).
    pedalboard pins bus width at load time and only negotiates symmetric layouts.
 
+Both of those host through JUCE, as does pluginval, so none of them can see
+how the plugins look to a host that is not JUCE — hence a third harness,
+`ambix_bustest`, which drives the VST3 interfaces directly. See
+[Tier 4 — ambix_bustest](#tier-4--ambix_bustest).
+
 ---
 
 ## Setup
@@ -32,8 +37,11 @@ pip install -r tests/requirements.txt
 
 ```bash
 cmake -B _build -DBUILD_VST=OFF -DBUILD_VST3=ON -DBUILD_AU=OFF -DBUILD_STANDALONE=OFF -DBUILD_TESTHOST=ON
-cmake --build _build --target ambix_converter_VST3 ambix_testhost
+cmake --build _build --target ambix_converter_VST3 ambix_testhost ambix_bustest
 ```
+
+`-DBUILD_TESTHOST=ON` builds both CLI harnesses, `ambix_testhost` and
+`ambix_bustest`, into `_build/testhost/`.
 
 Build other plugin targets (`ambix_mirror_VST3`, `ambix_encoder_VST3`,
 `ambix_binaural_VST3`, `ambix_decoder_VST3`, etc.) as the corresponding
@@ -92,6 +100,7 @@ tests/
 ├── test_vmic.py                  # smoke only (config-heavy)
 ├── test_smoke_all.py             # load + silence + finite over every built VST3
 ├── test_pluginval.py             # Tracktion pluginval host-compatibility run over every built VST3
+├── test_bus_layouts.py            # VST3 bus negotiation, seen from outside JUCE (ambix_bustest)
 ├── requirements.txt
 └── pytest.ini
 ```
@@ -170,6 +179,44 @@ PLUGINVAL_SKIP_GUI=0 pytest tests/test_pluginval.py -v
 Full validator logs land in `_build/pluginval-logs/`; CI uploads that
 directory as an artifact when the job fails.
 
+### Tier 4 — ambix_bustest
+
+`test_bus_layouts.py` checks how the plugins negotiate channel layouts with a
+host — a thing the three tiers above structurally cannot see, because they are
+all JUCE hosts. When a plugin cannot answer `IAudioProcessor::getBusArrangement()`,
+JUCE's host quietly substitutes `discreteChannels(count)` and carries on, so a
+plugin whose buses it cannot describe still passes everything, pluginval at
+strictness 10 included. Other hosts are less forgiving: Max/MSP left
+ambix_encoder stuck on its 1st-order default rather than negotiate with a bus
+it could not read.
+
+`ambix_bustest` therefore skips JUCE and calls `IComponent` / `IAudioProcessor`
+itself, linking the VST3 interfaces JUCE already vendors. It reports each bus
+as JSON — channel count, and whether the arrangement can be named — before and
+after negotiating a requested pair of arrangements, optionally pushing a ramp
+through to see whether the channels come back in the order they went in.
+
+```bash
+cmake --build _build --target ambix_bustest
+_build/testhost/ambix_bustest --plugin _build/vst3/ambix_rotator.vst3 \
+    --in-arr 0xffff --out-arr 0xffff --check-order
+```
+
+An arrangement is a bit per speaker, so `(1 << n) - 1` is what a host asking
+by channel count sends. Worth knowing when reading the test: VST3 defines
+kAmbi5th/6th/7thOrderACN as exactly those masks for 36/49/64 channels, while
+orders 1-4 put their ACN speakers up in bits 20+. Orders 1-4 and 5-7 therefore
+arrive as different kinds of layout, which is why the test sweeps every order
+rather than trusting one.
+
+The tests assert that every bus is describable on the plugin's default layout
+and after negotiation, and that negotiating never permutes channels — the last
+being what the `applyBusLayouts` guard in `common/ambix_buses.h` exists to
+prevent, including the two layouts JUCE's reorder table would shuffle
+(`k71Music` and `k71_4`). One documented exception: a bus of plain channels
+wider than `MAX_DESCRIBABLE_PLAIN_WIDTH` (19) keeps a discrete layout, which
+is order-safe but cannot be reported.
+
 ### Golden files
 
 On the first run of each regression test the plugin output is saved to
@@ -199,3 +246,10 @@ scope; their dedicated test files only assert structural invariants
 (load, silence, finite output, correct shape). Functional DSP coverage
 there would need a committed configuration fixture and is left as
 future work.
+
+Layout negotiation is the one area deliberately tested from outside JUCE
+(`test_bus_layouts.py`), because a JUCE host papers over exactly the failure
+that matters there. What it does not cover is the other wrappers: the VST2,
+AU and LV2 builds negotiate through their own JUCE wrappers, and
+`common/ambix_buses.h` treats them differently on purpose — the fixes it
+carries are VST3-only, since discrete layouts give those formats no trouble.

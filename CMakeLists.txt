@@ -323,5 +323,7 @@ ENDIF()
 IF (BUILD_TESTHOST)
 	message ("-- Building ambix_testhost (CLI test harness)")
 	ADD_SUBDIRECTORY ( ambix_testhost )
+	message ("-- Building ambix_bustest (raw VST3 bus-layout probe)")
+	ADD_SUBDIRECTORY ( ambix_bustest )
 ENDIF()
 
