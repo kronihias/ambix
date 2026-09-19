@@ -52,7 +52,7 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
 #if BINAURAL_DECODER
         .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
 #else
-        .withOutput ("Output", ambix::discreteBusDefault (NUM_OUTPUTS), true)
+        .withOutput ("Output", juce::AudioChannelSet::discreteChannels(NUM_OUTPUTS), true)
 #endif
     ),
     _AmbiChannels(0),

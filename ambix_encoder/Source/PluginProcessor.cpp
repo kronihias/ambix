@@ -87,12 +87,12 @@ namespace
 Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
 #ifdef UNIVERSAL_AMBISONIC
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  ambix::discreteBusDefault (MAX_INPUT_CHANNELS), true)
+        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels (MAX_INPUT_CHANNELS), true)
         .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
 #else
     AudioProcessor (BusesProperties()
-        .withInput  ("Input",  ambix::discreteBusDefault (MAX_INPUT_CHANNELS), true)
+        .withInput  ("Input",  juce::AudioChannelSet::discreteChannels (MAX_INPUT_CHANNELS), true)
         .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
 #endif

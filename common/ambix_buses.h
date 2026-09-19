@@ -22,7 +22,9 @@
  back to identity bit-position order. See toReorderSafeLayout() below.
 
  A discrete layout used to cost the plugin the ability to report that bus
- back to the host, which is its own bug (see discreteBusDefault below);
+ back to the host at all — VST3 had no arrangement for it, so a host that
+ read a bus before negotiating (Max/MSP among them) took the failure as
+ "not negotiable" and left the plugin on its default layout.
  JUCE_patches/juce_VST3Common.h.patch fixes that at the source by giving
  discreteChannels(N) an arrangement for any N up to 64.
 
@@ -56,22 +58,20 @@ namespace ambix
 
     An ambisonic bus is rewritten to `ambisonic(order)` rather than
     `discreteChannels(N)` whenever N is an ambisonic width. Both dodge the
-    reorder (ACN order is the same on both sides), but discrete does not
-    survive the trip back: VST3 has no arrangement for it, so the plugin can
-    no longer answer `IAudioProcessor::getBusArrangement()` for that bus.
-    That matters because the host's proposal is only ACN-labelled by luck —
-    the VST3 constants kAmbi5th/6th/7thOrderACN happen to be the plain
-    36/49/64-bit masks, so a host that asks by channel count lands on
-    ambisonic for orders 5-7 and on a speaker layout for orders 1-4. Without
-    this, every ambix plugin came out of a 1st-to-4th-order negotiation
-    unable to describe its own buses.
+    reorder, and both can be reported back to the host — but only the
+    ambisonic one reports the truth. The host's proposal is ACN-labelled by
+    luck rather than intent: the VST3 constants kAmbi5th/6th/7thOrderACN
+    happen to be the plain 36/49/64-bit masks, so a host that asks by channel
+    count lands on ambisonic for orders 5-7 and on a speaker layout for
+    orders 1-4. Keeping the ambisonic identity means a 16-channel bus reads
+    as 3rd order rather than sixteen anonymous speakers, whichever way the
+    host happened to ask.
 
     Buses that are not ambisonic to begin with — the encoder's sources, the
     decoder's loudspeakers, vmic's virtual mics — have no such identity to
-    fall back on and stay discrete. That no longer costs them the ability to
-    describe themselves: JUCE_patches/juce_VST3Common.h.patch gives
-    discreteChannels(N) an arrangement of its own, the plain N-bit mask, for
-    any N up to 64. */
+    fall back on and stay discrete. That costs them nothing:
+    JUCE_patches/juce_VST3Common.h.patch gives discreteChannels(N) an
+    arrangement of its own, the plain N-bit mask, for any N up to 64. */
 inline juce::AudioProcessor::BusesLayout
 toReorderSafeLayout (const juce::AudioProcessor& processor,
                   const juce::AudioProcessor::BusesLayout& in,
@@ -108,30 +108,6 @@ toReorderSafeLayout (const juce::AudioProcessor& processor,
     for (int i = 0; i < out.inputBuses.size();  ++i) rewrite (out.inputBuses.getReference  (i), true,  i);
     for (int i = 0; i < out.outputBuses.size(); ++i) rewrite (out.outputBuses.getReference (i), false, i);
     return out;
-}
-
-/** Default layout for a bus of N independent, non-ambisonic channels (the
-    encoder's sources, the decoder's loudspeakers).
-
-    VST3 has no speaker arrangement for `discreteChannels(N)` with N > 1: JUCE
-    maps only the first discrete channel to a speaker bit, so
-    `getVst3SpeakerArrangement()` comes back empty and the wrapper answers
-    `IAudioProcessor::getBusArrangement()` with kResultFalse — the plugin
-    cannot tell the host what is on that bus. A host that reads a bus before
-    negotiating can take that failure as "not negotiable" and leave the plugin
-    on its default layout - which in the universal build is 1st order, so the
-    encoder looked like it could not work out the order (reported from Max 9,
-    mcs.vst~, where every square-bus ambix plugin negotiated fine).
-
-    So under VST3 start at mono and let the host negotiate the width upward —
-    the same move AMBI_CH_SET makes for the ambisonic buses. Every other
-    wrapper negotiates nothing and takes the default as the channel count, so
-    there the full width stays. */
-inline juce::AudioChannelSet discreteBusDefault (int numChannels)
-{
-    return juce::PluginHostType::getPluginLoadedAs() == juce::AudioProcessor::wrapperType_VST3
-             ? juce::AudioChannelSet::mono()
-             : juce::AudioChannelSet::discreteChannels (numChannels);
 }
 
 } // namespace ambix
