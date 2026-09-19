@@ -216,10 +216,10 @@ never permutes channels — the last being what the `applyBusLayouts` guard in
 reorder table would shuffle (`k71Music` and `k71_4`).
 
 Describability comes from two places, and the tests do not care which: the
-guard keeps an ambisonic bus ambisonic and gives a plain-channel bus an
-identity-ordered speaker set, while `JUCE_patches/juce_VST3Common.h.patch`
-gives `discreteChannels(N)` an arrangement of its own for any N up to 64.
-Where they overlap they produce the same N-bit mask.
+guard in `common/ambix_buses.h` keeps an ambisonic bus ambisonic, and
+`JUCE_patches/juce_VST3Common.h.patch` gives `discreteChannels(N)` an
+arrangement of its own — the plain N-bit mask — for any N up to 64, which
+covers every other bus.
 
 ### Golden files
 
