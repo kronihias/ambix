@@ -66,6 +66,30 @@ toDiscreteLayout (const juce::AudioProcessor::BusesLayout& in,
     return out;
 }
 
+/** Default layout for a bus of N independent, non-ambisonic channels (the
+    encoder's sources, the decoder's loudspeakers).
+
+    VST3 has no speaker arrangement for `discreteChannels(N)` with N > 1: JUCE
+    maps only the first discrete channel to a speaker bit, so
+    `getVst3SpeakerArrangement()` comes back empty and the wrapper answers
+    `IAudioProcessor::getBusArrangement()` with kResultFalse — the plugin
+    cannot tell the host what is on that bus. A host that reads a bus before
+    negotiating can take that failure as "not negotiable" and leave the plugin
+    on its default layout - which in the universal build is 1st order, so the
+    encoder looked like it could not work out the order (reported from Max 9,
+    mcs.vst~, where every square-bus ambix plugin negotiated fine).
+
+    So under VST3 start at mono and let the host negotiate the width upward —
+    the same move AMBI_CH_SET makes for the ambisonic buses. Every other
+    wrapper negotiates nothing and takes the default as the channel count, so
+    there the full width stays. */
+inline juce::AudioChannelSet discreteBusDefault (int numChannels)
+{
+    return juce::PluginHostType::getPluginLoadedAs() == juce::AudioProcessor::wrapperType_VST3
+             ? juce::AudioChannelSet::mono()
+             : juce::AudioChannelSet::discreteChannels (numChannels);
+}
+
 } // namespace ambix
 
 /** applyBusLayouts override that rewrites any named multichannel layout
