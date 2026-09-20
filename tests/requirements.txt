@@ -1,5 +1,14 @@
 # Python dependencies for ambix plugin test suite
-pedalboard>=0.9.16   # tier 1: VST3 host for square-bus plugins (JUCE 8 manifest support)
+# Capped below 0.9.25: that release's Linux wheel is built with an AVX-512
+# baseline (its pedalboard_native .so carries ~19k zmm references and ~2.5k
+# mask-register instructions, where 0.9.24 has none) and it is not guarded by
+# runtime dispatch, so it dies with SIGILL while importing on any runner whose
+# CPU lacks AVX-512. GitHub's Linux fleet is mixed: four of six runs on
+# 2026-09-19 crashed that way, the other two landed on capable hardware and
+# passed. macOS and Windows wheels are unaffected. Before raising the cap:
+#   unzip -o pedalboard-<ver>-cp311-cp311-manylinux*x86_64.whl
+#   llvm-objdump -d pedalboard_native.cpython-311-x86_64-linux-gnu.so | grep -c zmm
+pedalboard>=0.9.16,<0.9.25   # tier 1: VST3 host for square-bus plugins (JUCE 8 manifest support)
 pytest>=7.0
 numpy>=1.24
 scipy>=1.10
