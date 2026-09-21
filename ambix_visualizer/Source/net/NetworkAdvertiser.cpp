@@ -1,5 +1,7 @@
 #include "NetworkAdvertiser.h"
 
+#include "NetAddress.h"
+
 NetworkAdvertiser::NetworkAdvertiser()
 {
     createNsdPair();
@@ -91,7 +93,13 @@ void NetworkAdvertiser::rebuildEncoders()
         // the encoder is advertising; the Discover panel disables the
         // Subscribe toggle when this is empty.
         e.encoderUuid = fields.getValue ("euid",  {});
-        e.ip          = svc.address;
+        // An encoder inside this same machine is addressed over loopback,
+        // whatever address it advertised — see preferLoopbackIfLocal().
+        // Normalising here, at the single point where an advertised address
+        // enters the visualizer, keeps the cache, the change-detection
+        // compare below, the Discover tab's Endpoint column and every
+        // subscribe/unsubscribe destination on one address.
+        e.ip          = ambix::net::preferLoopbackIfLocal (svc.address);
         e.port        = svc.port;
         e.lastSeen    = svc.lastSeen;
         e.track       = fields.getValue ("track", {});

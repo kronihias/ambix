@@ -7,8 +7,12 @@
 
 #include "NetworkAdvertiser.h"
 
+#include "NetAddress.h"
+
 namespace
 {
+    using ambix::net::preferLoopbackIfLocal;
+
     juce::String buildDescription (const juce::StringPairArray& fields)
     {
         juce::String s;
@@ -165,7 +169,14 @@ bool NetworkAdvertiser::addSubscriber (const juce::String& uuid,
     // it in from our NSD list. Either may still be empty on first receipt —
     // we keep the entry anyway and let `reconcileWithVisualizers` finish the
     // resolution once the visualizer's NSD packet arrives.
-    juce::String resolvedIp = ip;
+    // A visualizer inside this same machine is addressed over loopback,
+    // whatever address it put in the subscribe message — see
+    // preferLoopbackIfLocal(). rebuildOscSenders() matches existing senders
+    // on (ip, port) to preserve their source port, and the visualizer keys
+    // its pucks on that source port, so a churning address would not just
+    // strand the stream but duplicate every puck. lookupVisualizerIpByUuid()
+    // normalises too, so both paths land on the same key.
+    juce::String resolvedIp = preferLoopbackIfLocal (ip);
     if (resolvedIp.isEmpty())
         resolvedIp = lookupVisualizerIpByUuid (uuid);
 
@@ -191,7 +202,7 @@ juce::String NetworkAdvertiser::lookupVisualizerIpByUuid (const juce::String& uu
     {
         const auto fields = parseDescription (svc.description);
         if (fields.getValue ("uuid", {}) == uuid)
-            return svc.address.toString();
+            return preferLoopbackIfLocal (svc.address.toString());
     }
     return {};
 }
@@ -229,7 +240,7 @@ bool NetworkAdvertiser::reconcileWithVisualizers()
         const auto fields = parseDescription (svc.description);
         const auto uuid = fields.getValue ("uuid", {});
         if (uuid.isNotEmpty())
-            uuidToIp[uuid] = svc.address.toString();
+            uuidToIp[uuid] = preferLoopbackIfLocal (svc.address.toString());
     }
 
     bool changed = false;
