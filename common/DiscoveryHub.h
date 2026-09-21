@@ -21,13 +21,11 @@
  broadcast-port) pair, and fans out onChange notifications to every
  subscriber for that pair.
 
- Why this exists: AvailableServiceList listens on a fixed UDP port. When
- two plugin instances live in the same process and each create their own
- listener on the same port, both succeed in binding (JUCE sets
- SO_REUSEADDR), but on macOS the kernel only delivers each incoming
- broadcast packet to ONE of them. Symptom: only one plugin instance ever
- sees discovered peers — every other instance flickers between
- "subscriber present" and "subscriber gone".
+ Why this exists: AvailableServiceList listens on a fixed UDP port, so two
+ plugin instances in one process each creating their own listener collide
+ on that port. Symptom: only one plugin instance ever sees discovered
+ peers — every other instance flickers between "subscriber present" and
+ "subscriber gone".
 
  The hub takes the listener out of every plugin instance and hosts it
  once per process. Each plugin (in browse mode) registers a callback via
@@ -35,8 +33,27 @@
  the underlying AvailableServiceList is created on first subscribe and
  destroyed when the last subscriber goes away.
 
+ NOTE on the cause, which the original version of this comment (and the
+ mcfx and sonolink copies it came from) got wrong. It claimed both
+ listeners bind successfully and macOS then delivers each broadcast to
+ only ONE of them. That is not what happens: the second bind *fails*.
+ SO_REUSEADDR, which DatagramSocket's constructor sets, does not permit
+ two UDP sockets on one port on BSD-derived stacks — SO_REUSEPORT does,
+ and nothing in stock JUCE ever sets it. AvailableServiceList also
+ discards bindToPort()'s result, so the failure is silent and the second
+ listener waits forever on a socket bound to nothing. Measured: with
+ SO_REUSEPORT set on every socket, all of them bind AND all of them
+ receive each broadcast (a broadcast goes to all; only a unicast is
+ delivered to just one).
+
+ JUCE_patches/juce_network_discovery.patch now sets SO_REUSEPORT and
+ checks the bind, which is what actually made an encoder in a DAW and the
+ visualizer app discover each other on one machine. That demotes this hub
+ from a necessity to an optimisation — one listener and one wakeup per
+ process instead of N — which is still worth having, so it stays.
+
  Lifted from mcfx (which lifted it from sonolink) — same author, same
- license, same exact macOS bug.
+ license.
 
  ==============================================================================
 */
