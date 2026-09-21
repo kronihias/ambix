@@ -1,7 +1,43 @@
 #include "DiscoverPanel.h"
 
+#include "NetAddress.h"
+
 namespace
 {
+    // The address we ask an encoder to send its updates back to.
+    //
+    // For an encoder on this same machine that is 127.0.0.1: the return leg
+    // never leaves the machine either, so pinning it to a Wi-Fi address only
+    // buys a dependency on that address surviving a DHCP renewal or a roam.
+    // It also has to agree with what the encoder derives on its own — its
+    // addSubscriber() runs the same preferLoopbackIfLocal() over whatever we
+    // put here — and (ip, port) is the key rebuildOscSenders() matches on to
+    // keep an OSCSender's source port stable. Disagreeing would rebuild that
+    // sender and duplicate every puck we draw.
+    //
+    // For a remote encoder, our first routable address, as before. Computed
+    // per target rather than once per pass: a visualizer can be subscribed to
+    // a local and a remote encoder at the same time, and they need different
+    // answers.
+    juce::String ownIpFor (const juce::String& encoderIp)
+    {
+        if (ambix::net::isOwnIPv4Address (encoderIp))
+            return "127.0.0.1";
+
+        // Cached: reassertSubscriptions() calls this once per subscribed
+        // encoder on a 3 s timer, and getAllAddresses() is an uncached
+        // interface walk. getCachedLocalIPv4Addresses() holds the same list
+        // for 2 s, which is well inside the time a DHCP renewal takes to
+        // matter.
+        for (const auto& t : ambix::net::getCachedLocalIPv4Addresses())
+        {
+            if (t.startsWith ("127.") || t.startsWith ("169.254.") || t == "0.0.0.0")
+                continue;
+            return t;
+        }
+        return {};
+    }
+
     juce::StringArray splitIds (const juce::String& packed)
     {
         juce::StringArray out;
@@ -257,16 +293,10 @@ void DiscoverPanel::setSubscribed (const juce::String& encoderUuid, bool on)
     {
         if (on)
         {
-            // Pick the best local IP to include in the subscribe message so
-            // the encoder doesn't have to wait for NSD to resolve our UUID.
-            juce::String ownIp;
-            for (const auto& a : juce::IPAddress::getAllAddresses (false))
-            {
-                const auto s = a.toString();
-                if (s.startsWith ("127.") || s.startsWith ("169.254.") || s == "0.0.0.0")
-                    continue;
-                ownIp = s; break;
-            }
+            // The IP we include in the subscribe message, so the encoder
+            // doesn't have to wait for NSD to resolve our UUID. Derived from
+            // this encoder's address — see ownIpFor().
+            const auto ownIp = ownIpFor (match->ip.toString());
             sender.sendSubscribe (match->ip.toString(), match->port,
                                   settings.visualizerUuid,
                                   settings.listenPort,
@@ -287,17 +317,6 @@ void DiscoverPanel::connectAll()
     if (cache.empty())
         return;
 
-    // Pick our best local IP so subscribes carry it (avoids the encoder having
-    // to resolve us via NSD). Matches the logic in setSubscribed().
-    juce::String ownIp;
-    for (const auto& a : juce::IPAddress::getAllAddresses (false))
-    {
-        const auto s = a.toString();
-        if (s.startsWith ("127.") || s.startsWith ("169.254.") || s == "0.0.0.0")
-            continue;
-        ownIp = s; break;
-    }
-
     auto ids = splitIds (settings.subscribedEncoderIds);
     bool anyAdded = false;
 
@@ -314,11 +333,12 @@ void DiscoverPanel::connectAll()
         }
         // Always (re)send subscribe — cheap, and covers the case where we
         // were already in the list but the encoder has since forgotten us.
+        // ownIpFor() is per-encoder: this list can mix local and remote ones.
         sender.sendSubscribe (e.ip.toString(), e.port,
                               settings.visualizerUuid,
                               settings.listenPort,
                               juce::SystemStats::getComputerName(),
-                              ownIp);
+                              ownIpFor (e.ip.toString()));
     }
 
     if (anyAdded)
@@ -357,24 +377,16 @@ void DiscoverPanel::reassertSubscriptions()
 {
     const auto ids = splitIds (settings.subscribedEncoderIds);
 
-    juce::String ownIp;
-    for (const auto& a : juce::IPAddress::getAllAddresses (false))
-    {
-        const auto s = a.toString();
-        if (s.startsWith ("127.") || s.startsWith ("169.254.") || s == "0.0.0.0")
-            continue;
-        ownIp = s; break;
-    }
-
     for (const auto& e : cache)
     {
         if (! ids.contains (e.encoderUuid))
             continue;
+        // Per-encoder, as in connectAll() — see ownIpFor().
         sender.sendSubscribe (e.ip.toString(), e.port,
                               settings.visualizerUuid,
                               settings.listenPort,
                               juce::SystemStats::getComputerName(),
-                              ownIp);
+                              ownIpFor (e.ip.toString()));
     }
 }
 
