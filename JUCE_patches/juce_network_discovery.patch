@@ -1,8 +1,8 @@
 diff --git a/modules/juce_core/native/juce_Network_windows.cpp b/modules/juce_core/native/juce_Network_windows.cpp
-index b22468b504..2748be9a18 100644
+index b22468b504..25f47c784a 100644
 --- a/modules/juce_core/native/juce_Network_windows.cpp
 +++ b/modules/juce_core/native/juce_Network_windows.cpp
-@@ -609,10 +609,46 @@ void IPAddress::findAllAddresses (Array<IPAddress>& result, bool includeIPv6)
+@@ -609,10 +609,50 @@ void IPAddress::findAllAddresses (Array<IPAddress>& result, bool includeIPv6)
      }
  }
  
@@ -14,8 +14,12 @@ index b22468b504..2748be9a18 100644
 +    if (interfaceAddress.isIPv6)
 +        return {};
 +
-+    // Loopback: 127/8 broadcasts to 127.255.255.255 so same-host listeners
-+    // still see advertisements when no routable interface is up.
++    // Loopback: the broadcast address of 127.0.0.0/8 is 127.255.255.255.
++    // Correct as an accessor, but note this is NOT what makes same-host
++    // discovery work — NetworkServiceDiscovery skips the loopback address in
++    // its interface loop and sends a unicast to 127.0.0.1 instead, because a
++    // 127/8 broadcast is silently dropped on at least macOS. See the comment
++    // in Advertiser::sendBroadcast().
 +    if (interfaceAddress.address[0] == 127)
 +        return IPAddress (127, 255, 255, 255);
 +
@@ -53,41 +57,86 @@ index b22468b504..2748be9a18 100644
  
  
 diff --git a/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp b/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp
-index 4ab805b912..1c0acd9bab 100644
+index 4ab805b912..52d1f80c3c 100644
 --- a/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp
 +++ b/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp
-@@ -81,11 +81,16 @@ void NetworkServiceDiscovery::Advertiser::sendBroadcast()
+@@ -81,11 +81,15 @@ void NetworkServiceDiscovery::Advertiser::sendBroadcast()
  {
      static IPAddress local = IPAddress::local();
  
-+    IPAddress preferredAddress;
++    bool sentOnRoutableInterface = false;
 +
      for (auto& address : IPAddress::getAllAddresses())
      {
          if (address == local)
              continue;
  
-+        if (preferredAddress.isNull())
-+            preferredAddress = address;
++        sentOnRoutableInterface = true;
 +
          message.setAttribute ("address", address.toString());
  
          auto broadcastAddress = IPAddress::getInterfaceBroadcastAddress (address);
-@@ -93,6 +98,17 @@ void NetworkServiceDiscovery::Advertiser::sendBroadcast()
+@@ -93,6 +97,32 @@ void NetworkServiceDiscovery::Advertiser::sendBroadcast()
  
          socket.write (broadcastAddress.toString(), broadcastPort, data.toRawUTF8(), (int) data.getNumBytesAsUTF8());
      }
 +
-+    // Also advertise on the loopback interface so same-host listeners receive
-+    // us even when no routable interface is up. Reuse the first real
-+    // interface's address when there is one, so this extra packet carries the
-+    // same "address" attribute as the others — otherwise same-host receivers
-+    // would see the address field flap between each broadcast tick.
-+    const auto loopbackSource = preferredAddress.isNull() ? local : preferredAddress;
-+    message.setAttribute ("address", loopbackSource.toString());
++    if (sentOnRoutableInterface)
++        return;
++
++    // Nothing routable is up (Wi-Fi off, cable out), so getAllAddresses()
++    // held only 127.0.0.1 and the loop above skipped it via `address ==
++    // local`: not one packet has been sent. Fall back to loopback so
++    // same-host participants can still find each other offline.
++    //
++    // Sent as a UNICAST to 127.0.0.1, not a broadcast to 127.255.255.255.
++    // macOS accepts a sendto() addressed to 127.255.255.255 — it returns the
++    // full byte count with no error — and then silently discards it: nothing
++    // bound to 0.0.0.0 on this machine ever sees it. Do not "fix" this back
++    // to the 127/8 broadcast address; it looks more correct and does nothing.
++    //
++    // Caveat, and the reason this is a fallback rather than an extra copy
++    // sent every tick: with SO_REUSEPORT (see the AvailableServiceList
++    // constructor) a *unicast* is delivered to exactly ONE of the sockets
++    // sharing the port, whereas a broadcast reaches all of them. So offline,
++    // with more than two participants on a machine, which one hears this is
++    // arbitrary. While any interface is up the subnet-directed broadcasts
++    // above reach every local listener and this path is not used at all.
++    message.setAttribute ("address", local.toString());
 +    const auto loopbackData = message.toString (XmlElement::TextFormat().singleLine().withoutHeader());
-+    socket.write (IPAddress (127, 255, 255, 255).toString(), broadcastPort,
++    socket.write (IPAddress (127, 0, 0, 1).toString(), broadcastPort,
 +                  loopbackData.toRawUTF8(), (int) loopbackData.getNumBytesAsUTF8());
  }
  
  //==============================================================================
+@@ -103,7 +133,29 @@ NetworkServiceDiscovery::AvailableServiceList::AvailableServiceList (const Strin
+     acquireMulticastLock();
+    #endif
+ 
+-    socket.bindToPort (broadcastPort);
++    // Share the port. Every discovery participant on a machine binds the
++    // same broadcastPort, and on macOS SO_REUSEADDR alone is NOT enough to
++    // permit that — bind() returns EADDRINUSE and only the first process to
++    // start can ever listen. (DatagramSocket's constructor already sets
++    // SO_REUSEADDR via makeReusable; setEnablePortReuse adds SO_REUSEPORT,
++    // which is what BSD-derived stacks actually require. Linux/Windows treat
++    // address re-use as implying port re-use, so this is a no-op there.)
++    //
++    // Without this an encoder in a DAW and a visualizer app on one machine
++    // silently never see each other: whichever launched second gets a failed
++    // bind and a listen thread that waits forever on a socket bound to
++    // nothing.
++    socket.setEnablePortReuse (true);
++
++    // Deliberately checked: a failed bind here is otherwise completely
++    // silent, and the symptom (an empty service list, forever) gives no hint
++    // that the socket was never listening.
++    if (! socket.bindToPort (broadcastPort))
++    {
++        jassertfalse;
++        return;
++    }
++
+     startThread (Priority::background);
+ }
+ 
