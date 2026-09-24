@@ -144,7 +144,8 @@ public:
          setFullScreen (true);
          setContentOwned (new MainContentComponent (*this), false);
         #else
-         setContentOwned (new MainContentComponent (*this), true);
+         setConstrainer (&decoratorConstrainer);
+         setMainContent();
         
         // addToDesktop();
         //end modified code
@@ -169,6 +170,7 @@ public:
         #endif
 
         pluginHolder->stopPlaying();
+        decoratorConstrainer.setMainContentComponent (nullptr);
         clearContentComponent();
         pluginHolder = nullptr;
     }
@@ -240,6 +242,7 @@ public:
     void resetToDefaultState()
     {
         pluginHolder->stopPlaying();
+        decoratorConstrainer.setMainContentComponent (nullptr);
         clearContentComponent();
         pluginHolder->deletePlugin();
 
@@ -247,7 +250,11 @@ public:
             props->removeValue ("filterState");
 
         pluginHolder->createPlugin();
-        setContentOwned (new MainContentComponent (*this), true);
+       #if JUCE_IOS || JUCE_ANDROID
+        setContentOwned (new MainContentComponent (*this), false);
+       #else
+        setMainContent();
+       #endif
         pluginHolder->startPlaying();
 
         resized();
@@ -508,6 +515,30 @@ public:
     std::unique_ptr<StandalonePluginHolder> pluginHolder;
 
 private:
+    /** Creates the editor's content component and makes the window follow
+        the editor: resizable (with the maximise / fullscreen button) only if
+        the editor is, and never outside the editor's own size limits.
+        JUCE's stock standalone does the same; without it the window can only
+        be resized from the editor's corner handle, and macOS greys out the
+        green zoom / fullscreen button. */
+    void setMainContent()
+    {
+        auto* content = new MainContentComponent (*this);
+        decoratorConstrainer.setMainContentComponent (content);
+        setContentOwned (content, true);
+
+        const bool resizable = content->isEditorResizable();
+        setResizable (resizable, false);
+
+        const int buttons = DocumentWindow::minimiseButton | DocumentWindow::closeButton
+                          | (resizable ? DocumentWindow::maximiseButton : 0);
+       #if JUCE_WINDOWS
+        setTitleBarButtonsRequired (buttons, false);
+       #else
+        setTitleBarButtonsRequired (buttons, true);
+       #endif
+    }
+
     void buttonClicked (Button*) override
     {
         PopupMenu m;
@@ -749,6 +780,32 @@ private:
             return {};
         }
 
+    public:
+        bool isEditorResizable() const   { return editor != nullptr && editor->isResizable(); }
+
+        ComponentBoundsConstrainer* getEditorConstrainer() const
+        {
+            return editor != nullptr ? editor->getConstrainer() : nullptr;
+        }
+
+        /** Window border around the editor: native frame, window decorations
+            and the notification banner (as in JUCE's stock standalone). */
+        BorderSize<int> computeBorder() const
+        {
+            const auto nativeFrame = [&]() -> BorderSize<int>
+            {
+                if (auto* peer = owner.getPeer())
+                    if (const auto frameSize = peer->getFrameSizeIfPresent())
+                        return *frameSize;
+
+                return {};
+            }();
+
+            return nativeFrame.addedTo (owner.getContentComponentBorder())
+                              .addedTo (BorderSize<int> { shouldShowNotification ? NotificationArea::height : 0, 0, 0, 0 });
+        }
+
+    private:
         //==============================================================================
         StandaloneFilterWindow& owner;
         NotificationArea notification;
@@ -761,8 +818,32 @@ private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)
     };
 
+    /** Checks window sizes against the editor's own constrainer (plus the
+        window border), so resizing the window or going fullscreen never picks
+        a size the editor would then correct, which flickers. Copied from
+        JUCE's stock StandaloneFilterWindow. */
+    class DecoratorConstrainer : public BorderedComponentBoundsConstrainer
+    {
+    public:
+        ComponentBoundsConstrainer* getWrappedConstrainer() const override
+        {
+            return contentComponent != nullptr ? contentComponent->getEditorConstrainer() : nullptr;
+        }
+
+        BorderSize<int> getAdditionalBorder() const override
+        {
+            return contentComponent != nullptr ? contentComponent->computeBorder() : BorderSize<int>{};
+        }
+
+        void setMainContentComponent (MainContentComponent* in) { contentComponent = in; }
+
+    private:
+        MainContentComponent* contentComponent = nullptr;
+    };
+
     //==============================================================================
     TextButton optionsButton;
+    DecoratorConstrainer decoratorConstrainer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StandaloneFilterWindow)
 };
