@@ -10,6 +10,15 @@
 #include "JuceHeader.h"
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 #include "AudioDeviceSelectorComponent.h"
+
+// Mute input when the device is a computer's own microphone + speakers (see
+// MainContentComponent::updateFeedbackGuard). Not needed when there is no
+// input, or when the plug-in keeps its standalone outputs silent.
+#if ! defined (JSA_STANDALONE_NO_INPUT) && ! defined (JSA_STANDALONE_SILENT_OUTPUT)
+ #define JSA_FEEDBACK_GUARD 1
+#else
+ #define JSA_FEEDBACK_GUARD 0
+#endif
 #if JSA_VENDORED_JACK
  #include "JackAudioDevice.h"
 #endif
@@ -517,7 +526,8 @@ private:
     class MainContentComponent  : public Component,
                                   private Value::Listener,
                                   private Button::Listener,
-                                  private ComponentListener
+                                  private ComponentListener,
+                                  private ChangeListener
     {
     public:
         MainContentComponent (StandaloneFilterWindow& filterWindow)
@@ -525,8 +535,6 @@ private:
               editor (owner.getAudioProcessor()->hasEditor() ? owner.getAudioProcessor()->createEditorIfNeeded()
                                                              : new GenericAudioProcessorEditor (*owner.getAudioProcessor()))
         {
-            Value& inputMutedValue = owner.pluginHolder->getMuteInputValue();
-
             if (editor != nullptr)
             {
                 editor->addComponentListener (this);
@@ -537,18 +545,25 @@ private:
 
             addChildComponent (notification);
 
-            // The JACK backend never auto-connects ports, so there is no feedback
-            // loop to guard against: input is force-unmuted in the window ctor and
-            // we never wire up / show the "Audio input is muted to avoid feedback
-            // loop" notification.
-            ignoreUnused (inputMutedValue);
-            shouldShowNotification = false;
+            // Input starts unmuted (window ctor): the usual setup is JACK or a
+            // multichannel interface, where nothing loops back by itself. The
+            // banner shows whenever input is muted, either by the user (Audio
+            // Settings toggle) or by the feedback guard below.
+            inputMutedValue.referTo (owner.pluginHolder->getMuteInputValue());
+            inputMutedValue.addListener (this);
 
-            inputMutedChanged (shouldShowNotification);
+           #if JSA_FEEDBACK_GUARD
+            owner.pluginHolder->deviceManager.addChangeListener (this);
+            updateFeedbackGuard();
+           #endif
+
+            inputMutedChanged (inputMutedValue.getValue());
         }
 
         ~MainContentComponent() override
         {
+            owner.pluginHolder->deviceManager.removeChangeListener (this);
+
             if (editor != nullptr)
             {
                 editor->removeComponentListener (this);
@@ -577,7 +592,7 @@ private:
             enum { height = 30 };
 
             NotificationArea (Button::Listener* settingsButtonListener)
-                : notification ("notification", "Audio input is muted to avoid feedback loop"),
+                : notification ("notification", "Audio input is muted"),
                  #if JUCE_IOS || JUCE_ANDROID
                   settingsButton ("Unmute Input")
                  #else
@@ -612,6 +627,9 @@ private:
                 settingsButton.setBounds (r.removeFromRight (70));
                 notification.setBounds (r);
             }
+
+            void setText (const String& text)   { notification.setText (text, dontSendNotification); }
+
         private:
             Label notification;
             TextButton settingsButton;
@@ -620,6 +638,13 @@ private:
         //==============================================================================
         void inputMutedChanged (bool newInputMutedValue)
         {
+            // A mute the user sets or lifts is theirs; the guard only undoes its own.
+            if (! newInputMutedValue)
+                autoMuted = false;
+
+            notification.setText (autoMuted ? "Input muted: microphone and speakers can feed back"
+                                            : "Audio input is muted");
+
             shouldShowNotification = newInputMutedValue;
             notification.setVisible (shouldShowNotification);
 
@@ -637,6 +662,64 @@ private:
         }
 
         void valueChanged (Value& value) override     { inputMutedChanged (value.getValue()); }
+
+        void changeListenerCallback (ChangeBroadcaster*) override
+        {
+           #if JSA_FEEDBACK_GUARD
+            updateFeedbackGuard();
+           #endif
+        }
+
+        /** A plug-in that passes input to output howls straight away on a
+            computer's own microphone and speakers. Mute the input when the
+            device switches into that setup, and lift the mute again when it
+            switches away, but only if it is still the guard's own mute. It
+            acts on the transition, not on every device change, so the user
+            can still unmute on purpose (e.g. wearing headphones that the OS
+            reports as "Speakers").
+
+            Detected by the device names macOS and Windows give the built-in
+            hardware ("MacBook Pro Microphone" / "MacBook Pro Speakers",
+            "Microphone (Realtek ...)" / "Speakers (Realtek ...)"). Routing
+            through an interface can loop too, but that is the user's patch,
+            and JACK never auto-connects. */
+        void updateFeedbackGuard()
+        {
+            const bool risky = isAcousticFeedbackRisk();
+
+            if (risky && ! feedbackRisk)
+            {
+                autoMuted = true;
+                inputMutedValue.setValue (true);
+                inputMutedChanged (true);   // Value listeners fire async; update the text now
+            }
+            else if (! risky && feedbackRisk && autoMuted)
+            {
+                inputMutedValue.setValue (false);
+            }
+
+            feedbackRisk = risky;
+        }
+
+        bool isAcousticFeedbackRisk() const
+        {
+            auto& dm = owner.pluginHolder->deviceManager;
+
+            if (dm.getCurrentAudioDeviceType() == "JACK")
+                return false;
+
+            auto* device = dm.getCurrentAudioDevice();
+
+            if (device == nullptr
+                || device->getActiveInputChannels().isZero()
+                || device->getActiveOutputChannels().isZero())
+                return false;
+
+            const auto setup = dm.getAudioDeviceSetup();
+            return setup.inputDeviceName.containsIgnoreCase ("Microphone")
+                && setup.outputDeviceName.containsIgnoreCase ("Speakers");
+        }
+
         void buttonClicked (Button*) override
         {
            #if JUCE_IOS || JUCE_ANDROID
@@ -671,6 +754,9 @@ private:
         NotificationArea notification;
         std::unique_ptr<AudioProcessorEditor> editor;
         bool shouldShowNotification = false;
+        Value inputMutedValue;
+        bool feedbackRisk = false;   // device was mic + speakers at the last check
+        bool autoMuted    = false;   // the current mute was set by the guard
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)
     };
