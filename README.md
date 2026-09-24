@@ -292,6 +292,14 @@ LV2 plug-ins are fixed-order (like VST2), using the `AMBI_ORDER` CMake variable 
 
 ## Changelog
 
+### v0.4.7 (2026-09-24) <!-- omit in toc -->
+
+- VST3: plug-ins can describe their channel layouts to the host again — orders 1 to 4 were affected on every plug-in; fixes layout handling in strict hosts such as Max/MSP
+- `ambix_encoder` / `ambix Visualizer`: discovery works with several plug-ins and the app on one machine; same-machine peers talk over 127.0.0.1
+- Standalone: audio input on macOS, input muted with a warning on a computer's own microphone + speakers, resizable window
+- `ambix_widening`, `ambix_maxre`: fixed out-of-bounds writes
+- every plug-in is validated with pluginval in CI
+
 ### v0.4.6 (2026-06-06) <!-- omit in toc -->
 
 - LV2: `BUILD_LV2` now builds LV2 plug-ins independently — previously they were only produced when `BUILD_VST` was also enabled, which required the (proprietary) VST2 SDK
