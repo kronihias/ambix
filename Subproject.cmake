@@ -148,6 +148,10 @@ juce_add_plugin (${SUBPROJECT_NAME}
     FORMATS ${_FORMATS}
     VERSION ${VERSION}
     LV2URI http://www.matthiaskronlachner.com/${SUBPROJECT_NAME}
+    # Without the usage-description plist key macOS hard-denies audio input
+    # for the standalone: no prompt, the device just delivers zeros.
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "Audio input is needed to process the incoming channels."
     ${_LOCAL_NETWORK_ARGS})
 
 juce_generate_juce_header(${SUBPROJECT_NAME})
@@ -228,7 +232,16 @@ IF(BUILD_STANDALONE)
 	list (FIND _FORMATS "Standalone" _has_standalone)
 	IF(NOT _has_standalone EQUAL -1)
 		IF (APPLE)
+			# Seal the whole .app before copying it. The linker only signs the
+			# executable (ad hoc), so the bundle itself stays unsigned and its
+			# Info.plist unbound. macOS then can't reliably tie the microphone
+			# grant to the app and asks again on each launch. With an ad-hoc
+			# signature the grant still resets on every rebuild; set
+			# AMBIX_DEV_CODESIGN_IDENTITY to an Apple Development identity to
+			# keep it. Release builds are re-signed with the Developer ID anyway.
 			add_custom_command (TARGET ${SUBPROJECT_NAME}_Standalone POST_BUILD
+				COMMAND codesign --force --sign "${AMBIX_DEV_CODESIGN_IDENTITY}"
+					"${CMAKE_CURRENT_BINARY_DIR}/${SUBPROJECT_NAME}_artefacts/$<CONFIG>/Standalone/${SUBPROJECT_NAME}.app"
 				COMMAND ${CMAKE_COMMAND} -E copy_directory
 					"${CMAKE_CURRENT_BINARY_DIR}/${SUBPROJECT_NAME}_artefacts/$<CONFIG>/Standalone/${SUBPROJECT_NAME}.app"
 					"${BIN_DIR}/standalone/${SUBPROJECT_NAME}.app"

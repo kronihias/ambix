@@ -24,6 +24,7 @@ SET(BUILD_VST3 TRUE CACHE BOOL "build VST3 plugins (universal order, no _oX suff
 SET(BUILD_AU FALSE CACHE BOOL "build AudioUnit plugins (macOS only, universal order)")
 SET(BUILD_STANDALONE FALSE CACHE BOOL "build standalone application (for those with editor)")
 SET(BUILD_LV2 FALSE CACHE BOOL "build LV2 plugins")
+SET(AMBIX_DEV_CODESIGN_IDENTITY "-" CACHE STRING "macOS: identity the dev-build Standalone .app is sealed with (\"-\" = ad hoc; an Apple Development identity keeps the microphone grant across rebuilds)")
 SET(BUILD_VISUALIZER TRUE CACHE BOOL "build the cross-platform ambix_visualizer GUI app (companion to ambix_encoder)")
 SET(BUILD_TESTHOST FALSE CACHE BOOL "build the ambix_testhost CLI used by tests/ to host VST3s with asymmetric main buses")
 SET(MAX_AMBI_ORDER 7 CACHE STRING "Maximum ambisonic order for universal (VST3/AU) builds")
