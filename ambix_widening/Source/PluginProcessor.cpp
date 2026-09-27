@@ -299,7 +299,7 @@ void Ambix_wideningAudioProcessor::calcParams()
         // parameters in rad
 
         double phi_hat = ((double)mod_depth_param)*2*M_PI;
-        double rot_offset = M_PI - ((double)rot_offset_param + 0.002)*2*M_PI; // offset needed - why??
+        double rot_offset = M_PI - ((double)rot_offset_param)*2*M_PI;
 
         // std::cout << "MATRIX:" << std::endl;
 
@@ -313,6 +313,10 @@ void Ambix_wideningAudioProcessor::calcParams()
             // String output_cos = "cos: ";
             // String output_sin = "sin: ";
 
+            // single sided: weight lambda>0 by 2 (keeps Re{H} exact), normalize power 2-J0^2
+            double j0 = jn(0, (double)m*phi_hat);
+            double causal_gain = 1. / sqrt(2. - j0*j0);
+
             for (int lambda = 0; lambda <= BESSEL_APPR; lambda++) {
 
                 double bessel = jn(lambda, (double)m*phi_hat);
@@ -325,8 +329,14 @@ void Ambix_wideningAudioProcessor::calcParams()
                 if (fabs(d_cos_coeff) < TRUNCATE) {
                     d_cos_coeff = 0.f;
                 }
-                if (fabs(d_cos_coeff) < TRUNCATE) {
+                if (fabs(d_sin_coeff) < TRUNCATE) {
                     d_sin_coeff = 0.f;
+                }
+
+                if (single_sided) {
+                    double w = (lambda == 0 ? 1. : 2.) * causal_gain;
+                    d_cos_coeff *= w;
+                    d_sin_coeff *= w;
                 }
 
                 cos_coeffs[m-1][lambda] = (float)d_cos_coeff;
@@ -498,7 +508,7 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                         float _coeff = _cos_coeffs[l_in-1][j];
                         float coeff = cos_coeffs[l_in-1][j];
 
-                        if (coeff != 0.f) { // skip zero coefficients
+                        if (coeff != 0.f || _coeff != 0.f) { // skip zero coefficients
 
                             // read from buffer
                             if (_buf_read_pos[i] + buffer.getNumSamples() < _buf_size)
@@ -545,7 +555,7 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                         float _coeff = -_sin_coeffs[l_in-1][j];
                         float coeff = -sin_coeffs[l_in-1][j];
 
-                        if (coeff != 0.f) { // skip zero coefficients
+                        if (coeff != 0.f || _coeff != 0.f) { // skip zero coefficients
 
                             // read from buffer
                             if (_buf_read_pos[i] + buffer.getNumSamples() < _buf_size)
@@ -592,7 +602,7 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                         float _coeff = _cos_coeffs[l_in-1][j];
                         float coeff = cos_coeffs[l_in-1][j];
 
-                        if (coeff != 0.f) { // skip zero coefficients
+                        if (coeff != 0.f || _coeff != 0.f) { // skip zero coefficients
 
                             // read from buffer
                             if (_buf_read_pos[i] + buffer.getNumSamples() < _buf_size)
@@ -639,7 +649,7 @@ void Ambix_wideningAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                         float _coeff = _sin_coeffs[l_in-1][j];
                         float coeff = sin_coeffs[l_in-1][j];
 
-                        if (coeff != 0.f) { // skip zero coefficients
+                        if (coeff != 0.f || _coeff != 0.f) { // skip zero coefficients
 
                             // read from buffer
                             if (_buf_read_pos[i] + buffer.getNumSamples() < _buf_size)
