@@ -210,7 +210,7 @@ private:
 
         double phi_hat = (double) lastModDepth * 2.0 * juce::MathConstants<double>::pi;
         double rot_offset = juce::MathConstants<double>::pi
-                            - ((double) lastRotOffset + 0.002) * 2.0 * juce::MathConstants<double>::pi;
+                            - (double) lastRotOffset * 2.0 * juce::MathConstants<double>::pi;
 
         // Compute Bessel coefficients for m=1
         float cosCoeff[BESSEL_APPR + 1];
