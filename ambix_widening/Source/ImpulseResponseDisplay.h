@@ -99,11 +99,19 @@ public:
         int activeFirLength = lastSingleSided ? (BESSEL_APPR + 1) : fullFirLength;
         int activeCenter = lastSingleSided ? 0 : BESSEL_APPR;
 
+        double j0 = jn (0, phi_hat);
+        double causalGain = 1.0 / std::sqrt (2.0 - j0 * j0);
+
         // Draw stems for ALL positions (full range), but grey out inactive ones
         for (int i = 0; i < fullFirLength; ++i)
         {
             int j = std::abs (i - BESSEL_APPR);
             double bessel = jn (j, phi_hat);
+
+            // match the single sided weighting in calcParams()
+            if (lastSingleSided && i >= BESSEL_APPR)
+                bessel *= (j == 0 ? 1.0 : 2.0) * causalGain;
+
             float amp = (float) bessel;
 
             float timeMs = (float) (i - center) * tMs;
