@@ -1,0 +1,176 @@
+--- a/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.h
++++ b/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.h
+@@ -53,7 +53,7 @@
+ 
+         @tags{Events}
+     */
+-    struct Advertiser  : private Thread
++    struct Advertiser
+     {
+         /** Creates and starts an Advertiser thread, broadcasting with the given properties.
+             @param serviceTypeUID       A user-supplied string to define the type of service this represents
+@@ -68,17 +68,21 @@
+                     int connectionPort,
+                     RelativeTime minTimeBetweenBroadcasts = RelativeTime::seconds (1.5));
+ 
+-        /** Destructor */
+-        ~Advertiser() override;
++        /** Destructor. Never kills the broadcast thread: if it is stuck in a
++            system call it is detached and finishes on its own. */
++        ~Advertiser();
+ 
++        /** Changes the Service::description sent from the next broadcast on. */
++        void setServiceDescription (const String& serviceDescription);
++
++        /** Changes the Service::port sent from the next broadcast on. */
++        void setConnectionPort (int connectionPort);
++
+     private:
+-        XmlElement message;
+-        const int broadcastPort;
+-        const RelativeTime minInterval;
+-        DatagramSocket socket { true };
++        struct State;
++        std::shared_ptr<State> state;
+ 
+-        void run() override;
+-        void sendBroadcast();
++        JUCE_DECLARE_NON_COPYABLE (Advertiser)
+     };
+ 
+     //==============================================================================
+--- a/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp
++++ b/modules/juce_events/interprocess/juce_NetworkServiceDiscovery.cpp
+@@ -40,47 +40,113 @@
+  extern void releaseMulticastLock();
+ #endif
+ 
++//==============================================================================
++// The broadcast thread and everything it touches live in a State shared with
++// the thread itself, so the Advertiser can go away without the thread having
++// to. Upstream JUCE ran the thread on the Advertiser and killed it after a
++// 2 s stopThread timeout; the thread is typically inside getaddrinfo() (called
++// by DatagramSocket::write), which on macOS can stall for seconds while the
++// network path is re-evaluated. Cancelling it there leaves a dispatch_once in
++// Network.framework owned by a dead thread, and the next getaddrinfo() in the
++// process traps ("Owner in ulock is unknown"). A detached thread instead
++// finishes its system call and exits.
++struct NetworkServiceDiscovery::Advertiser::State
++{
++    State (const String& serviceTypeUID, int port, RelativeTime interval)
++        : message (serviceTypeUID), broadcastPort (port), minInterval (interval) {}
++
++    void run()
++    {
++        Thread::setCurrentThreadName (SystemStats::getJUCEVersion() + ": Discovery_broadcast");
++
++        if (socket.bindToPort (0))
++        {
++            while (! shouldExit.load())
++            {
++                sendBroadcast();
++                wakeUp.wait ((double) minInterval.inMilliseconds());
++            }
++        }
++        else
++        {
++            jassertfalse;
++        }
++
++        finished.signal();
++    }
++
++    void sendBroadcast();
++
++    CriticalSection lock;
++    XmlElement message;
++    const int broadcastPort;
++    const RelativeTime minInterval;
++    DatagramSocket socket { true };
++
++    std::atomic<bool> shouldExit { false };
++    WaitableEvent wakeUp;
++    WaitableEvent finished { true };
++};
++
+ NetworkServiceDiscovery::Advertiser::Advertiser (const String& serviceTypeUID,
+                                                  const String& serviceDescription,
+                                                  int broadcastPortToUse, int connectionPort,
+                                                  RelativeTime minTimeBetweenBroadcasts)
+-    : Thread (SystemStats::getJUCEVersion() + ": Discovery_broadcast"),
+-      message (serviceTypeUID), broadcastPort (broadcastPortToUse),
+-      minInterval (minTimeBetweenBroadcasts)
+-{
+-    message.setAttribute ("id", Uuid().toString());
+-    message.setAttribute ("name", serviceDescription);
+-    message.setAttribute ("address", String());
+-    message.setAttribute ("port", connectionPort);
++    : state (std::make_shared<State> (serviceTypeUID, broadcastPortToUse, minTimeBetweenBroadcasts))
++{
++    state->message.setAttribute ("id", Uuid().toString());
++    state->message.setAttribute ("name", serviceDescription);
++    state->message.setAttribute ("address", String());
++    state->message.setAttribute ("port", connectionPort);
+ 
+-    startThread (Priority::background);
++    if (! Thread::launch (Thread::Priority::background, [s = state] { s->run(); }))
++        state->finished.signal();
+ }
+ 
+ NetworkServiceDiscovery::Advertiser::~Advertiser()
+ {
+-    stopThread (2000);
+-    socket.shutdown();
++    state->shouldExit = true;
++    state->wakeUp.signal();
++
++    // Normally immediate. Waiting a while keeps the thread from outliving the
++    // plugin binary when a host unloads it right after deleting the instance.
++    state->finished.wait (5000.0);
+ }
+ 
+-void NetworkServiceDiscovery::Advertiser::run()
++void NetworkServiceDiscovery::Advertiser::setServiceDescription (const String& serviceDescription)
+ {
+-    if (! socket.bindToPort (0))
+     {
+-        jassertfalse;
+-        return;
++        const ScopedLock sl (state->lock);
++
++        if (state->message.getStringAttribute ("name") == serviceDescription)
++            return;
++
++        state->message.setAttribute ("name", serviceDescription);
+     }
+ 
+-    while (! threadShouldExit())
++    state->wakeUp.signal();
++}
++
++void NetworkServiceDiscovery::Advertiser::setConnectionPort (int connectionPort)
++{
+     {
+-        sendBroadcast();
+-        wait ((int) minInterval.inMilliseconds());
++        const ScopedLock sl (state->lock);
++
++        if (state->message.getIntAttribute ("port") == connectionPort)
++            return;
++
++        state->message.setAttribute ("port", connectionPort);
+     }
++
++    state->wakeUp.signal();
+ }
+ 
+-void NetworkServiceDiscovery::Advertiser::sendBroadcast()
++void NetworkServiceDiscovery::Advertiser::State::sendBroadcast()
+ {
+     static IPAddress local = IPAddress::local();
+ 
++    auto message = [this] { const ScopedLock sl (lock); return XmlElement (this->message); }();
++
+     bool sentOnRoutableInterface = false;
+ 
+     for (auto& address : IPAddress::getAllAddresses())
