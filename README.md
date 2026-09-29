@@ -292,6 +292,14 @@ LV2 plug-ins are fixed-order (like VST2), using the `AMBI_ORDER` CMake variable 
 
 ## Changelog
 
+### v0.5.0 (2026-09-29) <!-- omit in toc -->
+
+- `ambix_encoder`: fixed a host crash (seen in REAPER on macOS) when a track or project name changed while network discovery was active
+- `ambix_widening`: fixed a coefficient truncation bug that disabled the widening at the centre rotation offset; the previous workaround rotated the image by ~0.7°
+- `ambix_widening`: single-sided (causal) mode keeps each order's level against the omni channel instead of losing up to 4 dB
+- `ambix_widening`: smoother parameter changes (taps fade out instead of cutting off)
+- `ambix_widening`: new defaults: single-sided on, Mod T 5 ms, Mod Depth 0°
+
 ### v0.4.7 (2026-09-24) <!-- omit in toc -->
 
 - VST3: plug-ins can describe their channel layouts to the host again — orders 1 to 4 were affected on every plug-in; fixes layout handling in strict hosts such as Max/MSP
