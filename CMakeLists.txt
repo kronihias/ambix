@@ -142,6 +142,15 @@ apply_juce_patch(
 apply_juce_patch(
     "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_network_discovery.patch")
 
+# NetworkServiceDiscovery::Advertiser: never kill the broadcast thread, and let
+# the description/port change in place. Upstream kills the thread after a 2 s
+# stopThread timeout, typically inside getaddrinfo(), which on macOS leaves
+# Network.framework with a dispatch_once owned by a dead thread; the next
+# getaddrinfo() in the process then crashes the host. Applies on top of
+# juce_network_discovery.patch.
+apply_juce_patch(
+    "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_network_advertiser.patch")
+
 # GCC 9 compatibility (e.g. Ubuntu 20.04): two source-level fixes for JUCE 8.
 #  1. juce_graphics_Harfbuzz.cpp fakes __has_builtin(x)=1 on GCC < 10, which
 #     makes libstdc++ 9's <utility> take a Clang-only builtin path. Include
