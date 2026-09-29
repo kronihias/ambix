@@ -313,9 +313,9 @@ void Ambix_wideningAudioProcessor::calcParams()
             // String output_cos = "cos: ";
             // String output_sin = "sin: ";
 
-            // single sided: weight lambda>0 by 2 (keeps Re{H} exact), normalize power 2-J0^2
+            // single sided: normalize the power of the truncated pair, (1+J0^2)/2
             double j0 = jn(0, (double)m*phi_hat);
-            double causal_gain = 1. / sqrt(2. - j0*j0);
+            double causal_gain = sqrt(2. / (1. + j0*j0));
 
             for (int lambda = 0; lambda <= BESSEL_APPR; lambda++) {
 
@@ -334,9 +334,8 @@ void Ambix_wideningAudioProcessor::calcParams()
                 }
 
                 if (single_sided) {
-                    double w = (lambda == 0 ? 1. : 2.) * causal_gain;
-                    d_cos_coeff *= w;
-                    d_sin_coeff *= w;
+                    d_cos_coeff *= causal_gain;
+                    d_sin_coeff *= causal_gain;
                 }
 
                 cos_coeffs[m-1][lambda] = (float)d_cos_coeff;
