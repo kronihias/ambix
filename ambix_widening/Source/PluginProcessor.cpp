@@ -35,10 +35,10 @@ Ambix_wideningAudioProcessor::Ambix_wideningAudioProcessor() :
         .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     mod_depth_param(0.0f),
-    mod_t_param(0.02f),
+    mod_t_param((5.f - 0.2f) / 69.8f), // 5 ms
     _mod_t_param(0.f),
     rot_offset_param(0.5f),
-    single_sided(false),
+    single_sided(true),
     param_changed(true),
     Q(10),
     ring_buffer(AMBI_CHANNELS,1000),

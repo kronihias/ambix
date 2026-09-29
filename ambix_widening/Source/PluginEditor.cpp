@@ -77,7 +77,7 @@ Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wi
     sld_mod_t.setTextBoxStyle (Slider::TextBoxLeft, false, 55, 20);
     sld_mod_t.setColour (Slider::thumbColourId, Colour (0xff2b1d69));
     sld_mod_t.addListener (this);
-    sld_mod_t.setDoubleClickReturnValue (true, 14.1);
+    sld_mod_t.setDoubleClickReturnValue (true, 5.0);
     sld_mod_t.setTextValueSuffix (" ms");
     sld_mod_t.setTooltip ("time constant between FIR taps in ms");
 
