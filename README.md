@@ -292,6 +292,10 @@ LV2 plug-ins are fixed-order (like VST2), using the `AMBI_ORDER` CMake variable 
 
 ## Changelog
 
+### v0.5.1 (2026-10-19) <!-- omit in toc -->
+
+- All plug-ins: parameter changes made in the plug-in GUI or via OSC are reported to the host again, so they are recorded as automation and saved with the project (broken since v0.4.0)
+
 ### v0.5.0 (2026-09-29) <!-- omit in toc -->
 
 - `ambix_encoder`: fixed a host crash (seen in REAPER on macOS) when a track or project name changed while network discovery was active
