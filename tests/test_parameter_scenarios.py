@@ -17,6 +17,10 @@ get wrong:
     loaded, vmic recomputing after a restore, legacy states missing an
     attribute).
 
+Scenarios marked "offline" process the way a host renders, for plugins
+whose real-time output legitimately depends on timing (binaural's convolver
+drops late partitions rather than wait for them).
+
 Each scenario runs through `ambix_bustest --step ...` on one instance. After
 every step it records latency, per-channel output RMS and correlation, and
 every parameter's value and text. Goldens in tests/golden/scenarios/, recorded
@@ -267,6 +271,7 @@ SCENARIOS = {
                       "Gain": 0.5, "storeConfigDataInProject": 0},
             "steps": [[W(4000)], [(0, 0.3)], [(0, 0.8)], [(0, 0.0)], [(0, 0.5)]],
             "sound_from_step": 0,
+            "offline": True,
         },
     },
 
@@ -277,6 +282,7 @@ SCENARIOS = {
                       "Gain": 0.6, "storeConfigDataInProject": 0},
             "steps": [[W(3000)], [(0, 0.3)], [(0, 0.8)], [(0, 0.0)]],
             "sound_from_step": 0,
+            "offline": True,
         },
     },
 }
@@ -308,6 +314,11 @@ def run_scenario(binary, plugin, scenario):
         pytest.skip(f"{plugin}.vst3 not built")
 
     cmd = [binary, "--plugin", path]
+    if scenario.get("offline"):
+        # binaural's convolver skips partitions its worker threads deliver
+        # late in real time (it must not wait on them), so on a busy machine
+        # the output would depend on timing; offline, it waits
+        cmd += ["--offline"]
     if "arr" in scenario:
         n_in, n_out = scenario["arr"]
         cmd += ["--in-arr", hex(mask(n_in)), "--out-arr", hex(mask(n_out))]

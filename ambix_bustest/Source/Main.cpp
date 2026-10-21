@@ -42,6 +42,9 @@
                                       optionally "wait=MS"; after each step
                                       report latency, output RMS and
                                       correlation, every value and text
+                 [--offline]          process the steps in offline mode (a
+                                      host rendering), so plug-ins that skip
+                                      late work in real time are deterministic
                  [--sweep V1,V2,...]  for every automatable parameter and each
                                       value, a fresh instance with only that
                                       parameter automated: output RMS per
@@ -840,8 +843,13 @@ void sleepMs (int ms)
 
 void printSteps (IPluginFactory& factory, const TUID cid, const std::vector<Step>& steps,
                  bool negotiate, SpeakerArrangement inArr, SpeakerArrangement outArr,
-                 const std::vector<char>& stateBytes)
+                 const std::vector<char>& stateBytes, bool offline)
 {
+    // Offline is how a host renders: a plug-in may then wait for its worker
+    // threads (binaural's convolver does), so the result doesn't depend on
+    // how busy the machine is. In real time it skips work that is late.
+    const auto mode = offline ? kOffline : kRealtime;
+
     constexpr int blockSize = 256, blocksPerStep = 8, measuredBlocks = 4;
 
     Instance inst;
@@ -875,7 +883,7 @@ void printSteps (IPluginFactory& factory, const TUID cid, const std::vector<Step
     component.activateBus (kAudio, kInput,  0, true);
     component.activateBus (kAudio, kOutput, 0, true);
 
-    ProcessSetup setup { kRealtime, kSample32, blockSize, 48000.0 };
+    ProcessSetup setup { mode, kSample32, blockSize, 48000.0 };
 
     if (proc.setupProcessing (setup) != kResultOk)
     {
@@ -900,7 +908,7 @@ void printSteps (IPluginFactory& factory, const TUID cid, const std::vector<Step
     outBus.numChannels = numOut; outBus.channelBuffers32 = outPtr.data();
 
     ProcessData data {};
-    data.processMode        = kRealtime;
+    data.processMode        = mode;
     data.symbolicSampleSize = kSample32;
     data.numSamples         = blockSize;
     data.numInputs  = 1; data.inputs  = &inBus;
@@ -1025,6 +1033,7 @@ int main (int argc, char** argv)
     ParamChanges changes;
     std::vector<ParamValue> sweepProbes;
     std::vector<Step> steps;
+    bool offline = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -1039,6 +1048,7 @@ int main (int argc, char** argv)
         else if (a == "--state-in"  && i + 1 < argc) stateIn  = argv[++i];
         else if (a == "--state-out" && i + 1 < argc) stateOut = argv[++i];
         else if (a == "--step" && i + 1 < argc)    steps.push_back (parseStep (argv[++i]));
+        else if (a == "--offline")                 offline = true;
         else if (a == "--sweep" && i + 1 < argc)
         {
             const std::string list = argv[++i];
@@ -1237,7 +1247,7 @@ int main (int argc, char** argv)
             fprintf (stderr, "ambix_bustest: cannot read %s\n", stateIn.c_str());
             return 2;
         }
-        printSteps (*module.factory, classInfo.cid, steps, negotiate, inArr, outArr, stateBytes);
+        printSteps (*module.factory, classInfo.cid, steps, negotiate, inArr, outArr, stateBytes, offline);
     }
 
     fprintf (report, "\n}\n");
