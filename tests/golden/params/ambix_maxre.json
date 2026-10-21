@@ -1,0 +1,111 @@
+{
+ "displayed": {
+  "0": {
+   "48": {
+    "text": "inverse max_re weight",
+    "value": 0
+   },
+   "49": {
+    "text": "0",
+    "value": 0
+   }
+  },
+  "0.25": {
+   "48": {
+    "text": "inverse max_re weight",
+    "value": 0
+   },
+   "49": {
+    "text": "2",
+    "value": 0.25
+   }
+  },
+  "0.5": {
+   "48": {
+    "text": "no weighting",
+    "value": 0.5
+   },
+   "49": {
+    "text": "4",
+    "value": 0.5
+   }
+  },
+  "0.55": {
+   "48": {
+    "text": "no weighting",
+    "value": 0.5
+   },
+   "49": {
+    "text": "4",
+    "value": 0.550000012
+   }
+  },
+  "0.75": {
+   "48": {
+    "text": "max_re weight",
+    "value": 1
+   },
+   "49": {
+    "text": "5",
+    "value": 0.75
+   }
+  },
+  "1": {
+   "48": {
+    "text": "max_re weight",
+    "value": 1
+   },
+   "49": {
+    "text": "7",
+    "value": 1
+   }
+  }
+ },
+ "fresh_values": {
+  "2": 0,
+  "48": 0.5,
+  "49": 1
+ },
+ "parameters": [
+  {
+   "can_automate": true,
+   "id": 48,
+   "index": 0,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "apply",
+   "step_count": 0,
+   "title": "apply",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 49,
+   "index": 1,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "order",
+   "step_count": 0,
+   "title": "order",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 2,
+   "index": 2,
+   "is_bypass": true,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Bypass",
+   "step_count": 1,
+   "title": "Bypass",
+   "units": ""
+  }
+ ],
+ "restored": {
+  "48": 0.5,
+  "49": 1
+ }
+}

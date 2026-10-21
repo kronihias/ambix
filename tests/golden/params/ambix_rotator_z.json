@@ -1,0 +1,73 @@
+{
+ "displayed": {
+  "0": {
+   "48": {
+    "text": "-180 deg",
+    "value": 0
+   }
+  },
+  "0.25": {
+   "48": {
+    "text": "-90 deg",
+    "value": 0.25
+   }
+  },
+  "0.5": {
+   "48": {
+    "text": "0 deg",
+    "value": 0.5
+   }
+  },
+  "0.55": {
+   "48": {
+    "text": "18 deg",
+    "value": 0.550000012
+   }
+  },
+  "0.75": {
+   "48": {
+    "text": "90 deg",
+    "value": 0.75
+   }
+  },
+  "1": {
+   "48": {
+    "text": "180 deg",
+    "value": 1
+   }
+  }
+ },
+ "fresh_values": {
+  "1": 0,
+  "48": 0.5
+ },
+ "parameters": [
+  {
+   "can_automate": true,
+   "id": 48,
+   "index": 0,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Z-axis r",
+   "step_count": 0,
+   "title": "Z-axis rot",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 1,
+   "index": 1,
+   "is_bypass": true,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Bypass",
+   "step_count": 1,
+   "title": "Bypass",
+   "units": ""
+  }
+ ],
+ "restored": {
+  "48": 0.550000012
+ }
+}

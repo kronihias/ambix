@@ -1,0 +1,605 @@
+{
+ "displayed": {
+  "0": {
+   "1567": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "1568": {
+    "text": "No",
+    "value": 0
+   },
+   "1569": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "1570": {
+    "text": "No",
+    "value": 0
+   },
+   "1571": {
+    "text": "",
+    "value": 0
+   },
+   "48": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "49": {
+    "text": "No",
+    "value": 0
+   },
+   "50": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "51": {
+    "text": "No",
+    "value": 0
+   },
+   "52": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "53": {
+    "text": "No",
+    "value": 0
+   },
+   "54": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "55": {
+    "text": "No",
+    "value": 0
+   },
+   "56": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  },
+  "0.25": {
+   "1567": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "1568": {
+    "text": "No",
+    "value": 0
+   },
+   "1569": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "1570": {
+    "text": "No",
+    "value": 0
+   },
+   "1571": {
+    "text": "no change",
+    "value": 0.25
+   },
+   "48": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "49": {
+    "text": "No",
+    "value": 0
+   },
+   "50": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "51": {
+    "text": "No",
+    "value": 0
+   },
+   "52": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "53": {
+    "text": "No",
+    "value": 0
+   },
+   "54": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "55": {
+    "text": "No",
+    "value": 0
+   },
+   "56": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  },
+  "0.5": {
+   "1567": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "1568": {
+    "text": "No",
+    "value": 0
+   },
+   "1569": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "1570": {
+    "text": "No",
+    "value": 0
+   },
+   "1571": {
+    "text": "flop front <> back",
+    "value": 0.5
+   },
+   "48": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "49": {
+    "text": "No",
+    "value": 0
+   },
+   "50": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "51": {
+    "text": "Invert!",
+    "value": 1
+   },
+   "52": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "53": {
+    "text": "No",
+    "value": 0
+   },
+   "54": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "55": {
+    "text": "No",
+    "value": 0
+   },
+   "56": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  },
+  "0.55": {
+   "1567": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "1568": {
+    "text": "No",
+    "value": 0
+   },
+   "1569": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "1570": {
+    "text": "No",
+    "value": 0
+   },
+   "1571": {
+    "text": "flop front <> back",
+    "value": 0.550000012
+   },
+   "48": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "49": {
+    "text": "No",
+    "value": 0
+   },
+   "50": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "51": {
+    "text": "Invert!",
+    "value": 1
+   },
+   "52": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "53": {
+    "text": "No",
+    "value": 0
+   },
+   "54": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "55": {
+    "text": "No",
+    "value": 0
+   },
+   "56": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  },
+  "0.75": {
+   "1567": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "1568": {
+    "text": "No",
+    "value": 0
+   },
+   "1569": {
+    "text": "-6.00 dB",
+    "value": 0.53095901
+   },
+   "1570": {
+    "text": "No",
+    "value": 0
+   },
+   "1571": {
+    "text": "merge left + right",
+    "value": 0.75
+   },
+   "48": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "49": {
+    "text": "No",
+    "value": 0
+   },
+   "50": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "51": {
+    "text": "No",
+    "value": 0
+   },
+   "52": {
+    "text": "6.020 dB",
+    "value": 1
+   },
+   "53": {
+    "text": "No",
+    "value": 0
+   },
+   "54": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "55": {
+    "text": "No",
+    "value": 0
+   },
+   "56": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  },
+  "1": {
+   "1567": {
+    "text": "-inf dB",
+    "value": 0
+   },
+   "1568": {
+    "text": "No",
+    "value": 0
+   },
+   "1569": {
+    "text": "-6.00 dB",
+    "value": 0.53095901
+   },
+   "1570": {
+    "text": "No",
+    "value": 0
+   },
+   "1571": {
+    "text": "merge top+bottom",
+    "value": 1
+   },
+   "48": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "49": {
+    "text": "No",
+    "value": 0
+   },
+   "50": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "51": {
+    "text": "No",
+    "value": 0
+   },
+   "52": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "53": {
+    "text": "No",
+    "value": 0
+   },
+   "54": {
+    "text": "0 dB",
+    "value": 0.75
+   },
+   "55": {
+    "text": "No",
+    "value": 0
+   },
+   "56": {
+    "text": "6.020 dB",
+    "value": 1
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  }
+ },
+ "fresh_values": {
+  "15": 0,
+  "1567": 0.75,
+  "1568": 0,
+  "1569": 0.75,
+  "1570": 0,
+  "1571": 0,
+  "48": 0.75,
+  "49": 0,
+  "50": 0.75,
+  "51": 0,
+  "52": 0.75,
+  "53": 0,
+  "54": 0.75,
+  "55": 0,
+  "56": 0.75,
+  "57": 0
+ },
+ "parameters": [
+  {
+   "can_automate": true,
+   "id": 48,
+   "index": 0,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "X even g",
+   "step_count": 0,
+   "title": "X even gain",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 49,
+   "index": 1,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "X even i",
+   "step_count": 0,
+   "title": "X even invert",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 50,
+   "index": 2,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "X odd ga",
+   "step_count": 0,
+   "title": "X odd gain",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 51,
+   "index": 3,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "X odd in",
+   "step_count": 0,
+   "title": "X odd invert",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 52,
+   "index": 4,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Y even g",
+   "step_count": 0,
+   "title": "Y even gain",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 53,
+   "index": 5,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Y even i",
+   "step_count": 0,
+   "title": "Y even invert",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 54,
+   "index": 6,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Y odd ga",
+   "step_count": 0,
+   "title": "Y odd gain",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 55,
+   "index": 7,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Y odd in",
+   "step_count": 0,
+   "title": "Y odd invert",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 56,
+   "index": 8,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Z even g",
+   "step_count": 0,
+   "title": "Z even gain",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 57,
+   "index": 9,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Z even i",
+   "step_count": 0,
+   "title": "Z even invert",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 1567,
+   "index": 10,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Z odd ga",
+   "step_count": 0,
+   "title": "Z odd gain",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 1568,
+   "index": 11,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Z odd in",
+   "step_count": 0,
+   "title": "Z odd invert",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 1569,
+   "index": 12,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Circular",
+   "step_count": 0,
+   "title": "Circular gain",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 1570,
+   "index": 13,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Circular",
+   "step_count": 0,
+   "title": "Circular invert",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 1571,
+   "index": 14,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Preset",
+   "step_count": 0,
+   "title": "Preset",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 15,
+   "index": 15,
+   "is_bypass": true,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Bypass",
+   "step_count": 1,
+   "title": "Bypass",
+   "units": ""
+  }
+ ],
+ "restored": {
+  "1567": 0.75,
+  "1568": 0,
+  "1569": 0.75,
+  "1570": 0,
+  "1571": 0.550000012,
+  "48": 0.75,
+  "49": 0,
+  "50": 0.75,
+  "51": 1,
+  "52": 0.75,
+  "53": 0,
+  "54": 0.75,
+  "55": 0,
+  "56": 0.75,
+  "57": 0
+ }
+}
