@@ -323,3 +323,80 @@ def test_text_for_any_value(migrated):
             assert p["text"][probe] == current["displayed"][probe][pid]["text"], (
                 f"{plugin}: parameter {pid} displays {probe} as {p['text'][probe]!r} "
                 f"while not at it, {current['displayed'][probe][pid]['text']!r} when at it")
+
+
+# ---------------------------------------------------------------------------
+# VST3 parameter IDs must be unique
+# ---------------------------------------------------------------------------
+
+def test_vst3_ids_unique(contract):
+    """Every parameter has its own VST3 ID, and the only bypass is the
+    wrapper's, last. A clash makes a parameter unreachable for VST3 hosts:
+    the ID resolves to whichever parameter was registered last."""
+    plugin, current, golden = contract
+    params = current["parameters"]
+    ids = [p["id"] for p in params]
+    assert len(ids) == len(set(ids)), f"{plugin}: duplicate VST3 IDs {sorted(i for i in ids if ids.count(i) > 1)}"
+    bypass = [p["index"] for p in params if p["is_bypass"]]
+    assert bypass == [len(params) - 1], f"{plugin}: bypass parameters at {bypass}"
+
+
+# Parameter 8 of these two hashed to 56, the ID JUCE's wrapper gives its own
+# bypass parameter (one past the last parameter, kept by
+# juce_vst3_legacy_bypass_id.patch). It now has an ID of its own on VST3;
+# bypass stays at 56 so existing bypass automation still finds it.
+CLASHED = [("ambix_vmic", "center elevation 2"), ("ambix_directional_loudness", "center elevation 2")]
+LEGACY_BYPASS_ID = 56
+
+
+@pytest.mark.parametrize("plugin,title", CLASHED, ids=[p for p, _ in CLASHED])
+def test_former_clash_reachable(plugin, title, bustest_bin, tmp_path):
+    fresh = run_bustest(bustest_bin, plugin)
+    params = {p["index"]: p for p in fresh["parameters"]}
+
+    p8 = params[8]
+    assert p8["title"] == title and not p8["is_bypass"]
+    assert p8["id"] != LEGACY_BYPASS_ID
+
+    bypass = [p for p in fresh["parameters"] if p["is_bypass"]]
+    assert [p["id"] for p in bypass] == [LEGACY_BYPASS_ID], "bypass must keep its ID"
+
+    # automated through process() under its own ID, the value reaches the
+    # processor and the project ...
+    state = tmp_path / "state.bin"
+    report = run_bustest(bustest_bin, plugin, {p8["id"]: 0.8}, state_out=str(state))
+    assert {p["index"]: p for p in report["parameters"]}[8]["value"] == pytest.approx(0.8, abs=VALUE_TOL)
+    assert re.search(r'\b8="0\.8\d*"', processor_chunk(state.read_bytes())), "not saved as attribute 8"
+
+    # ... and bypass is still bypass, not parameter 8
+    report = run_bustest(bustest_bin, plugin, {LEGACY_BYPASS_ID: 1.0})
+    after = {p["index"]: p for p in report["parameters"]}
+    assert after[8]["value"] == pytest.approx(p8["value"], abs=VALUE_TOL)
+    assert [p["value"] for p in report["parameters"] if p["is_bypass"]] == [1.0]
+
+
+@pytest.mark.parametrize("plugin,title", CLASHED, ids=[p for p, _ in CLASHED])
+def test_former_clash_drives_processing(plugin, title, bustest_bin):
+    """Same input, same steps, except one run moves parameter 8 under its
+    new ID: the output has to differ. (Filter 2 is attenuated first, so its
+    position matters.)"""
+    path = vst3(plugin)
+    if not os.path.exists(path):
+        pytest.skip(f"{plugin}.vst3 not built")
+
+    fresh = run_bustest(bustest_bin, plugin)
+    ids = {p["index"]: p["id"] for p in fresh["parameters"]}
+
+    def run(second_step):
+        cmd = [bustest_bin, "--plugin", path, "--step", f"{ids[12]}=0.2", "--step", second_step]
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        assert out.returncode == 0, out.stderr[-2000:]
+        lines = out.stdout.splitlines()
+        start = [i for i, line in enumerate(lines) if line.strip() == "{"][-1]
+        return json.loads("\n".join(lines[start:]))["steps"][1]
+
+    still, moved = run(""), run(f"{ids[8]}=0.8")
+    assert moved["values"][str(ids[8])][0] == pytest.approx(0.8, abs=VALUE_TOL)
+    assert moved["values"][str(LEGACY_BYPASS_ID)][0] == 0, "that was the bypass"
+    assert max(abs(a - b) for a, b in zip(still["rms"] + still["proj"], moved["rms"] + moved["proj"])) > 1e-3, (
+        f"{plugin}: moving {title} doesn't change the output")

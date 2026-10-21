@@ -68,7 +68,9 @@ Ambix_vmicAudioProcessor::Ambix_vmicAudioProcessor() :
             const int index = PARAMS_PER_FILTER*f + param;
             String paramName (name);
             paramName << " " << f+1;
-            addParameter (params[index] = new ambix::Parameter (*this, index, paramName, initial, std::move (text)));
+            // (on VST3, parameter 8 gets an ID of its own: see idFor)
+            addParameter (params[index] = new ambix::Parameter (*this, index, paramName, initial, std::move (text), {},
+                                                                ambix::Parameter::idFor (*this, index, PARAMS_PER_FILTER*NUM_FILTERS_VMIC)));
         };
 
         add (AzimuthParam,   "center azimuth",   0.5f, degText360); // 0 deg

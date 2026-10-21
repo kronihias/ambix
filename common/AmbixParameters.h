@@ -27,6 +27,14 @@
 namespace ambix
 {
 
+// Same hashing as JUCE's VST3 wrapper (its default when the plug-in client
+// config hasn't been seen in this translation unit).
+#ifdef JUCE_USE_STUDIO_ONE_COMPATIBLE_PARAMETERS
+ constexpr bool kStudioOneCompatibleIds = JUCE_USE_STUDIO_ONE_COMPATIBLE_PARAMETERS;
+#else
+ constexpr bool kStudioOneCompatibleIds = true;
+#endif
+
 struct ParameterOwner
 {
     virtual ~ParameterOwner() = default;
@@ -56,9 +64,11 @@ public:
     // the legacy code ignored.
     using SnapFunction = std::function<float (float)>;
 
+    // parameterId: leave empty for the index as a string (see idFor()).
     Parameter (ParameterOwner& ownerToUse, int parameterIndex, const juce::String& name,
-               float initialValue, TextFunction valueToText, SnapFunction snap = {})
-        : AudioParameterFloat (juce::ParameterID { juce::String (parameterIndex), 1 }, name,
+               float initialValue, TextFunction valueToText, SnapFunction snap = {},
+               const juce::String& parameterId = {})
+        : AudioParameterFloat (juce::ParameterID { parameterId.isNotEmpty() ? parameterId : juce::String (parameterIndex), 1 }, name,
                                makeRange (std::move (snap)), initialValue,
                                juce::AudioParameterFloatAttributes()
                                    .withStringFromValueFunction (std::move (valueToText))),
@@ -76,6 +86,32 @@ public:
     }
 
     int getIndex() const noexcept { return index; }
+
+    // The ID for parameter `parameterIndex` of a plug-in with `numParameters`
+    // parameters: the index as a string, except where that would clash on
+    // VST3. JUCE's VST3 wrapper hashes the string to the VST3 ID, and gives
+    // its own bypass parameter the ID numParameters (legacy behaviour, kept by
+    // juce_vst3_legacy_bypass_id.patch). The single-digit strings hash to
+    // 48..57, so in a plug-in with 48..57 parameters one of them lands on the
+    // bypass and becomes unreachable. That one gets a derived ID - on VST3
+    // only, as AU has no such bypass and keeps its ID - while the bypass keeps
+    // its ID, so existing bypass automation still finds it.
+    static juce::String idFor (const juce::AudioProcessor& processor, int parameterIndex, int numParameters)
+    {
+        const juce::String plain (parameterIndex);
+
+        if (processor.wrapperType == juce::AudioProcessor::wrapperType_VST3
+            && juce::VST3ClientExtensions::convertJuceParameterId (plain, kStudioOneCompatibleIds)
+                   == (uint32_t) numParameters)
+        {
+            const auto derived = plain + "_vst3";
+            jassert (juce::VST3ClientExtensions::convertJuceParameterId (derived, kStudioOneCompatibleIds)
+                     >= (uint32_t) (numParameters + 10)); // above every single-digit hash and the bypass
+            return derived;
+        }
+
+        return plain;
+    }
 
     // The parameter at `parameterIndex` of `processor`, or nullptr if that
     // isn't an ambix::Parameter.

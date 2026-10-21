@@ -46,13 +46,28 @@ AUDIO_ATOL = 1e-6
 VALUE_TOL  = 1e-6
 
 
-def vst3_id(index):
-    """The VST3 ID JUCE gives parameter `index`: Java-style String hash of
-    the index, masked to 31 bits (see juce_VST3ClientExtensions.cpp)."""
+def hash_id(text):
+    """JUCE's VST3 ID for a parameter ID string: Java-style String hash,
+    masked to 31 bits (see juce_VST3ClientExtensions.cpp)."""
     h = 0
-    for ch in str(index):
+    for ch in text:
         h = (31 * h + ord(ch)) & 0xFFFFFFFF
     return h & 0x7FFFFFFF
+
+
+# Plugins whose parameter count collides with a parameter's hashed index
+# (vmic and dirloud: 56 = hash("8") = the wrapper bypass ID).
+NUM_PARAMS = {"ambix_vmic": 56, "ambix_directional_loudness": 56}
+
+
+def vst3_id(index, plugin=None):
+    """The VST3 ID of parameter `index`, as ambix::Parameter::idFor() picks
+    it: the hashed index, or the hashed "<index>_vst3" where the plain one
+    would land on the bypass."""
+    plain = hash_id(str(index))
+    if plugin is not None and plain == NUM_PARAMS.get(plugin):
+        return hash_id(f"{index}_vst3")
+    return plain
 
 
 def mask(n):
@@ -221,6 +236,9 @@ SCENARIOS = {
                       zip(range(7 * f, 7 * f + 7), [0.5, 0.5, 0, 0.1, 0.1, 0.5, 0])},
             "steps": [[]],
         },
+        "elevation_2_reaches_dsp": {"steps": [
+            [(12, 0.2)], [(8, 0.8)], [(8, 0.3)],   # filter 2 attenuated, then moved
+        ]},
         "restore_reaches_parameter_8": {
             "state": {**{str(i): v for f in range(8) for i, v in
                          zip(range(7 * f, 7 * f + 7), [0.5, 0.5, 0, 0.1, 0.1, 0.5, 0])}, "8": 0.8},
@@ -229,6 +247,9 @@ SCENARIOS = {
     },
 
     "ambix_directional_loudness": {
+        "elevation_2_reaches_dsp": {"steps": [
+            [(12, 0.2)], [(8, 0.8)], [(8, 0.3)],   # filter 2 attenuated, then moved
+        ]},
         "filter_edits_and_solo": {"steps": [
             [(5, 0.3)], [(2, 1.0), (3, 0.4), (4, 0.3)], [(6, 1.0)], [(12, 0.8)], [(13, 1.0)],
             [(6, 0.0), (13, 0.0)], [(2, 0.5)], [(RawID(vst3_id(8)), 1.0)], [(RawID(vst3_id(8)), 0.0)],
@@ -270,13 +291,13 @@ def bustest_bin():
     return BUSTEST_BIN
 
 
-def step_arg(step):
+def step_arg(step, plugin):
     parts = []
     for key, value in step:
         if key == "wait":
             parts.append(f"wait={value}")
         else:
-            pid = int(key) if isinstance(key, RawID) else vst3_id(key)
+            pid = int(key) if isinstance(key, RawID) else vst3_id(key, plugin)
             parts.append(f"{pid}={value!r}")
     return ",".join(parts)
 
@@ -298,7 +319,7 @@ def run_scenario(binary, plugin, scenario):
                 f.write(xml_state(scenario["state"]))
             cmd += ["--state-in", state]
         for step in scenario["steps"]:
-            cmd += ["--step", step_arg(step)]
+            cmd += ["--step", step_arg(step, plugin)]
 
         run = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
