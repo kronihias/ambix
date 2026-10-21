@@ -30,13 +30,15 @@
 #define TRUNCATE 0.001 // -60dB
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 #include <atomic>
 
 //==============================================================================
 /**
 */
 class Ambix_wideningAudioProcessor  : public AudioProcessor,
-                                      public ChangeBroadcaster
+                                      public ChangeBroadcaster,
+                                      public ambix::ParameterOwner
 {
 public:
     //==============================================================================
@@ -62,14 +64,6 @@ public:
 
     //==============================================================================
     const String getName() const override;
-
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -105,21 +99,26 @@ public:
 
 private:
 
+    void parameterValueSet (int index, float newValue) override;
+
     void calcParams();
     void checkBuffer();
 
-    float mod_depth_param; // 0.0 -> 0deg, 1.0 -> 360deg
+    ambix::Parameter* mod_depth_param; // 0.0 -> 0deg, 1.0 -> 360deg
 
-    float mod_t_param, _mod_t_param; // 0.0 ->
+    ambix::Parameter* mod_t_param; // 0.0 ->
+    float _mod_t_param;
 
     // t = Q/samplerate ;  Q = t*samplerate;
     // Q=10....3000 @ 44.1kHz -> t = 0.2 ms....70ms
 
-    float rot_offset_param; // 0.0 -> -180deg, 1.0 -> 180deg
+    ambix::Parameter* rot_offset_param; // 0.0 -> -180deg, 1.0 -> 180deg
 
-    bool single_sided;
+    ambix::Parameter* single_sided_param; // stored as 0 / 1 (<= 0.5 -> off)
 
-    std::atomic<bool> param_changed; // mod_depth or offset changed
+    bool single_sided; // audio thread's copy of single_sided_param, updated in calcParams()
+
+    std::atomic<bool> param_changed; // set on every parameter set
 
     int Q;
 

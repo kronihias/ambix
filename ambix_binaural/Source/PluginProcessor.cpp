@@ -61,13 +61,16 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
     _load_ir(true),
     SampleRate(44100),
     isProcessing(false),
-    _gain(0.5f),
     _appliedGain(-1.f),
     _storeConfigDataInProject(1),
     _readyToSaveConfiguration(false),
     Thread("ambix_binaural")
 
 {
+    // stored only - processBlock() applies it to the speakers
+    addParameter (gain_param = new ambix::Parameter (*this, 0, "OutGain", 0.5f,
+        [] (float v, int) { String text; text = String(ParamToDB(v)).substring(0, 5); text << " dB"; return text; }));
+
     presetDir = presetDir.getSpecialLocation(File::userApplicationDataDirectory).getChildFile("ambix/binaural_presets");
     std::cout << "Recursive search dir:" << presetDir.getFullPathName() << std::endl;
 
@@ -153,36 +156,6 @@ void Ambix_binauralAudioProcessor::LoadPresetByName(String presetName)
 const String Ambix_binauralAudioProcessor::getName() const
 {
     return JucePlugin_Name;
-}
-
-int Ambix_binauralAudioProcessor::getNumParameters()
-{
-    return 1;
-}
-
-float Ambix_binauralAudioProcessor::getParameter (int index)
-{
-    return _gain;
-}
-
-void Ambix_binauralAudioProcessor::setParameter (int index, float newValue)
-{
-    // may run on the audio thread or the message thread while the loader
-    // rebuilds _AmbiSpeakers - only store it, processBlock applies it
-    _gain = jlimit(0.f, 1.f, newValue);
-}
-
-const String Ambix_binauralAudioProcessor::getParameterName (int index)
-{
-    return String("OutGain");
-}
-
-const String Ambix_binauralAudioProcessor::getParameterText (int index)
-{
-    String text;
-    text = String(ParamToDB(_gain)).substring(0, 5);
-    text << " dB";
-    return text;
 }
 
 const String Ambix_binauralAudioProcessor::getInputChannelName (int channelIndex) const
@@ -349,7 +322,7 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
 
         int NumSpeakers = _AmbiSpeakers.size();
 
-        const float gain = _gain;
+        const float gain = gain_param->get();
         if (gain != _appliedGain)
         {
             for (int i=0; i < NumSpeakers; i++)
@@ -940,7 +913,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     ///////////////////
                     // finally add speaker with decoder row
 
-                    _AmbiSpeakers.add(new AmbiSpeaker(getSampleRate(), getBlockSize(), ParamToRMS(_gain) ));
+                    _AmbiSpeakers.add(new AmbiSpeaker(getSampleRate(), getBlockSize(), ParamToRMS(gain_param->get()) ));
                     _AmbiSpeakers.getLast()->setDecoderRow(DecoderRow);
 
                     _AmbiChannels = jmax(_AmbiChannels, DecoderRow.size());
@@ -1014,6 +987,11 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
 #endif
 
     ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
+
+    // the speakers were built with the gain as it was then - have processBlock
+    // apply the current one (the audio thread doesn't touch _appliedGain
+    // while !configLoaded)
+    _appliedGain = -1.f;
 
     configLoaded = true;
 
@@ -1233,7 +1211,7 @@ void Ambix_binauralAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("activePreset", activePreset);
     xml.setAttribute ("presetDir", presetDir.getFullPathName());
     xml.setAttribute("ConvBufferSize", (int)ConvBufferSize);
-    xml.setAttribute("Gain", _gain);
+    xml.setAttribute("Gain", gain_param->get());
     xml.setAttribute("storeConfigDataInProject", _storeConfigDataInProject.get());
 
     // add .zip configuration as base64 dump
@@ -1269,7 +1247,7 @@ void Ambix_binauralAudioProcessor::setStateInformation (const void* data, int si
 
             ConvBufferSize = xmlState->getIntAttribute("ConvBufferSize", ConvBufferSize);
 
-            _gain = jlimit(0.f, 1.f, (float)xmlState->getDoubleAttribute("Gain", 0.5f));
+            gain_param->restore(jlimit(0.f, 1.f, (float)xmlState->getDoubleAttribute("Gain", 0.5f)));
 
             _storeConfigDataInProject.set(xmlState->getIntAttribute("storeConfigDataInProject", 0)); // -> default: don't store convolver data for existing projects
 

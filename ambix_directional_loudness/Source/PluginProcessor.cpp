@@ -36,20 +36,52 @@ Ambix_directional_loudnessAudioProcessor::Ambix_directional_loudnessAudioProcess
     _param_changed(false),
     output_buffer(AMBI_CHANNELS,256)
 {
-    // init parameters
-    shape.setConstant(0.f); // circular
+    // init parameters - order, names, texts and initial values as the
+    // legacy index-based API had them. shape and solo were stored quantised
+    // (shape <= 0.5 -> 0 else 1, solo > 0.5 -> on): snapped the same way.
+    auto degText360 = [] (float v, int) // center_sph was a double array
+    {
+        String text = String(((double) v - 0.5)*360).substring(0, 5);
+        text << " deg";
+        return text;
+    };
+    auto degText180 = [] (float v, int)
+    {
+        String text = String(v*180).substring(0, 5);
+        text << " deg";
+        return text;
+    };
+    auto shapeText = [] (float v, int) { return String (v <= 0.5 ? "circular" : "rectangular"); };
+    auto gainText = [] (float v, int)
+    {
+        String text = String(ParamToDB(v)).substring(0, 5);
+        text << " dB";
+        return text;
+    };
+    auto soloText = [] (float v, int) { return String (v > 0.5f ? "on" : "off"); };
 
-    width.setConstant(0.1f); // +-18°
+    auto snapShape = [] (float v) { return (v <= 0.5f ? 0.f : 1.f); };
+    auto snapSolo  = [] (float v) { return v > 0.5f ? 1.f : 0.f; };
 
-    height.setConstant(0.1f); // +-18°
+    for (int f = 0; f < NUM_FILTERS; f++)
+    {
+        auto add = [this, f] (int param, const char* name, float initial, ambix::Parameter::TextFunction text,
+                              ambix::Parameter::SnapFunction snap = {})
+        {
+            const int index = PARAMS_PER_FILTER*f + param;
+            String paramName (name);
+            paramName << " " << f+1;
+            addParameter (params[index] = new ambix::Parameter (*this, index, paramName, initial, std::move (text), std::move (snap)));
+        };
 
-    gain.setConstant(0.5f); // 0 dB
-
-    window.setConstant(false); // off
-
-    transition.setConstant(0.f); // not used yet
-
-    center_sph.setConstant(0.5f); // 0 deg
+        add (AzimuthParam,   "center azimuth",   0.5f, degText360); // 0 deg
+        add (ElevationParam, "center elevation", 0.5f, degText360); // 0 deg
+        add (ShapeParam,     "shape",            0.f,  shapeText, snapShape); // circular
+        add (WidthParam,     "width",            0.1f, degText180); // +-18°
+        add (HeightParam,    "height",           0.1f, degText180); // +-18°
+        add (GainParam,      "gain",             0.5f, gainText);   // 0 dB
+        add (WindowParam,    "solo",             0.f,  soloText, snapSolo); // off
+    }
 
     // set transformation matrix to identity matrix
     Sh_transf = Eigen::MatrixXd::Identity(AMBI_CHANNELS, AMBI_CHANNELS);
@@ -67,56 +99,6 @@ const String Ambix_directional_loudnessAudioProcessor::getName() const
     return JucePlugin_Name;
 }
 
-int Ambix_directional_loudnessAudioProcessor::getNumParameters()
-{
-    return PARAMS_PER_FILTER*NUM_FILTERS;
-}
-
-float Ambix_directional_loudnessAudioProcessor::getParameter (int index)
-{
-    int filter_id = (int)floor(index/PARAMS_PER_FILTER);
-
-    if (filter_id >= NUM_FILTERS) // safety..
-        return 0.f;
-
-    switch (index%PARAMS_PER_FILTER) {
-
-        case 0:
-            return (float)center_sph(filter_id, 0);
-            break;
-
-        case 1:
-            return (float)center_sph(filter_id, 1);
-            break;
-
-        case 2:
-            return shape(filter_id);
-            break;
-
-        case 3:
-            return width(filter_id);
-
-        case 4:
-            return height(filter_id);
-
-
-        case 5:
-            return gain(filter_id);
-
-
-        case 6:
-            return window(filter_id) ? 1.f : 0.f;
-
-
-        case 7:
-            return transition(filter_id);
-
-
-        default:
-            return 0.0f;
-    }
-}
-
 /*
  Parameters:
  ////////////
@@ -126,177 +108,18 @@ float Ambix_directional_loudnessAudioProcessor::getParameter (int index)
  Width
  Height
  Gain
- Window
+ Window (solo)
 */
-void Ambix_directional_loudnessAudioProcessor::setParameter (int index, float newValue)
+void Ambix_directional_loudnessAudioProcessor::parameterValueSet (int index, float)
 {
-
+    // the value itself lives in the parameter object; calcParams() reads it.
+    // Every set recalculates, as legacy setParameter() did - also a restore
+    // of the value the parameter already had.
     int filter_id = (int)floor(index/PARAMS_PER_FILTER);
 
+    // flag after the write so the audio thread picks up the new value
     if (filter_id < NUM_FILTERS) // safety..
-    {
-        bool known_param = true;
-
-        switch (index%PARAMS_PER_FILTER) {
-
-            case 0:
-                center_sph(filter_id, 0) = newValue;
-                break;
-
-            case 1:
-                center_sph(filter_id, 1) = newValue;
-                break;
-
-            case 2:
-                shape(filter_id) = (newValue <= 0.5f ? 0 : 1.f);
-                break;
-
-            case 3:
-                width(filter_id) = newValue;
-                break;
-
-            case 4:
-                height(filter_id) = newValue;
-                break;
-
-            case 5:
-                gain(filter_id) = newValue;
-                break;
-
-            case 6:
-                window(filter_id) = newValue > 0.5f ? true : false;
-                break;
-
-            case 7:
-                transition(filter_id) = newValue;
-                break;
-
-            default:
-                known_param = false;
-                break;
-        }
-
-        // flag after the write so the audio thread picks up the new value
-        if (known_param)
-            _param_changed = true;
-
-    }
-
-    sendChangeMessage();
-}
-
-const String Ambix_directional_loudnessAudioProcessor::getParameterName (int index)
-{
-    String text;
-
-    int filter_id = (int)floor(index/PARAMS_PER_FILTER);
-
-    if (filter_id >= NUM_FILTERS) // safety..
-        return String();
-
-    switch (index%PARAMS_PER_FILTER) {
-
-        case 0:
-            text = "center azimuth";
-            break;
-
-        case 1:
-            text = "center elevation";
-            break;
-
-        case 2:
-            text = "shape";
-            break;
-
-        case 3:
-            text = "width";
-            break;
-
-        case 4:
-            text = "height";
-            break;
-
-        case 5:
-            text = "gain";
-            break;
-
-        case 6:
-            text = "solo";
-            break;
-
-        case 7:
-            text = "transition";
-            break;
-
-        default:
-            return "";
-    }
-
-    text << " ";
-    text << filter_id+1;
-    return text;
-}
-
-const String Ambix_directional_loudnessAudioProcessor::getParameterText (int index)
-{
-    String text;
-
-    int filter_id = (int)floor(index/PARAMS_PER_FILTER);
-
-    if (filter_id >= NUM_FILTERS) // safety..
-        return String();
-
-    switch (index%PARAMS_PER_FILTER) {
-
-        case 0:
-            text = String((center_sph(filter_id, 0) - 0.5)*360).substring(0, 5);
-            text << " deg";
-            break;
-
-        case 1:
-            text = String((center_sph(filter_id, 1) - 0.5)*360).substring(0, 5);
-            text << " deg";
-            break;
-
-        case 2:
-            if (shape(filter_id) <= 0.5)
-                text = "circular";
-            else
-                text = "rectangular";
-            break;
-
-        case 3:
-            text = String(width(filter_id)*180).substring(0, 5);
-            text << " deg";
-            break;
-
-        case 4:
-            text = String(height(filter_id)*180).substring(0, 5);
-            text << " deg";
-            break;
-
-        case 5:
-            text = String(ParamToDB(gain(filter_id))).substring(0, 5);
-            text << " dB";
-            break;
-
-        case 6:
-            if (window(filter_id))
-                text = "on";
-            else
-                text = "off";
-            break;
-
-        case 7:
-            text = String(transition(filter_id)).substring(0, 5);
-            text << "";
-            break;
-
-        default:
-            return "";
-    }
-
-    return text;
+        _param_changed = true;
 }
 
 const String Ambix_directional_loudnessAudioProcessor::getInputChannelName (int channelIndex) const
@@ -654,6 +477,28 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
 
     if (_param_changed.exchange(false))
     {
+        // one read of every parameter (atomics), in place of the arrays
+        // legacy setParameter() wrote from the setting thread
+        ArrayParam shape;
+        ArrayParam width;
+        ArrayParam height;
+        ArrayParam gain;
+        ArrayBoolParam window;
+        SphCoordParam center_sph;
+
+        for (int k=0; k < NUM_FILTERS; k++)
+        {
+            center_sph(k, 0) = getParam(k, AzimuthParam).get();
+            center_sph(k, 1) = getParam(k, ElevationParam).get();
+            shape(k) = getParam(k, ShapeParam).get();
+            width(k) = getParam(k, WidthParam).get();
+            height(k) = getParam(k, HeightParam).get();
+            gain(k) = getParam(k, GainParam).get();
+            window(k) = getParam(k, WindowParam).get() > 0.5f;
+        }
+
+        const float transition = 0.f; // not used yet (never a parameter)
+
         // convert parameters to values for the filter
         // ArrayIntParam _shape = shape;
 
@@ -706,7 +551,7 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
 
                 if (one_filter_is_solo)
                 {
-                    double newmult = (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), window(k), transition(k));
+                    double newmult = (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), window(k), transition);
 
                     if (window(k) && newmult > -1.f)
                     {
@@ -716,7 +561,7 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
                             multipl *= newmult;
                     }
                 } else {
-                    multipl *= (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), window(k), transition(k));
+                    multipl *= (double)sph_filter.GetWeight(&Sph_coord_vec, Carth_coord.row(i), &_center_sph_vec, _center_carth.row(k), (int)shape(k), _width(k), _height(k), _gain(k), window(k), transition);
                 }
             }
 
@@ -1010,9 +855,9 @@ void Ambix_directional_loudnessAudioProcessor::getStateInformation (MemoryBlock&
     XmlElement xml ("MYPLUGINSETTINGS");
 
     // add some attributes to it..
-    for (int i=0; i < getNumParameters(); i++)
+    for (int i=0; i < PARAMS_PER_FILTER*NUM_FILTERS; i++)
     {
-        xml.setAttribute (String(i), getParameter(i));
+        xml.setAttribute (String(i), (double) params[i]->get());
     }
     xml.setAttribute("filter_sel_id_1", filter_sel_id_1);
     xml.setAttribute("filter_sel_id_2", filter_sel_id_2);
@@ -1046,8 +891,9 @@ void Ambix_directional_loudnessAudioProcessor::setStateInformation (const void* 
         // make sure that it's actually our type of XML object..
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
-            for (int i=0; i < getNumParameters(); i++) {
-                setParameter(i, xmlState->getDoubleAttribute(String(i)));
+            // legacy setParameter(): side effects, no host notification
+            for (int i=0; i < PARAMS_PER_FILTER*NUM_FILTERS; i++) {
+                params[i]->restore((float) xmlState->getDoubleAttribute(String(i)));
             }
             filter_sel_id_1 = xmlState->getIntAttribute("filter_sel_id_1", 0);
             filter_sel_id_2 = xmlState->getIntAttribute("filter_sel_id_2", 0);

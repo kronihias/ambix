@@ -57,9 +57,9 @@ STATE_PROBE = "0.55"
 IDENTITY_FIELDS = ["index", "id", "title", "short_title", "units", "step_count",
                    "can_automate", "read_only", "is_bypass", "is_list"]
 
-# Plugins already on parameter objects. AMBIX_MIGRATED (comma-separated)
-# adds to it, for checking a port before it is listed here.
-MIGRATED = {"ambix_rotator_z"} | (set(os.environ.get("AMBIX_MIGRATED", "").split(",")) - {""})
+# Plugins on parameter objects: all of them. AMBIX_MIGRATED (comma-separated)
+# adds to it, for a plugin added to the suite before it is ported.
+MIGRATED = set(ALL_PLUGINS) | (set(os.environ.get("AMBIX_MIGRATED", "").split(",")) - {""})
 
 # Parameters whose text legitimately depends on another parameter, so it
 # can't be checked against a fresh instance: the encoder's MoveAzimuth and
@@ -256,6 +256,14 @@ def test_automated_value_and_text(contract, probe):
         got = current["displayed"][probe][pid]
         assert got["value"] == pytest.approx(want["value"], abs=VALUE_TOL), (
             f"{plugin}: parameter {pid} automated to {probe} reads back differently")
+
+        # The text is asked for the probe value. The legacy API could only
+        # describe the current value, so where a side effect moved the value
+        # away from the probe in the same block (encoder Az/El via SetRel or
+        # rotation) the golden holds the current value's text instead. Text
+        # at the current value is pinned by the sweep and the scenarios.
+        if want["value"] != pytest.approx(float(probe), abs=VALUE_TOL):
+            continue
         assert got["text"] == want["text"], (
             f"{plugin}: parameter {pid} at {probe} displays differently")
 

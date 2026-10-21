@@ -35,13 +35,15 @@ void LegendreU::Calc(int nmax, double arg)
 {
     if (nmax < 0)
         nmax = 0;
+    if (nmax > kMaxOrder)
+        nmax = kMaxOrder;
     
     // Recompute whenever either input changed - with && a new nmax at an
     // unchanged arg (or vice versa) silently kept the stale Pn.
     if (_arg != arg || _nmax != nmax)
     {
         // init the vector
-        Pn = Eigen::VectorXd::Zero(nmax+1);
+        Pn = Vector::Zero(nmax+1);
 
         // known values for Pn(0) and Pn(1)
         Pn(0) = 1.;
@@ -59,7 +61,7 @@ void LegendreU::Calc(int nmax, double arg)
 }
 
 
-const Eigen::VectorXd& LegendreU::Get() const
+const LegendreU::Vector& LegendreU::Get() const
 {
     return Pn;
 }

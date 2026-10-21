@@ -33,6 +33,13 @@
 
 #include "ReaperVST3Integration.h"
 
+#include "../../common/AmbixParameters.h"
+
+#include <algorithm>
+#include <atomic>
+#include <map>
+#include <vector>
+
 #define _2PI 6.2831853071795
 
 // Maximum number of input source channels supported by the unified binary.
@@ -56,7 +63,8 @@ class Ambix_encoderAudioProcessor  : public AudioProcessor,
                                     private OSCReceiver::Listener<OSCReceiver::RealtimeCallback>,
                                     private juce::ChangeListener,
 #endif
-                                    public ChangeBroadcaster
+                                    public ChangeBroadcaster,
+                                    public ambix::ParameterOwner
 {
 public:
     //==============================================================================
@@ -83,14 +91,23 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
+    // What the legacy setParameter() did with a value: store it and run its
+    // side effects. Called synchronously by ambix::Parameter on the thread
+    // that set the value (often the audio thread) - real-time safe.
+    void parameterValueSet (int index, float newValue) override;
 
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
+    ambix::Parameter* getParam (int index) const noexcept
+    {
+        return juce::isPositiveAndBelow (index, kTotalParams) ? paramObjs[(size_t) index] : nullptr;
+    }
 
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
-    const String getParameterLabel(int index);
+    // Host gestures for editor / UI edits (message thread only). Counted per
+    // parameter, so overlapping UI edits of the same parameter (a slider
+    // drag plus a panner drag, two touches) send one begin / end pair.
+    void beginGesture (int index);
+    void endGesture   (int index);
+    // A single UI edit: begin, set + notify the host, end.
+    void setParameterFromUi (int index, float newValue);
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -155,6 +172,9 @@ public:
     int getActiveSources() const;
 
     bool isLinked() const { return linked_param >= 0.5f; }
+
+    // Raw (normalised) value of a parameter, as the legacy getParameter().
+    float getParamValue (int index) const { return getParam (index) != nullptr ? getParam (index)->get() : 0.f; }
 
     // Source-layout import / export. JSON format follows SPARTA's
     // GenericLayout / IEM MultiEncoder convention:
@@ -290,22 +310,36 @@ private:
     void linkedToUnlinkedSnapshot();
     void unlinkedToLinkedSnapshot();
 
+    // Creates the parameter objects (PluginParameters.cpp).
+    void addParameters();
+    // Display text for `value` of parameter `index` (the legacy getParameterText()).
+    juce::String parameterText (int index, float value) const;
+    static int activeSourcesFromNorm (float v);
+
+    std::array<ambix::Parameter*, kTotalParams> paramObjs {};
+    std::array<int, kTotalParams> gestureDepth {}; // message thread only
+
     double SampleRate;
 
+    // Shadow copies of the parameter values, written only by
+    // parameterValueSet() (exactly where the legacy setParameter() stored
+    // them). The side effects need the previous value (the parameter
+    // already holds the new one when valueChanged() fires), and the rest of
+    // the code reads these from any thread, hence atomics.
     // global (linked-mode) params
-    float azimuth_param;
-    float elevation_param;
-    float size_param;
-    float width_param;
-    float linked_param;
-    float num_active_sources_param;
+    std::atomic<float> azimuth_param;
+    std::atomic<float> elevation_param;
+    std::atomic<float> size_param;
+    std::atomic<float> width_param;
+    std::atomic<float> linked_param;
+    std::atomic<float> num_active_sources_param;
 
     // per-source params (azimuth, elevation, size, mute, solo). All stored
     // in [0,1] so they're properly automatable. Azimuth/elevation share
     // the [0,1] → [-180°, +180°] encoding; size is plain 0..1; mute/solo
     // are booleans encoded as >0.5 = on. Mute/solo are orthogonal to
     // position so they apply regardless of linked/unlinked mode.
-    struct SourceParams { float az, el, size, mute, solo; };
+    struct SourceParams { std::atomic<float> az, el, size, mute, solo; };
     std::array<SourceParams, kMaxSources> source_params;
 
     // last osc value sent (deltas only)
@@ -316,9 +350,9 @@ private:
     float _dpk;
 
     // advanced parameter control
-    float speed_param;
-    float azimuth_set_param, azimuth_set_rel_param, azimuth_mv_param;
-    float elevation_set_param, elevation_set_rel_param, elevation_mv_param;
+    std::atomic<float> speed_param;
+    std::atomic<float> azimuth_set_param, azimuth_set_rel_param, azimuth_mv_param;
+    std::atomic<float> elevation_set_param, elevation_set_rel_param, elevation_mv_param;
 
     AudioSampleBuffer InputBuffer;
 
@@ -366,6 +400,45 @@ private:
 #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_encoderAudioProcessor)
+};
+
+//==============================================================================
+// Host gestures for drags on the panners (message thread only). A touch's
+// gesture on a parameter opens the first time that touch moves it and closes
+// on mouse-up, so it follows whatever the drag ends up writing (linked or
+// per-source position, width).
+class PannerGestures
+{
+public:
+    void set (Ambix_encoderAudioProcessor& p, int touch, int index, float newValue)
+    {
+        auto& open = touches[touch];
+        if (std::find (open.begin(), open.end(), index) == open.end())
+        {
+            open.push_back (index);
+            p.beginGesture (index);
+        }
+        if (auto* param = p.getParam (index))
+            param->setValueNotifyingHost (newValue);
+    }
+
+    void release (Ambix_encoderAudioProcessor& p, int touch)
+    {
+        auto it = touches.find (touch);
+        if (it == touches.end()) return;
+        for (auto index : it->second)
+            p.endGesture (index);
+        touches.erase (it);
+    }
+
+    void releaseAll (Ambix_encoderAudioProcessor& p)
+    {
+        while (! touches.empty())
+            release (p, touches.begin()->first);
+    }
+
+private:
+    std::map<int, std::vector<int>> touches;
 };
 
 #endif  // __PLUGINPROCESSOR_H_58CE358E__

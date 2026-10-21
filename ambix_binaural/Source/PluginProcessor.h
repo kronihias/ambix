@@ -25,6 +25,7 @@
 #include "AmbiSpeaker.h"
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 
 #if BINAURAL_DECODER
     #if WITH_ZITA_CONVOLVER
@@ -107,7 +108,8 @@ inline float DbToParam(float db)
 */
 class Ambix_binauralAudioProcessor  : public AudioProcessor,
                                       public ChangeBroadcaster,
-                                      public Thread
+                                      public Thread,
+                                      public ambix::ParameterOwner
 {
 public:
     //==============================================================================
@@ -134,14 +136,6 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
-
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
     bool isInputChannelStereoPair (int index) const override;
@@ -162,6 +156,8 @@ public:
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    ambix::Parameter* gain_param; // output gain, applied to the speakers in processBlock
 
     // use a thread to load a configuration
     void run() override;
@@ -253,7 +249,7 @@ private:
 
     std::atomic<bool> isProcessing; // handshake with the loader thread, see LoadConfiguration
 
-    std::atomic<float> _gain; // output gain, applied to the speakers in processBlock
+    void parameterValueSet (int, float) override {} // gain is only stored
 
     float _appliedGain; // audio thread only
 

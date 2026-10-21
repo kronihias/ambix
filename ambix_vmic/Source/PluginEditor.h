@@ -38,7 +38,8 @@
                                                                     //[/Comments]
 */
 class Ambix_vmicAudioProcessorEditor  : public AudioProcessorEditor,
-                                        public ChangeListener
+                                        public ChangeListener,
+                                        private Timer
 {
 public:
     //==============================================================================
@@ -53,6 +54,10 @@ public:
     void resized() override;
 
     void changeListenerCallback (ChangeBroadcaster *source) override;
+
+    // polls the parameters (the processor no longer posts change messages
+    // for them)
+    void timerCallback() override;
 
     void selectFilterTab(int id);
 
@@ -72,6 +77,13 @@ private:
 
     TooltipWindow tooltipWindow;
     int lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
+
+    ambix::ParameterChangeWatcher paramWatcher;
+
+    // pushes the filters' parameters to the graph and the tabs: all of
+    // them, or (force == false) only filters whose values changed
+    void updateFilters (bool force);
+    float shownFilter[NUM_FILTERS_VMIC][6] {}; // az, el, sh, w, h, g last pushed
 
     Ambix_vmicAudioProcessor* getProcessor() const
     {

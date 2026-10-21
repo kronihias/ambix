@@ -18,7 +18,6 @@
  */
 
 #include "FilterTab.h"
-#include "../../common/JuceCompat.h"
 
 #define PARAMS_PER_FILTER 7
 
@@ -111,6 +110,10 @@ FilterTab::FilterTab(int id, Ambix_directional_loudnessAudioProcessor* myProcess
 
 FilterTab::~FilterTab()
 {
+    // closed mid-drag: don't leave the host's gesture open
+    if (dragging != nullptr)
+        if (auto* param = paramFor (dragging))
+            param->endChangeGesture();
 }
 
 void FilterTab::paint(juce::Graphics &g)
@@ -171,35 +174,75 @@ void FilterTab::resized()
 }
 
 
+ambix::Parameter* FilterTab::paramFor (Slider* slider) const
+{
+    if (slider == &sld_az)   return &_myProcessor->getParam(_id, Ambix_directional_loudnessAudioProcessor::AzimuthParam);
+    if (slider == &sld_el)   return &_myProcessor->getParam(_id, Ambix_directional_loudnessAudioProcessor::ElevationParam);
+    if (slider == &sld_w)    return &_myProcessor->getParam(_id, Ambix_directional_loudnessAudioProcessor::WidthParam);
+    if (slider == &sld_h)    return &_myProcessor->getParam(_id, Ambix_directional_loudnessAudioProcessor::HeightParam);
+    if (slider == &sld_gain) return &_myProcessor->getParam(_id, Ambix_directional_loudnessAudioProcessor::GainParam);
+    return nullptr;
+}
+
+void FilterTab::setParam (Slider* slider, ambix::Parameter& param, float value)
+{
+    if (slider != nullptr && slider == dragging)
+    {
+        param.setValueNotifyingHost (value);
+    }
+    else
+    {
+        param.beginChangeGesture();
+        param.setValueNotifyingHost (value);
+        param.endChangeGesture();
+    }
+}
+
+void FilterTab::sliderDragStarted (Slider* slider)
+{
+    if (auto* param = paramFor (slider))
+    {
+        dragging = slider;
+        param->beginChangeGesture();
+    }
+}
+
+void FilterTab::sliderDragEnded (Slider* slider)
+{
+    if (auto* param = paramFor (slider))
+    {
+        if (dragging == slider)
+            dragging = nullptr;
+        param->endChangeGesture();
+    }
+}
+
 void FilterTab::buttonClicked (Button* buttonThatWasClicked)
 {
     if (buttonThatWasClicked == &btn_solo)
     {
-        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::WindowParam, buttonThatWasClicked->getToggleState() ? 1.f : 0.f);
+        setParam (nullptr, _myProcessor->getParam(_id, Ambix_directional_loudnessAudioProcessor::WindowParam), buttonThatWasClicked->getToggleState() ? 1.f : 0.f);
     }
 }
 
 void FilterTab::sliderValueChanged (Slider* sliderThatWasMoved)
 {
-    if (sliderThatWasMoved == &sld_az)
+    auto* param = paramFor (sliderThatWasMoved);
+
+    if (param == nullptr)
+        return;
+
+    if (sliderThatWasMoved == &sld_az || sliderThatWasMoved == &sld_el)
     {
-        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::AzimuthParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
+        setParam (sliderThatWasMoved, *param, Deg360ToParam(sliderThatWasMoved->getValue()) );
     }
-    else if (sliderThatWasMoved == &sld_el)
+    else if (sliderThatWasMoved == &sld_w || sliderThatWasMoved == &sld_h)
     {
-        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::ElevationParam, Deg360ToParam(sliderThatWasMoved->getValue()) );
-    }
-    else if (sliderThatWasMoved == &sld_w)
-    {
-        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::WidthParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
-    }
-    else if (sliderThatWasMoved == &sld_h)
-    {
-        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::HeightParam, Deg180ToParam(sliderThatWasMoved->getValue()) );
+        setParam (sliderThatWasMoved, *param, Deg180ToParam(sliderThatWasMoved->getValue()) );
     }
     else if (sliderThatWasMoved == &sld_gain)
     {
-        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::GainParam, DbToParam(sliderThatWasMoved->getValue()) );
+        setParam (sliderThatWasMoved, *param, DbToParam(sliderThatWasMoved->getValue()) );
     }
 }
 
@@ -207,26 +250,35 @@ void FilterTab::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 {
     if (comboBoxThatHasChanged == &box_shape)
     {
-        setParameterNotifyingHost(_myProcessor, PARAMS_PER_FILTER*_id+Ambix_directional_loudnessAudioProcessor::ShapeParam, (float)comboBoxThatHasChanged->getSelectedId()-1.f);
+        setParam (nullptr, _myProcessor->getParam(_id, Ambix_directional_loudnessAudioProcessor::ShapeParam), (float)comboBoxThatHasChanged->getSelectedId()-1.f);
     }
 }
 
 void FilterTab::setFilter(float az, float el, bool shape, float width, float height, float gain, bool solo)
 {
 
-    sld_az.setValue(az, dontSendNotification);
+    // a slider in a drag keeps what the mouse says
+    if (dragging != &sld_az)
+        sld_az.setValue(az, dontSendNotification);
 
-    sld_el.setValue(el, dontSendNotification);
+    if (dragging != &sld_el)
+        sld_el.setValue(el, dontSendNotification);
 
-    box_shape.setSelectedId(shape ? 2 : 1);
+    // No notification: showing a value is not the user choosing one. (It
+    // used to echo it back, which rewrote a host value other than 0 / 1 and,
+    // now that edits carry gestures, would punch in during automation.)
+    box_shape.setSelectedId(shape ? 2 : 1, dontSendNotification);
 
     sld_h.setEnabled(shape);
 
-    sld_w.setValue(width , dontSendNotification);
+    if (dragging != &sld_w)
+        sld_w.setValue(width , dontSendNotification);
 
-    sld_h.setValue(height, dontSendNotification);
+    if (dragging != &sld_h)
+        sld_h.setValue(height, dontSendNotification);
 
-    sld_gain.setValue(gain, dontSendNotification);
+    if (dragging != &sld_gain)
+        sld_gain.setValue(gain, dontSendNotification);
 
     btn_solo.setToggleState(solo, dontSendNotification);
 

@@ -29,11 +29,13 @@
 #include <Eigen/Eigen>
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 
 //==============================================================================
 /**
 */
-class Ambix_maxreAudioProcessor  : public AudioProcessor
+class Ambix_maxreAudioProcessor  : public AudioProcessor,
+                                   private ambix::ParameterOwner
 {
 public:
     //==============================================================================
@@ -60,14 +62,6 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
-
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
     bool isInputChannelStereoPair (int index) const override;
@@ -89,7 +83,7 @@ public:
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    void CalcParams();
+    void CalcParams (int order_, float apply_param_);
 
     enum Parameters
 	{
@@ -106,12 +100,14 @@ private:
 
     Array<float> weights;
 
-    float apply_param; // < 0.33 apply inverse (de-max-re); 0.33..0.66 do nothing, > 0.66 max_re weighting
+    void parameterValueSet (int index, float newValue) override;
+    static int orderFromParam (float orderParam);
+
+    ambix::Parameter* apply_param; // < 0.33 apply inverse (de-max-re); 0.33..0.66 do nothing, > 0.66 max_re weighting; stored quantised to 0 / 0.5 / 1
     float _apply_param;
 
-    float order_param; // set the order in case it is wanted lower then compiled version
+    ambix::Parameter* order_param; // set the order in case it is wanted lower then compiled version
 
-    int order;
     int _order;
 
 

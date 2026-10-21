@@ -27,6 +27,11 @@
 #include "ambix_buses.h"
 #include "SphericalHarmonic/SphericalHarmonic.h"
 #include <Eigen/Eigen>
+#include "../../common/AmbixParameters.h"
+
+#include <array>
+#include <atomic>
+#include <vector>
 
 #include "AmbisonicConfig.h"
 
@@ -34,6 +39,7 @@
 /**
 */
 class Ambix_warpAudioProcessor  : public AudioProcessor,
+                                  public ambix::ParameterOwner,
                                   public ChangeBroadcaster
 {
 public:
@@ -60,14 +66,6 @@ public:
 
     //==============================================================================
     const String getName() const override;
-
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -101,37 +99,56 @@ public:
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    // the parameter at `index` (one of Parameters)
+    ambix::Parameter& param (int index) const { return *params[index]; }
+
 private:
+
+    // what the legacy setParameter() did besides storing the value; runs
+    // synchronously on the thread that set the parameter
+    void parameterValueSet (int index, float newValue) override;
 
     void calcParams();
 
+    // order the In/Out order parameter selects, capped (in universal builds)
+    // to what the input bus carries - as calcParams() caps it
+    int orderForDisplay (float orderParam);
+
+    // current values live in the parameter objects (atomic)
+    ambix::Parameter* params[totalNumParams] {};
+
+    // values the current transformation matrix was computed for
     // warp azimuth
-    float phi_param, _phi_param;
-    float phi_curve_param, _phi_curve_param;
+    float _phi_param;
+    float _phi_curve_param;
 
     // warp elevation
-    float theta_param, _theta_param;
-    float theta_curve_param, _theta_curve_param;
+    float _theta_param;
+    float _theta_curve_param;
 
     // use pre emphasis
-    float preemp_param, _preemp_param;
+    float _preemp_param;
 
-    // input / output ambisonics order
+    // input / output ambisonics order: set from the parameters' side effects
+    // (any thread) and capped by calcParams() (audio thread)
+    int _in_order;  // orders the current matrices were built for (audio thread);
+    int _out_order; // calcParams derives the wanted ones from the parameters
 
-    float in_order_param;
-    float out_order_param;
-
-    int in_order, _in_order;
-    int out_order, _out_order;
-
-    bool _initialized;
+    std::atomic<bool> _initialized;
 
 
     AudioSampleBuffer output_buffer;
 
 
-    SphericalHarmonic sph_h_in;
-    SphericalHarmonic sph_h_out;
+    // Everything that depends only on an order is built once, in the
+    // constructor, for every order 0..AMBI_ORDER, so an order or layout
+    // change only picks one (the audio thread used to parse the t-design,
+    // allocate and invert here).
+    std::vector<Eigen::MatrixXd> Sh_matrix_inv_for_order; // undistorted SH Matrix inverse, per input order
+    std::array<SphericalHarmonic, AMBI_ORDER + 1> sph_h_out_for_order;
+
+    const Eigen::MatrixXd* Sh_matrix_inv = nullptr; // the one for the current input order
+    SphericalHarmonic*     sph_h_out     = nullptr; // the one for the current output order
 
     // Eigen stuff
 
@@ -140,7 +157,6 @@ private:
 
 
     // Eigen::VectorXd Ymn; // Ymn result
-    Eigen::MatrixXd Sh_matrix_inv; // undistorted SH Matrix
     Eigen::MatrixXd Sh_matrix_mod; // distorted SH Matrix
     Eigen::VectorXd pre_emphasis; // per sampling point pre-emphasis gain
     Eigen::MatrixXd Sph_coord_mod; // warped spherical coordinates

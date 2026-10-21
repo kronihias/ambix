@@ -28,6 +28,7 @@
 #include <Eigen/Eigen>
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 
 #ifndef NUM_FILTERS
     #define NUM_FILTERS 8 // number of directional filters that can be controlled
@@ -126,7 +127,8 @@ inline float Deg180ToParam(float deg)
 /**
 */
 class Ambix_directional_loudnessAudioProcessor  : public AudioProcessor,
-                                                  public ChangeBroadcaster
+                                                  public ambix::ParameterOwner,
+                                                  public ChangeBroadcaster // numChannelsChanged(), view state
 {
 public:
     //==============================================================================
@@ -153,13 +155,9 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
+    // the parameter objects: PARAMS_PER_FILTER per filter, in Parameters order
+    ambix::Parameter& getParam (int index) const { return *params[index]; }
+    ambix::Parameter& getParam (int filter, int param) const { return *params[PARAMS_PER_FILTER*filter + param]; }
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -242,17 +240,15 @@ public:
 
 private:
 
+    // legacy setParameter() body minus the change message: flags the
+    // transformation matrix for recalculation
+    void parameterValueSet (int index, float newValue) override;
+
     void calcParams();
 
-
-    ArrayParam shape;
-    ArrayParam width;
-    ArrayParam height;
-    ArrayParam gain;
-    ArrayBoolParam window;
-    ArrayParam transition;
-
-    SphCoordParam center_sph;
+    // owned by AudioProcessor; calcParams() reads them once per change.
+    // shape and solo store 0 / 1, as the legacy members did.
+    ambix::Parameter* params[PARAMS_PER_FILTER*NUM_FILTERS] {};
 
 
     bool _initialized;

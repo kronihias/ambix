@@ -28,14 +28,19 @@
 class LegendreU {
     
 public:
+    // Fixed capacity, so recomputing for another order (maxre does it on the
+    // audio thread) never touches the heap. Orders above kMaxOrder are clamped.
+    static constexpr int kMaxOrder = 63;
+    using Vector = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxOrder + 1, 1>;
+
     LegendreU();
     ~LegendreU();
   
     void Calc(int nmax, double arg);
     
-    const Eigen::VectorXd& Get() const;
+    const Vector& Get() const;
     
-    Eigen::VectorXd Pn;
+    Vector Pn;
     
 private:
     

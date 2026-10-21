@@ -21,7 +21,6 @@
 #include "PluginEditor.h"
 #include "Colormap.h"
 #include "HammerAitovSample.h"
-#include "../../common/JuceCompat.h"
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)
@@ -335,7 +334,8 @@ Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioP
     : AudioProcessorEditor (ownerFilter),
     tabbedComponent(TabbedButtonBar::TabsAtTop),
     tabbedComponent2(TabbedButtonBar::TabsAtTop),
-    panninggraph(ownerFilter)
+    panninggraph(ownerFilter),
+    paramWatcher(*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
 
@@ -447,8 +447,9 @@ Ambix_directional_loudnessAudioProcessorEditor::Ambix_directional_loudnessAudioP
     setResizeLimits (600, 380, 1920, 1200);
     setSize (1100, 640);
 
-    ownerFilter->addChangeListener(this);
+    ownerFilter->addChangeListener(this); // channel count, restored view state
 
+    paramWatcher.changed(); // changeListenerCallback() primes the editor
     changeListenerCallback(nullptr);
 
     startTimerHz (30);
@@ -545,9 +546,7 @@ void Ambix_directional_loudnessAudioProcessorEditor::resized()
 
 void Ambix_directional_loudnessAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
-    // sendChangeMessage() also fires on every parameter change, so repaint only
-    // when the channel count (ambisonic order) actually changes - otherwise we
-    // would redraw the whole editor on every automation step.
+    // repaint only when the channel count (ambisonic order) actually changes
     {
         const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
                           |  getAudioProcessor()->getTotalNumOutputChannels();
@@ -579,6 +578,17 @@ void Ambix_directional_loudnessAudioProcessorEditor::changeListenerCallback (Cha
 
 
     } else {
+        syncViewState();
+        updateFilters(true);
+    }
+
+}
+
+void Ambix_directional_loudnessAudioProcessorEditor::syncViewState()
+{
+    Ambix_directional_loudnessAudioProcessor* ourProcessor = getProcessor();
+
+    {
         // Re-sync the main-UI toggles (state may have been restored by the
         // host or mutated by the popup).
         if (btn_projection.getToggleState() != ourProcessor->view_proj_ha)
@@ -601,16 +611,27 @@ void Ambix_directional_loudnessAudioProcessorEditor::changeListenerCallback (Cha
 
         panninggraph.setEnergyEnabled (ourProcessor->view_energy_on);
         color_bar.setVisible (ourProcessor->view_energy_on);
+    }
+}
 
+void Ambix_directional_loudnessAudioProcessorEditor::updateFilters (bool force)
+{
+    Ambix_directional_loudnessAudioProcessor* ourProcessor = getProcessor();
+
+    {
         bool onesolo = false;
 
         for (int i=0; i < NUM_FILTERS; i++)
         {
-            bool s = ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WindowParam) > 0.5f ? true : false;
+            bool s = ourProcessor->getParam(i, Ambix_directional_loudnessAudioProcessor::WindowParam).get() > 0.5f ? true : false;
 
             onesolo = onesolo || s;
 
         }
+
+        if (onesolo != shownOneSolo)
+            force = true;
+        shownOneSolo = onesolo;
 
         panninggraph.setOneFilterSolo(onesolo);
 
@@ -619,19 +640,26 @@ void Ambix_directional_loudnessAudioProcessorEditor::changeListenerCallback (Cha
         for (int i=0; i < NUM_FILTERS; i++)
         {
 
-            float az = ParamToDeg360( ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::AzimuthParam) );
+            float az = ParamToDeg360( ourProcessor->getParam(i, Ambix_directional_loudnessAudioProcessor::AzimuthParam).get() );
 
-            float el = ParamToDeg360( ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::ElevationParam) );
+            float el = ParamToDeg360( ourProcessor->getParam(i, Ambix_directional_loudnessAudioProcessor::ElevationParam).get() );
 
-            bool sh = ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::ShapeParam) <= 0.5f ? false : true;
+            bool sh = ourProcessor->getParam(i, Ambix_directional_loudnessAudioProcessor::ShapeParam).get() <= 0.5f ? false : true;
 
-            float w = ParamToDeg180(ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WidthParam) );
+            float w = ParamToDeg180(ourProcessor->getParam(i, Ambix_directional_loudnessAudioProcessor::WidthParam).get() );
 
-            float h = ParamToDeg180( ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::HeightParam) );
+            float h = ParamToDeg180( ourProcessor->getParam(i, Ambix_directional_loudnessAudioProcessor::HeightParam).get() );
 
-            float g = ParamToDB( ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::GainParam) );
+            float g = ParamToDB( ourProcessor->getParam(i, Ambix_directional_loudnessAudioProcessor::GainParam).get() );
 
-            bool s = ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WindowParam) > 0.5f ? true : false;
+            bool s = ourProcessor->getParam(i, Ambix_directional_loudnessAudioProcessor::WindowParam).get() > 0.5f ? true : false;
+
+            const float shown[7] = { az, el, sh ? 1.f : 0.f, w, h, g, s ? 1.f : 0.f };
+
+            if (! force && std::equal (shown, shown + 7, shownFilter[i]))
+                continue;
+
+            std::copy (shown, shown + 7, shownFilter[i]);
 
             panninggraph.setFilter(i, az, el, sh, w, h, g, s);
             _filtertabs.getUnchecked(i)->setFilter(az, el, sh, w, h, g, s);
@@ -650,7 +678,7 @@ void Ambix_directional_loudnessAudioProcessorEditor::buttonClicked (Button* butt
     if (buttonThatWasClicked == &btn_solo_reset)
     {
         for (int i=0; i<NUM_FILTERS; i++)
-            setParameterNotifyingHost(ourProcessor, PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WindowParam, 0.f);
+            setParam(PARAMS_PER_FILTER*i+Ambix_directional_loudnessAudioProcessor::WindowParam, 0.f);
         return;
     }
 
@@ -790,10 +818,23 @@ void Ambix_directional_loudnessAudioProcessorEditor::onViewStateChanged()
     smoothed_max_db_ = -20.f;
 }
 
+void Ambix_directional_loudnessAudioProcessorEditor::setParam (int index, float value)
+{
+    auto& param = getProcessor()->getParam (index);
+    param.beginChangeGesture();
+    param.setValueNotifyingHost (value);
+    param.endChangeGesture();
+}
+
 void Ambix_directional_loudnessAudioProcessorEditor::timerCallback()
 {
     auto* p = getProcessor();
     if (p == nullptr) return;
+
+    // parameters: polled here, the processor no longer posts change
+    // messages for them
+    if (paramWatcher.changed())
+        updateFilters(false);
 
     // Lazy mesh push once the processor has its grids initialized, and
     // re-push when the projection changes (handled inside the helper).
@@ -889,8 +930,8 @@ bool Ambix_directional_loudnessAudioProcessorEditor::keyPressed (const KeyPress&
         if (filterId >= 0 && filterId < NUM_FILTERS)
         {
             int paramIndex = PARAMS_PER_FILTER * filterId + Ambix_directional_loudnessAudioProcessor::WindowParam;
-            float current = ourProcessor->getParameter(paramIndex);
-            setParameterNotifyingHost(ourProcessor, paramIndex, current > 0.5f ? 0.f : 1.f);
+            float current = ourProcessor->getParam(paramIndex).get();
+            setParam(paramIndex, current > 0.5f ? 0.f : 1.f);
         }
         return true;
     }

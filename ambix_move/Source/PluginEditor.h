@@ -46,6 +46,23 @@ public:
 private:
     void saveUndoState();
 
+    // parameter index a slider controls, or -1
+    int paramForSlider (Slider* slider) const;
+
+    // Host gestures. begin/end are no-ops for a parameter whose gesture is
+    // already open / not open, so a drag (slider, view) holds one gesture
+    // and everything else gets a gesture per change.
+    void beginGesture (int index);
+    void endGesture (int index);
+
+    // A value set from the editor, wrapped in a gesture of its own unless
+    // one is already open for that parameter.
+    void setParameterFromEditor (int index, float newValue);
+
+    // Several values as one change (reset, undo/redo): all gestures begin,
+    // the values are set in the given order, then all gestures end.
+    void setParametersFromEditor (const std::vector<std::pair<int, float>>& values);
+
     LookAndFeel_V3 globalLaF;
 
     MoveView view;
@@ -88,6 +105,12 @@ private:
 
     bool _changed;
     int  lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
+
+    // parameters are polled from the timer (no change messages from the
+    // audio thread)
+    ambix::ParameterChangeWatcher paramWatcher;
+    int  lastMaxOrder_ = -1;
+    bool gestureOpen[Ambix_moveAudioProcessor::totalNumParams] = {};
 
     // Undo / redo state
     struct ParamSnapshot

@@ -150,8 +150,20 @@ public:
     static const int solo_symbol_act_pngSize;
 
 private:
-    void timerCallback() override;
+    void timerCallback() override; // energy view + parameter polling
     void pushEnergyToGraph();
+
+    // view state (toggles, colormap, mesh) from the processor
+    void syncViewState();
+
+    // pushes the filters' parameters to the graph and the tabs: all of
+    // them, or (force == false) only filters whose values changed
+    void updateFilters (bool force);
+    float shownFilter[NUM_FILTERS][7] {}; // az, el, sh, w, h, g, solo last pushed
+    bool shownOneSolo = false; // the filter paths depend on it: change -> all filters
+
+    // one host gesture around one value (solo reset, 's' key)
+    void setParam (int index, float value);
     void openSettingsPopup();
     void pushMeshForProjection();
     void updateToolbarLabels();
@@ -204,6 +216,8 @@ private:
 
     TooltipWindow tooltipWindow;
     int lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
+
+    ambix::ParameterChangeWatcher paramWatcher;
 
     Ambix_directional_loudnessAudioProcessor* getProcessor() const
     {

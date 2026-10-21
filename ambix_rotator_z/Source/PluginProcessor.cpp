@@ -130,7 +130,12 @@ Ambix_rotator_zAudioProcessor::Ambix_rotator_zAudioProcessor() :
 
 Ambix_rotator_zAudioProcessor::~Ambix_rotator_zAudioProcessor()
 {
-
+#ifdef WITH_OSC
+    // Stop the OSC thread first: its callback would otherwise run into a
+    // processor that is already being taken apart (pure virtual call).
+    OSCReceiver::removeListener (this);
+    OSCReceiver::disconnect();
+#endif
 }
 
 //==============================================================================
