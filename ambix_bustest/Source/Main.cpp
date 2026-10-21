@@ -35,6 +35,19 @@
                                       plays automation (repeatable)
                  [--state-in FILE]    restore component state from FILE first
                  [--state-out FILE]   write the component state to FILE last
+                 [--step SPEC]        scripted sequence on one instance (with
+                                      --in-arr/--out-arr and --state-in
+                                      applied first): SPEC is "ID=V,ID=V"
+                                      (changes in that order, one block),
+                                      optionally "wait=MS"; after each step
+                                      report latency, output RMS and
+                                      correlation, every value and text
+                 [--sweep V1,V2,...]  for every automatable parameter and each
+                                      value, a fresh instance with only that
+                                      parameter automated: output RMS per
+                                      channel for deterministic noise in,
+                                      the parameters that changed, the
+                                      displayed text and a state hash
 
  The parameter options exist because moving a plugin from the legacy
  setParameter() API to parameter objects changes what JUCE's wrapper exports -
@@ -58,7 +71,9 @@
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "public.sdk/source/common/memorystream.h"
 
+#include <cmath>
 #include <cstdio>
+#include <initializer_list>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -461,6 +476,520 @@ void printParameters (IEditController& controller)
     fprintf (report, "\n  ]");
 }
 
+//==============================================================================
+/*  The per-parameter sweep. Every run gets a fresh instance, so nothing one
+    run leaves behind (smoothing, phase accumulators, lazily built matrices)
+    can leak into the next one, and each result describes exactly one change
+    from a plugin's starting point. */
+struct Instance
+{
+    IComponent*       component    = nullptr;
+    IAudioProcessor*  proc         = nullptr;
+    IEditController*  controller   = nullptr;
+    IConnectionPoint* componentCP  = nullptr;
+    IConnectionPoint* controllerCP = nullptr;
+
+    bool create (IPluginFactory& factory, const TUID cid)
+    {
+        if (factory.createInstance (cid, IComponent::iid, (void**) &component) != kResultOk
+            || component == nullptr || component->initialize (nullptr) != kResultOk)
+            return false;
+
+        component->queryInterface (IAudioProcessor::iid, (void**) &proc);
+
+        TUID controllerCID {};
+
+        if (proc == nullptr
+            || component->getControllerClassId (controllerCID) != kResultOk
+            || factory.createInstance (controllerCID, IEditController::iid, (void**) &controller) != kResultOk
+            || controller == nullptr || controller->initialize (nullptr) != kResultOk)
+            return false;
+
+        component ->queryInterface (IConnectionPoint::iid, (void**) &componentCP);
+        controller->queryInterface (IConnectionPoint::iid, (void**) &controllerCP);
+
+        if (componentCP != nullptr && controllerCP != nullptr)
+        {
+            componentCP ->connect (controllerCP);
+            controllerCP->connect (componentCP);
+        }
+
+        syncController();
+        return true;
+    }
+
+    void syncController()
+    {
+        MemoryStream stream;
+
+        if (component->getState (&stream) == kResultOk)
+        {
+            stream.seek (0, IBStream::kIBSeekSet, nullptr);
+            controller->setComponentState (&stream);
+        }
+    }
+
+    ~Instance()
+    {
+        if (componentCP != nullptr && controllerCP != nullptr)
+        {
+            componentCP ->disconnect (controllerCP);
+            controllerCP->disconnect (componentCP);
+        }
+
+        for (FUnknown* p : std::initializer_list<FUnknown*> { componentCP, controllerCP, proc })
+            if (p != nullptr) p->release();
+
+        if (controller != nullptr) { controller->terminate(); controller->release(); }
+        if (component  != nullptr) { component ->terminate(); component ->release(); }
+    }
+};
+
+struct SweepResult
+{
+    bool ok = false;
+    std::vector<double> rms;            // per output channel, settled part only
+    std::vector<double> proj;           // per output channel: correlation with a
+                                        // fixed +-1 mix of the inputs, so a sign
+                                        // or a swapped direction shows up too
+    std::vector<ParamValue> values;     // every parameter, index order
+    std::string text;                   // the swept parameter, as displayed
+    uint64 stateHash = 0;               // FNV-1a over the saved state
+};
+
+/*  Fresh instance; `changes` (may be null) arrive with the first block; then
+    deterministic noise on every input until any smoothing has settled. */
+SweepResult sweepRun (IPluginFactory& factory, const TUID cid,
+                      IParameterChanges* changes, ParamID textId)
+{
+    constexpr int blockSize = 256, blocks = 16, measuredBlocks = 8;
+    SweepResult r;
+    Instance inst;
+
+    if (! inst.create (factory, cid))
+        return r;
+
+    auto& component = *inst.component;
+    auto& proc      = *inst.proc;
+
+    BusInfo in {}, out {};
+    component.getBusInfo (kAudio, kInput,  0, in);
+    component.getBusInfo (kAudio, kOutput, 0, out);
+
+    const int numIn = in.channelCount, numOut = out.channelCount;
+
+    component.activateBus (kAudio, kInput,  0, true);
+    component.activateBus (kAudio, kOutput, 0, true);
+
+    ProcessSetup setup { kRealtime, kSample32, blockSize, 48000.0 };
+
+    if (proc.setupProcessing (setup) != kResultOk)
+        return r;
+
+    component.setActive (true);
+    proc.setProcessing (true);
+
+    std::vector<std::vector<float>> inStore  ((size_t) numIn,  std::vector<float> ((size_t) blockSize));
+    std::vector<std::vector<float>> outStore ((size_t) numOut, std::vector<float> ((size_t) blockSize));
+    std::vector<float*> inPtr ((size_t) numIn), outPtr ((size_t) numOut);
+    std::vector<uint32> seeds ((size_t) numIn);
+    std::vector<double> sumSq ((size_t) numOut, 0.0), sumProj ((size_t) numOut, 0.0);
+    std::vector<float> mix ((size_t) blockSize);
+
+    for (int c = 0; c < numIn;  ++c) { inPtr [(size_t) c] = inStore [(size_t) c].data(); seeds[(size_t) c] = 7919u * (uint32) c + 1u; }
+    for (int c = 0; c < numOut; ++c)   outPtr[(size_t) c] = outStore[(size_t) c].data();
+
+    AudioBusBuffers inBus {}, outBus {};
+    inBus .numChannels = numIn;  inBus .channelBuffers32 = inPtr .data();
+    outBus.numChannels = numOut; outBus.channelBuffers32 = outPtr.data();
+
+    ProcessData data {};
+    data.processMode        = kRealtime;
+    data.symbolicSampleSize = kSample32;
+    data.numSamples         = blockSize;
+    data.numInputs  = 1; data.inputs  = &inBus;
+    data.numOutputs = 1; data.outputs = &outBus;
+
+    bool ok = true;
+
+    for (int b = 0; b < blocks && ok; ++b)
+    {
+        // a different, reproducible noise sequence per input channel
+        for (int c = 0; c < numIn; ++c)
+            for (int s = 0; s < blockSize; ++s)
+            {
+                auto& seed = seeds[(size_t) c];
+                seed = seed * 1664525u + 1013904223u;
+                inStore[(size_t) c][(size_t) s] = (float) (seed >> 8) / (float) (1u << 24) - 0.5f;
+            }
+
+        data.inputParameterChanges = b == 0 ? changes : nullptr;
+        ok = proc.process (data) == kResultOk;
+
+        if (b >= blocks - measuredBlocks)
+        {
+            std::fill (mix.begin(), mix.end(), 0.0f);
+
+            for (int c = 0; c < numIn; ++c)
+            {
+                const float w = (((uint32) c * 2654435761u) >> 7) & 1u ? 1.0f : -1.0f;
+                for (int s = 0; s < blockSize; ++s)
+                    mix[(size_t) s] += w * inStore[(size_t) c][(size_t) s];
+            }
+
+            for (int c = 0; c < numOut; ++c)
+                for (int s = 0; s < blockSize; ++s)
+                {
+                    const double y = outStore[(size_t) c][(size_t) s];
+                    sumSq  [(size_t) c] += y * y;
+                    sumProj[(size_t) c] += y * mix[(size_t) s];
+                }
+        }
+    }
+
+    proc.setProcessing (false);
+    component.setActive (false);
+
+    if (! ok)
+        return r;
+
+    for (auto s : sumSq)
+        r.rms.push_back (std::sqrt (s / (blockSize * measuredBlocks)));
+
+    for (auto s : sumProj)
+        r.proj.push_back (s / (blockSize * measuredBlocks));
+
+    inst.syncController();
+
+    auto& controller = *inst.controller;
+
+    for (int32 i = 0; i < controller.getParameterCount(); ++i)
+    {
+        ParameterInfo info {};
+        controller.getParameterInfo (i, info);
+        r.values.push_back (controller.getParamNormalized (info.id));
+    }
+
+    String128 text {};
+    controller.getParamStringByValue (textId, controller.getParamNormalized (textId), text);
+    r.text = jsonString (text);
+
+    MemoryStream stream;
+
+    if (component.getState (&stream) == kResultOk)
+    {
+        r.stateHash = 14695981039346656037ull;
+        auto* bytes = (const unsigned char*) stream.getData();
+
+        for (TSize i = 0; i < stream.getSize(); ++i)
+            r.stateHash = (r.stateHash ^ bytes[i]) * 1099511628211ull;
+    }
+
+    r.ok = true;
+    return r;
+}
+
+void printDoubles (const std::vector<double>& v)
+{
+    fprintf (report, "[");
+    for (size_t i = 0; i < v.size(); ++i)
+        fprintf (report, "%s%.7g", i == 0 ? "" : ", ", v[i]);
+    fprintf (report, "]");
+}
+
+/*  For each automatable, non-bypass parameter and each value: one run with
+    only that parameter changed. Reports output RMS, the parameters that
+    ended up different from a run with no change (side effects and
+    coupling show up here), the displayed text and the state hash. */
+void printSweep (IPluginFactory& factory, const TUID cid, const std::vector<ParamValue>& probes)
+{
+    auto baseline = sweepRun (factory, cid, nullptr, 0);
+
+    if (! baseline.ok)
+    {
+        fprintf (report, ",\n  \"sweep\": null");
+        return;
+    }
+
+    std::vector<ParameterInfo> infos;
+    {
+        Instance inst;
+        if (inst.create (factory, cid))
+            for (int32 i = 0; i < inst.controller->getParameterCount(); ++i)
+            {
+                ParameterInfo info {};
+                inst.controller->getParameterInfo (i, info);
+                infos.push_back (info);
+            }
+    }
+
+    fprintf (report, ",\n  \"sweep\": {\n    \"baseline_rms\": ");
+    printDoubles (baseline.rms);
+    fprintf (report, ",\n    \"baseline_proj\": ");
+    printDoubles (baseline.proj);
+    fprintf (report, ",\n    \"baseline_state\": \"%016llx\",\n    \"runs\": [", (unsigned long long) baseline.stateHash);
+
+    bool first = true;
+
+    for (const auto& info : infos)
+    {
+        if ((info.flags & ParameterInfo::kCanAutomate) == 0 || (info.flags & ParameterInfo::kIsBypass) != 0)
+            continue;
+
+        for (auto probe : probes)
+        {
+            ParamChanges changes;
+            ValueQueue q;
+            q.id = info.id;
+            q.value = probe;
+            changes.queues.push_back (q);
+
+            auto r = sweepRun (factory, cid, &changes, info.id);
+
+            fprintf (report, "%s\n      {\"id\": %u, \"set\": %g, \"ok\": %s",
+                     first ? "" : ",", (unsigned) info.id, probe, r.ok ? "true" : "false");
+            first = false;
+
+            if (r.ok)
+            {
+                fprintf (report, ", \"text\": \"%s\", \"state\": \"%016llx\", \"rms\": ",
+                         r.text.c_str(), (unsigned long long) r.stateHash);
+                printDoubles (r.rms);
+                fprintf (report, ", \"proj\": ");
+                printDoubles (r.proj);
+
+                // every parameter that differs from the untouched run,
+                // the swept one included
+                fprintf (report, ", \"changed\": {");
+                bool firstChanged = true;
+
+                for (size_t i = 0; i < r.values.size() && i < baseline.values.size() && i < infos.size(); ++i)
+                    if (std::abs (r.values[i] - baseline.values[i]) > 1e-7)
+                    {
+                        fprintf (report, "%s\"%u\": %.9g", firstChanged ? "" : ", ",
+                                 (unsigned) infos[i].id, r.values[i]);
+                        firstChanged = false;
+                    }
+
+                fprintf (report, "}");
+            }
+
+            fprintf (report, "}");
+        }
+    }
+
+    fprintf (report, "\n    ]\n  }");
+}
+
+//==============================================================================
+/*  Scripted sequences on one instance, for behaviour that depends on order
+    or history: which of two parameters set in the same block wins, a mode
+    chosen by whichever parameter was touched last, a preset followed by a
+    tweak, latency after a switch, a configuration that loads in the
+    background. */
+struct Step
+{
+    std::vector<ValueQueue> changes;    // in queue order, all in the step's first block
+    int waitMs = 0;                     // sleep before the step (background loading)
+};
+
+/*  "48=0.25,57=1" -> two changes in that order; "wait=2000" -> a pause;
+    both may be combined; "" just processes. */
+Step parseStep (const std::string& text)
+{
+    Step step;
+
+    for (size_t pos = 0; pos < text.size();)
+    {
+        auto comma = text.find (',', pos);
+        if (comma == std::string::npos) comma = text.size();
+
+        const auto item = text.substr (pos, comma - pos);
+        const auto eq = item.find ('=');
+
+        if (eq != std::string::npos)
+        {
+            const auto key = item.substr (0, eq);
+            const auto value = item.substr (eq + 1);
+
+            if (key == "wait")
+                step.waitMs = atoi (value.c_str());
+            else
+            {
+                ValueQueue q;
+                q.id    = (ParamID) strtoul (key.c_str(), nullptr, 0);
+                q.value = strtod (value.c_str(), nullptr);
+                step.changes.push_back (q);
+            }
+        }
+
+        pos = comma + 1;
+    }
+
+    return step;
+}
+
+void sleepMs (int ms)
+{
+   #if defined (_WIN32)
+    Sleep ((DWORD) ms);
+   #else
+    usleep ((useconds_t) ms * 1000);
+   #endif
+}
+
+void printSteps (IPluginFactory& factory, const TUID cid, const std::vector<Step>& steps,
+                 bool negotiate, SpeakerArrangement inArr, SpeakerArrangement outArr,
+                 const std::vector<char>& stateBytes)
+{
+    constexpr int blockSize = 256, blocksPerStep = 8, measuredBlocks = 4;
+
+    Instance inst;
+
+    if (! inst.create (factory, cid))
+    {
+        fprintf (report, ",\n  \"steps\": null");
+        return;
+    }
+
+    auto& component  = *inst.component;
+    auto& proc       = *inst.proc;
+    auto& controller = *inst.controller;
+
+    if (negotiate)
+        proc.setBusArrangements (&inArr, 1, &outArr, 1);
+
+    if (! stateBytes.empty())
+    {
+        MemoryStream stream (const_cast<char*> (stateBytes.data()), (TSize) stateBytes.size());
+        component.setState (&stream);
+        inst.syncController();
+    }
+
+    BusInfo in {}, out {};
+    component.getBusInfo (kAudio, kInput,  0, in);
+    component.getBusInfo (kAudio, kOutput, 0, out);
+
+    const int numIn = in.channelCount, numOut = out.channelCount;
+
+    component.activateBus (kAudio, kInput,  0, true);
+    component.activateBus (kAudio, kOutput, 0, true);
+
+    ProcessSetup setup { kRealtime, kSample32, blockSize, 48000.0 };
+
+    if (proc.setupProcessing (setup) != kResultOk)
+    {
+        fprintf (report, ",\n  \"steps\": null");
+        return;
+    }
+
+    component.setActive (true);
+    proc.setProcessing (true);
+
+    std::vector<std::vector<float>> inStore  ((size_t) numIn,  std::vector<float> ((size_t) blockSize));
+    std::vector<std::vector<float>> outStore ((size_t) numOut, std::vector<float> ((size_t) blockSize));
+    std::vector<float*> inPtr ((size_t) numIn), outPtr ((size_t) numOut);
+    std::vector<uint32> seeds ((size_t) numIn);
+    std::vector<float> mix ((size_t) blockSize);
+
+    for (int c = 0; c < numIn;  ++c) { inPtr [(size_t) c] = inStore [(size_t) c].data(); seeds[(size_t) c] = 7919u * (uint32) c + 1u; }
+    for (int c = 0; c < numOut; ++c)   outPtr[(size_t) c] = outStore[(size_t) c].data();
+
+    AudioBusBuffers inBus {}, outBus {};
+    inBus .numChannels = numIn;  inBus .channelBuffers32 = inPtr .data();
+    outBus.numChannels = numOut; outBus.channelBuffers32 = outPtr.data();
+
+    ProcessData data {};
+    data.processMode        = kRealtime;
+    data.symbolicSampleSize = kSample32;
+    data.numSamples         = blockSize;
+    data.numInputs  = 1; data.inputs  = &inBus;
+    data.numOutputs = 1; data.outputs = &outBus;
+
+    fprintf (report, ",\n  \"channels\": [%d, %d],\n  \"steps\": [", numIn, numOut);
+
+    for (size_t si = 0; si < steps.size(); ++si)
+    {
+        const auto& step = steps[si];
+
+        if (step.waitMs > 0)
+            sleepMs (step.waitMs);
+
+        ParamChanges changes;
+        changes.queues = step.changes;
+
+        std::vector<double> sumSq ((size_t) numOut, 0.0), sumProj ((size_t) numOut, 0.0);
+        bool ok = true;
+
+        for (int b = 0; b < blocksPerStep && ok; ++b)
+        {
+            for (int c = 0; c < numIn; ++c)
+                for (int s = 0; s < blockSize; ++s)
+                {
+                    auto& seed = seeds[(size_t) c];
+                    seed = seed * 1664525u + 1013904223u;
+                    inStore[(size_t) c][(size_t) s] = (float) (seed >> 8) / (float) (1u << 24) - 0.5f;
+                }
+
+            data.inputParameterChanges = (b == 0 && ! changes.queues.empty()) ? &changes : nullptr;
+            ok = proc.process (data) == kResultOk;
+
+            if (b >= blocksPerStep - measuredBlocks)
+            {
+                std::fill (mix.begin(), mix.end(), 0.0f);
+
+                for (int c = 0; c < numIn; ++c)
+                {
+                    const float w = (((uint32) c * 2654435761u) >> 7) & 1u ? 1.0f : -1.0f;
+                    for (int s = 0; s < blockSize; ++s)
+                        mix[(size_t) s] += w * inStore[(size_t) c][(size_t) s];
+                }
+
+                for (int c = 0; c < numOut; ++c)
+                    for (int s = 0; s < blockSize; ++s)
+                    {
+                        const double y = outStore[(size_t) c][(size_t) s];
+                        sumSq  [(size_t) c] += y * y;
+                        sumProj[(size_t) c] += y * mix[(size_t) s];
+                    }
+            }
+        }
+
+        std::vector<double> rms, proj;
+        for (auto s : sumSq)   rms .push_back (std::sqrt (s / (blockSize * measuredBlocks)));
+        for (auto s : sumProj) proj.push_back (s / (blockSize * measuredBlocks));
+
+        inst.syncController();
+
+        fprintf (report, "%s\n    {\"ok\": %s, \"latency\": %d, \"rms\": ",
+                 si == 0 ? "" : ",", ok ? "true" : "false", (int) proc.getLatencySamples());
+        printDoubles (rms);
+        fprintf (report, ", \"proj\": ");
+        printDoubles (proj);
+        fprintf (report, ", \"values\": {");
+
+        for (int32 i = 0; i < controller.getParameterCount(); ++i)
+        {
+            ParameterInfo info {};
+            controller.getParameterInfo (i, info);
+
+            const auto v = controller.getParamNormalized (info.id);
+            String128 text {};
+            controller.getParamStringByValue (info.id, v, text);
+
+            fprintf (report, "%s\"%u\": [%.9g, \"%s\"]", i == 0 ? "" : ", ",
+                     (unsigned) info.id, v, jsonString (text).c_str());
+        }
+
+        fprintf (report, "}}");
+    }
+
+    fprintf (report, "\n  ]");
+
+    proc.setProcessing (false);
+    component.setActive (false);
+}
+
 } // namespace
 
 //==============================================================================
@@ -494,6 +1023,8 @@ int main (int argc, char** argv)
     int blocks = 8;
     std::string stateIn, stateOut;
     ParamChanges changes;
+    std::vector<ParamValue> sweepProbes;
+    std::vector<Step> steps;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -507,6 +1038,17 @@ int main (int argc, char** argv)
         else if (a == "--params")                  reportParams = true;
         else if (a == "--state-in"  && i + 1 < argc) stateIn  = argv[++i];
         else if (a == "--state-out" && i + 1 < argc) stateOut = argv[++i];
+        else if (a == "--step" && i + 1 < argc)    steps.push_back (parseStep (argv[++i]));
+        else if (a == "--sweep" && i + 1 < argc)
+        {
+            const std::string list = argv[++i];
+            for (size_t pos = 0; pos < list.size();)
+            {
+                const auto comma = list.find (',', pos);
+                sweepProbes.push_back (strtod (list.substr (pos, comma - pos).c_str(), nullptr));
+                pos = comma == std::string::npos ? list.size() : comma + 1;
+            }
+        }
         else if (a == "--set" && i + 1 < argc)
         {
             const std::string kv = argv[++i];
@@ -532,7 +1074,8 @@ int main (int argc, char** argv)
                  "                     [--in-arr <mask>] [--out-arr <mask>]\n"
                  "                     [--check-order] [--blocks N]\n"
                  "                     [--params] [--set ID=VALUE]...\n"
-                 "                     [--state-in FILE] [--state-out FILE]\n");
+                 "                     [--state-in FILE] [--state-out FILE]\n"
+                 "                     [--sweep V1,V2,...] [--step SPEC]...\n");
         return 1;
     }
 
@@ -681,6 +1224,20 @@ int main (int argc, char** argv)
                             && writeFile (stateOut, stream.getData(), (size_t) stream.getSize());
             fprintf (report, ",\n  \"state_saved\": %s", ok ? "true" : "false");
         }
+    }
+
+    if (! sweepProbes.empty())
+        printSweep (*module.factory, classInfo.cid, sweepProbes);
+
+    if (! steps.empty())
+    {
+        std::vector<char> stateBytes;
+        if (! stateIn.empty() && ! readFile (stateIn, stateBytes))
+        {
+            fprintf (stderr, "ambix_bustest: cannot read %s\n", stateIn.c_str());
+            return 2;
+        }
+        printSteps (*module.factory, classInfo.cid, steps, negotiate, inArr, outArr, stateBytes);
     }
 
     fprintf (report, "\n}\n");

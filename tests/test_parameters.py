@@ -29,6 +29,7 @@ Regenerate goldens (only when a change is intended and reviewed) with
 
 import json
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -38,10 +39,10 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from conftest import ALL_PLUGINS, GOLDEN_DIR, REPO_ROOT, vst3
+from conftest import ALL_PLUGINS, BUILD_DIR, GOLDEN_DIR, vst3
 
 _BUSTEST_EXE = "ambix_bustest.exe" if os.name == "nt" else "ambix_bustest"
-BUSTEST_BIN = os.path.join(REPO_ROOT, "_build", "testhost", _BUSTEST_EXE)
+BUSTEST_BIN = os.path.join(BUILD_DIR, "testhost", _BUSTEST_EXE)
 
 PARAMS_GOLDEN_DIR = os.path.join(GOLDEN_DIR, "params")
 STATE_GOLDEN_DIR  = os.path.join(GOLDEN_DIR, "state")
@@ -123,7 +124,10 @@ def processor_chunk(blob):
     the raw bytes before JUCE's block."""
     if blob[:4] == b"VC2!":
         (size,) = struct.unpack("<I", blob[4:8])
-        return blob[8:8 + size].rstrip(b"\0").decode("utf-8")
+        xml = blob[8:8 + size].rstrip(b"\0").decode("utf-8")
+        # binaural/decoder save their preset folder, which lives under the
+        # user's home: not part of the format, and different on every machine
+        return re.sub(r'(presetDir|last_config_dir)="[^"]*"', r'\1="<dir>"', xml)
     marker = blob.find(b"JUCEPrivateData")
     return blob if marker < 0 else blob[:marker]
 
