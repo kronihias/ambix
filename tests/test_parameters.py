@@ -57,8 +57,14 @@ STATE_PROBE = "0.55"
 IDENTITY_FIELDS = ["index", "id", "title", "short_title", "units", "step_count",
                    "can_automate", "read_only", "is_bypass", "is_list"]
 
-# Plugins already on parameter objects.
-MIGRATED = {"ambix_rotator_z"}
+# Plugins already on parameter objects. AMBIX_MIGRATED (comma-separated)
+# adds to it, for checking a port before it is listed here.
+MIGRATED = {"ambix_rotator_z"} | (set(os.environ.get("AMBIX_MIGRATED", "").split(",")) - {""})
+
+# Parameters whose text legitimately depends on another parameter, so it
+# can't be checked against a fresh instance: the encoder's MoveAzimuth and
+# MoveElevation show deg/sec, which depends on MoveSpeed.
+TEXT_DEPENDS_ON_OTHERS = {("ambix_encoder", 6), ("ambix_encoder", 9)}
 
 # Values are floats sent through process() and read back; allow for the
 # float -> double round trip, nothing more.
@@ -303,7 +309,7 @@ def test_text_for_any_value(migrated):
     tooltips). The legacy API could only describe the current value."""
     plugin, current = migrated
     for pid, p in current["fresh"].items():
-        if p["is_bypass"] or not p["can_automate"]:
+        if p["is_bypass"] or not p["can_automate"] or (plugin, p["index"]) in TEXT_DEPENDS_ON_OTHERS:
             continue
         for probe in PROBES:
             assert p["text"][probe] == current["displayed"][probe][pid]["text"], (
