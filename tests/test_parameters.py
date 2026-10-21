@@ -57,7 +57,7 @@ IDENTITY_FIELDS = ["index", "id", "title", "short_title", "units", "step_count",
                    "can_automate", "read_only", "is_bypass", "is_list"]
 
 # Plugins already on parameter objects.
-MIGRATED = set()
+MIGRATED = {"ambix_rotator_z"}
 
 # Values are floats sent through process() and read back; allow for the
 # float -> double round trip, nothing more.

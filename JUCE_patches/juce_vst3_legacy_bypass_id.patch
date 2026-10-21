@@ -1,0 +1,20 @@
+--- a/modules/juce_audio_plugin_client/juce_audio_plugin_client_VST3.cpp
++++ b/modules/juce_audio_plugin_client/juce_audio_plugin_client_VST3.cpp
+@@ -702,7 +702,16 @@
+                 if (vst3WrapperProvidedBypassParam)
+                 {
+                     JUCE_BEGIN_IGNORE_WARNINGS_MSVC (6240)
+-                    vstParamID = static_cast<Vst::ParamID> ((isUsingManagedParameters() && ! forceLegacyParamIDs) ? paramBypass : numParameters);
++                   #if JUCE_VST3_KEEP_LEGACY_BYPASS_ID
++                    // ambix patch: a plug-in moving from the legacy setParameter()
++                    // API to parameter objects keeps the bypass ID it always had,
++                    // one past its last parameter, so bypass automation in existing
++                    // sessions still finds it. Upstream switches to 'byps' as soon
++                    // as parameters are managed.
++                    vstParamID = static_cast<Vst::ParamID> (numParameters);
++                   #else
++                    vstParamID = static_cast<Vst::ParamID> ((isUsingManagedParameters() && ! forceLegacyParamIDs) ? paramBypass : numParameters);
++                   #endif
+                     JUCE_END_IGNORE_WARNINGS_MSVC
+                 }
+ 

@@ -18,7 +18,6 @@
  */
 
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 
 #include "SphericalHarmonic/tools.h"
@@ -41,7 +40,7 @@ void Ambix_rotator_zAudioProcessor::oscMessageReceived (const OSCMessage& messag
             val = (float)message[1].getInt32();
         }
 
-        setParameterNotifyingHost(this, Ambix_rotator_zAudioProcessor::RotZParam, jlimit(0.f, 1.f, val/360.f+0.5f));
+        rot_z_param->setValueNotifyingHost (jlimit(0.f, 1.f, val/360.f+0.5f));
 
 
     } else if (message.getAddressPattern() == OSCAddressPattern("/head_pose")) {
@@ -58,7 +57,7 @@ void Ambix_rotator_zAudioProcessor::oscMessageReceived (const OSCMessage& messag
             val = (float)message[5].getInt32();
         }
 
-        setParameterNotifyingHost(this, Ambix_rotator_zAudioProcessor::RotZParam, jlimit(0.f, 1.f, val/360.f+0.5f));
+        rot_z_param->setValueNotifyingHost (jlimit(0.f, 1.f, val/360.f+0.5f));
     }
 
 // debug the message
@@ -91,9 +90,18 @@ Ambix_rotator_zAudioProcessor::Ambix_rotator_zAudioProcessor() :
         .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
         .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
-    rot_z_param(0.5f),
     output_buffer(16, 256)
 {
+    // legacy display: whole degrees, e.g. "18 deg"
+    auto degText  = [] (float v, int) { return String ((int) ((v - 0.5f) * 360.f)) + " deg"; };
+    auto degValue = [] (const String& t) { return jlimit (0.f, 1.f, t.getFloatValue() / 360.f + 0.5f); };
+
+    addParameter (rot_z_param = new AudioParameterFloat (ParameterID { "0", 1 }, "Z-axis rot",
+                                                         NormalisableRange<float> (0.f, 1.f), 0.5f,
+                                                         AudioParameterFloatAttributes()
+                                                             .withStringFromValueFunction (degText)
+                                                             .withValueFromStringFunction (degValue)));
+
     cos_z.resize(AMBI_ORDER+1);
     sin_z.resize(AMBI_ORDER+1);
 
@@ -129,66 +137,6 @@ Ambix_rotator_zAudioProcessor::~Ambix_rotator_zAudioProcessor()
 const String Ambix_rotator_zAudioProcessor::getName() const
 {
     return JucePlugin_Name;
-}
-
-int Ambix_rotator_zAudioProcessor::getNumParameters()
-{
-    return totalNumParams;
-}
-
-float Ambix_rotator_zAudioProcessor::getParameter (int index)
-{
-    switch (index)
-	{
-		case RotZParam:    return rot_z_param;
-		default:            return 0.0f;
-	}
-}
-
-void Ambix_rotator_zAudioProcessor::setParameter (int index, float newValue)
-{
-    switch (index)
-	{
-		case RotZParam:
-            rot_z_param = newValue;
-            break;
-		default:
-            break;
-	}
-}
-
-const String Ambix_rotator_zAudioProcessor::getParameterName (int index)
-{
-    switch (index)
-	{
-		case RotZParam:			return "Z-axis rot";
-		default:								break;
-	}
-
-	return String();
-}
-
-const String Ambix_rotator_zAudioProcessor::getParameterText (int index)
-{
-
-    float value;
-
-    switch (index)
-	{
-		case RotZParam:
-            value = ((rot_z_param-0.5f) * 360.f);
-            break;
-
-
-		default:
-            break;
-	}
-
-
-    String text;
-    text << (int)value;
-    text << " deg";
-	return text;
 }
 
 const String Ambix_rotator_zAudioProcessor::getInputChannelName (int channelIndex) const
@@ -292,13 +240,13 @@ void Ambix_rotator_zAudioProcessor::releaseResources()
     // spare memory, etc.
 }
 
-void Ambix_rotator_zAudioProcessor::calcParams()
+void Ambix_rotator_zAudioProcessor::calcParams (float rotZ)
 {
 
     // use mathematical negative angles!
 
-    cos_z.set(1, cosf(-(rot_z_param - 0.5f) * (float)_2PI)); // rot_z_param is from 0.0 -> 1.0
-    sin_z.set(1, sinf(-(rot_z_param - 0.5f) * (float)_2PI)); // -> map it to -pi...+pi ( -180....+180deg )
+    cos_z.set(1, cosf(-(rotZ - 0.5f) * (float)_2PI)); // rotZ is from 0.0 -> 1.0
+    sin_z.set(1, sinf(-(rotZ - 0.5f) * (float)_2PI)); // -> map it to -pi...+pi ( -180....+180deg )
 
     // chebyshev recursion
     int maxOrder = AMBI_ORDER;
@@ -347,8 +295,8 @@ void Ambix_rotator_zAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     FloatVectorOperations::copy (_cos_z.getRawDataPointer(), cos_z.getRawDataPointer(), jmin (_cos_z.size(), cos_z.size()));
     FloatVectorOperations::copy (_sin_z.getRawDataPointer(), sin_z.getRawDataPointer(), jmin (_sin_z.size(), sin_z.size()));
 
-    // calculate new parameters (end ramp)
-    calcParams();
+    // calculate new parameters (end ramp) - one atomic read per block
+    calcParams (rot_z_param->get());
 
 
     // iterate over input and output channels for z axis rotation
@@ -423,11 +371,9 @@ void Ambix_rotator_zAudioProcessor::getStateInformation (MemoryBlock& destData)
 
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    // add some attributes to it..
-    for (int i=0; i < getNumParameters(); i++)
-    {
-        xml.setAttribute (String(i), getParameter(i));
-    }
+    // same attribute as the legacy index-based API wrote, so projects stay
+    // readable by older versions
+    xml.setAttribute ("0", rot_z_param->get());
 
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);
@@ -445,9 +391,7 @@ void Ambix_rotator_zAudioProcessor::setStateInformation (const void* data, int s
         // make sure that it's actually our type of XML object..
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
-            for (int i=0; i < getNumParameters(); i++) {
-                setParameter(i, (float)xmlState->getDoubleAttribute(String(i)));
-            }
+            *rot_z_param = (float)xmlState->getDoubleAttribute("0");
         }
 
     }
