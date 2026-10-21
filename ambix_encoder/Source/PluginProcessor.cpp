@@ -1054,6 +1054,9 @@ void Ambix_encoderAudioProcessor::prepareToPlay (double sampleRate, int samplesP
 {
     SampleRate = sampleRate;
 
+    // allocate here so processBlock only ever shrinks/regrows within this size
+    InputBuffer.setSize (juce::jmax (MAX_INPUT_CHANNELS, getTotalNumInputChannels()), samplesPerBlock);
+
     _my_meter_dsp.setAudioParams ((int) SampleRate, samplesPerBlock);
     _my_meter_dsp.setParams (0.5f, 20.0f);
 
@@ -1107,7 +1110,7 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     const int active = juce::jmin (getActiveSources(), numIn, kMaxSources);
 
     if (InputBuffer.getNumSamples() != NumSamples || InputBuffer.getNumChannels() != numIn)
-        InputBuffer.setSize (juce::jmax (1, numIn), NumSamples);
+        InputBuffer.setSize (juce::jmax (1, numIn), NumSamples, false, false, true);
 
     InputBuffer.clear();
     for (int i = 0; i < juce::jmin (numIn, kMaxSources); ++i)

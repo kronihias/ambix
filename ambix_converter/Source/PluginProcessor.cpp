@@ -518,7 +518,7 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     // resize output buffer if necessare
     int NumSamples = buffer.getNumSamples();
 
-    output_buffer.setSize(std::max(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples);
+    output_buffer.setSize(std::max(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples, false, false, true);
 
     output_buffer.clear(); // in case of 2d where we might throw away some channels
 
@@ -599,7 +599,8 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     }
     */
 
-    buffer = output_buffer;
+    for (int ch = 0; ch < getTotalNumOutputChannels(); ++ch)
+        buffer.copyFrom(ch, 0, output_buffer, ch, 0, NumSamples);
 }
 
 //==============================================================================

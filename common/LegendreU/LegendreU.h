@@ -33,7 +33,7 @@ public:
   
     void Calc(int nmax, double arg);
     
-    Eigen::VectorXd Get();
+    const Eigen::VectorXd& Get() const;
     
     Eigen::VectorXd Pn;
     

@@ -135,7 +135,7 @@ void Ambix_directional_loudnessAudioProcessor::setParameter (int index, float ne
 
     if (filter_id < NUM_FILTERS) // safety..
     {
-        _param_changed = true;
+        bool known_param = true;
 
         switch (index%PARAMS_PER_FILTER) {
 
@@ -172,9 +172,13 @@ void Ambix_directional_loudnessAudioProcessor::setParameter (int index, float ne
                 break;
 
             default:
-                _param_changed = false;
+                known_param = false;
                 break;
         }
+
+        // flag after the write so the audio thread picks up the new value
+        if (known_param)
+            _param_changed = true;
 
     }
 
@@ -641,11 +645,14 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
         grid_energy_eq_post_block_  .setZero (eqN);
         grid_decode_eq_scratch_     .setZero (eqN);
 
+        // size once here, so the per-parameter copy below never allocates
+        Sh_matrix_mod.resize (Sh_matrix.rows(), Sh_matrix.cols());
+
         _initialized = true;
 
     }
 
-    if (_param_changed)
+    if (_param_changed.exchange(false))
     {
         // convert parameters to values for the filter
         // ArrayIntParam _shape = shape;
@@ -718,7 +725,7 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
         }
 
         // calculate new transformation matrix
-        Sh_transf = Sh_matrix_inv * Sh_matrix_mod;
+        Sh_transf.noalias() = Sh_matrix_inv * Sh_matrix_mod;
 
         // threshold coefficients
         for (int i = 0; i < Sh_transf.size(); i++)
@@ -726,8 +733,6 @@ void Ambix_directional_loudnessAudioProcessor::calcParams()
             if (abs(Sh_transf(i)) < 0.00001f)
                 Sh_transf(i) = 0.f;
         }
-
-        _param_changed = false;
     }
 
 
@@ -746,7 +751,6 @@ bool Ambix_directional_loudnessAudioProcessor::isBusesLayoutSupported (const Bus
 void Ambix_directional_loudnessAudioProcessor::numChannelsChanged()
 {
 #ifdef UNIVERSAL_AMBISONIC
-    _initialized = false;
     sendChangeMessage();
 #endif
 }
@@ -855,6 +859,10 @@ void Ambix_directional_loudnessAudioProcessor::processBlock (AudioSampleBuffer& 
     }
     // ---------- end energy tap ----------
 
+    if (output_buffer.getNumSamples() < NumSamples
+        || output_buffer.getNumChannels() < getTotalNumOutputChannels())
+        output_buffer.setSize (getTotalNumOutputChannels(), NumSamples, false, false, true);
+
     output_buffer.clear();
 
 
@@ -952,16 +960,31 @@ void Ambix_directional_loudnessAudioProcessor::processBlock (AudioSampleBuffer& 
 
 int Ambix_directional_loudnessAudioProcessor::getGridEnergySnapshot (std::vector<float>& out, bool postMod) const
 {
-    const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
-    out = postMod ? grid_energy_post_smoothed_ : grid_energy_smoothed_;
-    return (int) out.size();
+    return copyGridEnergy (postMod ? grid_energy_post_smoothed_ : grid_energy_smoothed_, out);
 }
 
 int Ambix_directional_loudnessAudioProcessor::getGridEnergySnapshotEq (std::vector<float>& out, bool postMod) const
 {
+    return copyGridEnergy (postMod ? grid_energy_eq_post_smoothed_ : grid_energy_eq_smoothed_, out);
+}
+
+// Resize `out` before taking the lock, so the audio thread never spins while
+// the GUI allocates; only the plain copy happens under the lock.
+int Ambix_directional_loudnessAudioProcessor::copyGridEnergy (const std::vector<float>& src, std::vector<float>& out) const
+{
+    size_t n;
+    {
+        const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
+        n = src.size();
+    }
+    out.resize (n);
+
     const juce::SpinLock::ScopedLockType l (grid_energy_lock_);
-    out = postMod ? grid_energy_eq_post_smoothed_ : grid_energy_eq_smoothed_;
-    return (int) out.size();
+    // src may have changed size in between; shrinking `out` does not allocate
+    n = std::min (n, src.size());
+    std::copy (src.begin(), src.begin() + (std::ptrdiff_t) n, out.begin());
+    out.resize (n);
+    return (int) n;
 }
 
 //==============================================================================

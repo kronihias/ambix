@@ -62,6 +62,7 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
     SampleRate(44100),
     isProcessing(false),
     _gain(0.5f),
+    _appliedGain(-1.f),
     _storeConfigDataInProject(1),
     _readyToSaveConfiguration(false),
     Thread("ambix_binaural")
@@ -166,13 +167,9 @@ float Ambix_binauralAudioProcessor::getParameter (int index)
 
 void Ambix_binauralAudioProcessor::setParameter (int index, float newValue)
 {
+    // may run on the audio thread or the message thread while the loader
+    // rebuilds _AmbiSpeakers - only store it, processBlock applies it
     _gain = jlimit(0.f, 1.f, newValue);
-
-    int NumSpeakers = _AmbiSpeakers.size();
-
-    for (int i=0; i < NumSpeakers; i++) {
-        _AmbiSpeakers.getUnchecked(i)->setGainFactor(ParamToRMS(_gain));
-    }
 }
 
 const String Ambix_binauralAudioProcessor::getParameterName (int index)
@@ -342,7 +339,8 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
 {
     isProcessing = true;
 
-    if (!configLoaded)
+    // a host sending more samples than prepared would overrun ambi_spk_buffer_
+    if (!configLoaded || buffer.getNumSamples() > ambi_spk_buffer_.getNumSamples())
     {
         // if nothing is loaded just clear the buffer...
         buffer.clear();
@@ -350,6 +348,14 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
     } else {
 
         int NumSpeakers = _AmbiSpeakers.size();
+
+        const float gain = _gain;
+        if (gain != _appliedGain)
+        {
+            for (int i=0; i < NumSpeakers; i++)
+                _AmbiSpeakers.getUnchecked(i)->setGainFactor(ParamToRMS(gain));
+            _appliedGain = gain;
+        }
 
         ambi_spk_buffer_.clear();
 
@@ -398,7 +404,8 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                 }
                 //std::cout << "new samples: " << NumSamples << " Samples, out level: " << buffer.getMagnitude(0, NumSamples) << std::endl;
             #else
-                mtxconv_.processBlock(ambi_spk_buffer_, buffer, NumSamples, true);
+                // only block on the convolver threads when rendering offline
+                mtxconv_.processBlock(ambi_spk_buffer_, buffer, NumSamples, isNonRealtime());
             #endif
         }
 #else
@@ -431,6 +438,10 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
 
     // unload first....
     if (configLoaded) {
+
+        // clear the flag *before* waiting: a block starting after this sees
+        // !configLoaded, one already running is caught by isProcessing
+        configLoaded = false;
 
         while (isProcessing) {
             Sleep(1);
@@ -981,18 +992,23 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
         zita_conv.start_process(CONVPROC_SCHEDULER_PRIORITY, CONVPROC_SCHEDULER_CLASS);
 
     #else
-        mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192, safemode_);
-
-        // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
-        for (int i=0; i < conv_data.getNumIRs(); i++)
+        // without "load IRs" the convolver keeps running with the old filters -
+        // adding them again would grow its filter arrays under the worker threads
+        if (_load_ir)
         {
-            if (threadShouldExit())
-                return;
+            mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192, safemode_);
 
-            mtxconv_.AddFilter(conv_data.getInCh(i), conv_data.getOutCh(i), *conv_data.getIR(i));
+            // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
+            for (int i=0; i < conv_data.getNumIRs(); i++)
+            {
+                if (threadShouldExit())
+                    return;
+
+                mtxconv_.AddFilter(conv_data.getInCh(i), conv_data.getOutCh(i), *conv_data.getIR(i));
+            }
+
+            mtxconv_.StartProc();
         }
-
-        mtxconv_.StartProc();
     #endif
 
 #endif

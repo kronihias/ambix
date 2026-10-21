@@ -142,6 +142,8 @@ private:
     // Eigen::VectorXd Ymn; // Ymn result
     Eigen::MatrixXd Sh_matrix_inv; // undistorted SH Matrix
     Eigen::MatrixXd Sh_matrix_mod; // distorted SH Matrix
+    Eigen::VectorXd pre_emphasis; // per sampling point pre-emphasis gain
+    Eigen::MatrixXd Sph_coord_mod; // warped spherical coordinates
 
     Eigen::MatrixXd Sh_transf; // Transformation Matrix
 

@@ -228,14 +228,18 @@ inline double calccostheta(int N)
 
 void Ambix_maxreAudioProcessor::CalcParams()
 {
-    if (_order != order || _apply_param != apply_param)
+    // snapshot, setParameter() may change these concurrently
+    const int order_ = order;
+    const float apply_param_ = apply_param;
+
+    if (_order != order_ || _apply_param != apply_param_)
     {
-        costheta = calccostheta(order); // 137.9°/(N+1.51)
+        costheta = calccostheta(order_); // 137.9°/(N+1.51)
 
-        legendre_u.Calc(order, costheta);
-        Pn = legendre_u.Get();
+        legendre_u.Calc(order_, costheta);
+        const Eigen::VectorXd& Pn = legendre_u.Get(); // Unassociated Legendre
 
-        if (apply_param < 0.33f) // apply reciprokal
+        if (apply_param_ < 0.33f) // apply reciprokal
         {
             for (int i=0; i < Pn.size(); i++) {
                 weights.set(i, (float)(1./Pn(i)));
@@ -260,8 +264,8 @@ void Ambix_maxreAudioProcessor::CalcParams()
         std::cout << std::endl;
         */
 
-        _order = order;
-        _apply_param = apply_param;
+        _order = order_;
+        _apply_param = apply_param_;
     }
 
 }

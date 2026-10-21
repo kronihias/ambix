@@ -59,7 +59,7 @@ void LegendreU::Calc(int nmax, double arg)
 }
 
 
-Eigen::VectorXd LegendreU::Get()
+const Eigen::VectorXd& LegendreU::Get() const
 {
     return Pn;
 }

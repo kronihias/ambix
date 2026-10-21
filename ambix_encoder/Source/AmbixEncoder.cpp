@@ -49,8 +49,8 @@ AmbixEncoder::~AmbixEncoder()
 
 void AmbixEncoder::calcParams()
 {
-  // save last status
-  _ambi_gain = ambi_gain;
+  // save last status - copy in place, Array::operator= reallocates
+  FloatVectorOperations::copy (_ambi_gain.getRawDataPointer(), ambi_gain.getRawDataPointer(), AMBI_CHANNELS);
 
   if (_azimuth != azimuth || _elevation != elevation || _size != size)
   {
@@ -68,9 +68,9 @@ void AmbixEncoder::calcParams()
     ///////////////////////////
     // apply size -> scaling of higher orders -> this is not really correct! more for sounddesign!
     if (size > 0.f) {
-      Array<float> ambi_weight;
+      float ambi_weight[AMBI_ORDER+1];
 
-      ambi_weight.add(1.f); // w
+      ambi_weight[0] = 1.f; // w
 
       for (int i=1; i <= AMBI_ORDER; i++) {
 
@@ -81,14 +81,14 @@ void AmbixEncoder::calcParams()
 
         // std::cout << "id: " << id << " weight: " << ambi_weight_lookup[id] << std::endl;
 
-        ambi_weight.add(ambi_weight_lookup[id]);
+        ambi_weight[i] = ambi_weight_lookup[id];
       }
 
       for (int i = 1; i < AMBI_CHANNELS; i++) // don't touch w
       {
         int l = (int)sqrt(i);
         //std::cout << "l: " << l << std::endl;
-        ambi_gain.set(i, ambi_gain[i] * ambi_weight.getUnchecked(l));
+        ambi_gain.set(i, ambi_gain[i] * ambi_weight[l]);
       }
     }
 

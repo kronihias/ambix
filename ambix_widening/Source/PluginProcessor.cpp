@@ -108,8 +108,6 @@ void Ambix_wideningAudioProcessor::setParameter (int index, float newValue)
 		default:
             break;
 	}
-
-    sendChangeMessage();
 }
 
 const String Ambix_wideningAudioProcessor::getParameterName (int index)
@@ -258,6 +256,11 @@ void Ambix_wideningAudioProcessor::changeProgramName (int index, const String& n
 //==============================================================================
 void Ambix_wideningAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    // preallocate the ring buffer for the longest Mod T, so checkBuffer()
+    // never has to resize it on the audio thread
+    int Q_max = (int)floor(paramModT2s(1.f)*sampleRate+0.5f);
+    ring_buffer.setSize(jmax(getTotalNumInputChannels(), getTotalNumOutputChannels()), Q_max*(BESSEL_APPR*2+1) + samplesPerBlock);
+
     calcParams();
 
     ring_buffer.clear();
@@ -277,8 +280,11 @@ void Ambix_wideningAudioProcessor::checkBuffer()
 
     _buf_size = Q*(BESSEL_APPR*2+1) + getBlockSize(); // + 1
 
-    if (ring_buffer.getNumSamples() < _buf_size) {
-        ring_buffer.setSize(AMBI_CHANNELS, _buf_size);
+    // ring_buffer is preallocated in prepareToPlay() for the longest Mod T
+    jassert (ring_buffer.getNumSamples() >= _buf_size);
+
+    if (ring_buffer.getNumSamples() < _buf_size) { // should not happen, last resort
+        ring_buffer.setSize(ring_buffer.getNumChannels(), _buf_size);
         // std::cout << "resized to: "<< _buf_size << " t: " << paramModT2ms(mod_t_param) << "ms; Q: " << Q << " samples; f: " << 1.f/paramModT2s(mod_t_param) << " Hz, Block: " << getBlockSize() << std::endl;
 
         ring_buffer.clear();
@@ -288,7 +294,7 @@ void Ambix_wideningAudioProcessor::calcParams()
 {
     checkBuffer();
 
-    if (param_changed) {
+    if (param_changed.exchange(false)) {
 
         // set new latency
         if (single_sided)
@@ -353,8 +359,6 @@ void Ambix_wideningAudioProcessor::calcParams()
             // std::cout << output_cos << std::endl;
             // std::cout << output_sin << std::endl;
         }
-
-        param_changed = false;
     }
 
 }

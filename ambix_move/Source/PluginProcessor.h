@@ -228,6 +228,7 @@ private:
     // Eigen members (mirror ambix_warp layout)
     Eigen::MatrixXd Carth_coord;     // unit-sphere sampling points (numsamples x 3)
     Eigen::MatrixXd Sh_matrix_inv;   // pseudo-inverse of undistorted SH basis
+    Eigen::MatrixXd Sh_matrix_mod;   // moved/rotated SH basis (numsamples x AMBI_CHANNELS), sized in init
     Eigen::MatrixXd Sh_transf;       // current transformation matrix
     Eigen::MatrixXd _Sh_transf;      // previous transformation matrix (for ramping)
 

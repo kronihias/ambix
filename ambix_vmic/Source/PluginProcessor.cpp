@@ -125,7 +125,7 @@ void Ambix_vmicAudioProcessor::setParameter (int index, float newValue)
 
     if (filter_id < NUM_FILTERS_VMIC) // safety..
     {
-        _param_changed = true;
+        bool known_param = true;
 
         switch (index%PARAMS_PER_FILTER) {
 
@@ -162,9 +162,13 @@ void Ambix_vmicAudioProcessor::setParameter (int index, float newValue)
                 break;
 
             default:
-                _param_changed = false;
+                known_param = false;
                 break;
         }
+
+        // flag after the write so the audio thread picks up the new value
+        if (known_param)
+            _param_changed = true;
 
     }
     sendChangeMessage();
@@ -448,7 +452,7 @@ void Ambix_vmicAudioProcessor::calcParams()
 
     }
 
-    if (_param_changed)
+    if (_param_changed.exchange(false))
     {
         // convert parameters to values for the filter
         // ArrayIntParam _shape = shape;
@@ -482,11 +486,8 @@ void Ambix_vmicAudioProcessor::calcParams()
         // iterate over all filters
         for (int k=0; k < NUM_FILTERS_VMIC; k++)
         {
-            // copy the SH_matrix to
-            Eigen::MatrixXd Sh_matrix_temp = Sh_matrix;
-
             // iterate over all sample points
-            for (int i=0; i < Sh_matrix_temp.rows(); i++)
+            for (int i=0; i < Sh_matrix.rows(); i++)
             {
 
                 Eigen::Vector2d Sph_coord_vec = Sph_coord.row(i);
@@ -498,11 +499,9 @@ void Ambix_vmicAudioProcessor::calcParams()
                 if (multipl < 0.f) // -1.f in case of outside region
                     multipl = 0.f;
 
-                Sh_matrix_temp.row(i) *= multipl;
+                // Sh_matrix_mod row is the weighted sum over all sample points
+                Sh_matrix_mod.row(k) += multipl * Sh_matrix.row(i);
             }
-
-            // Sh_matrix_mod row is the sum over the columns
-            Sh_matrix_mod.row(k) = Sh_matrix_temp.colwise().sum();
 
             // normalize and apply gain
             if (Sh_matrix_mod.row(k)(0) > 0.f)
@@ -523,8 +522,6 @@ void Ambix_vmicAudioProcessor::calcParams()
             if (abs(Sh_transf(i)) < 0.00001f)
                 Sh_transf(i) = 0.f;
         }
-
-        _param_changed = false;
     }
 
 

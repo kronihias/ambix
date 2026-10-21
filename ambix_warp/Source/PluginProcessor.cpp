@@ -359,19 +359,16 @@ void Ambix_warpAudioProcessor::calcParams()
         int in_ambi_channels = (in_order+1)*(in_order+1);
         for (int i=0; i < numsamples; i++)
         {
-            Eigen::VectorXd Ymn(in_ambi_channels); // Ymn result
-
             Sph_coord(i,0) = atan2(Carth_coord(i,1),Carth_coord(i,0)); // azimuth
             Sph_coord(i,1) = atan2(Carth_coord(i,2),sqrt(Carth_coord(i,0)*Carth_coord(i,0) + Carth_coord(i,1)*Carth_coord(i,1))); // elevation
 
             sph_h_in.Calc(Sph_coord(i,0),Sph_coord(i,1)); // phi theta
-            sph_h_in.Get(Ymn);
 
             // std::cout << "Ymn Size: " << Ymn.size() << std::endl;
             // std::cout << "Sh_matrix Size: " << Sh_matrix.size() << std::endl;
 
             //Sh_matrix.row(i) = Ymn;
-            Sh_matrix.block(i,0,1,in_ambi_channels) = Ymn.transpose();
+            Sh_matrix.block(i,0,1,in_ambi_channels) = sph_h_in.Ymn.transpose();
             // std::cout << "Size: " << Sh_matrix.block(i,0,1,in_ambi_channels).size() << ": " << Sh_matrix.block(i,0,1,in_ambi_channels) << std::endl;
         }
 
@@ -386,6 +383,12 @@ void Ambix_warpAudioProcessor::calcParams()
         // std::cout << "Size Inverse: " << Sh_matrix_inv.rows() << " x " << Sh_matrix_inv.cols() << std::endl;
 
         // std::cout << Sh_matrix_inv << std::endl;
+
+        // size the work matrices once here (independent of out order) so the
+        // recompute branch below does not allocate
+        Sh_matrix_mod.setZero(numsamples,AMBI_CHANNELS);
+        pre_emphasis.setOnes(numsamples);
+        Sph_coord_mod.resize(numsamples,2);
 
         _initialized = true;
     }
@@ -406,13 +409,11 @@ void Ambix_warpAudioProcessor::calcParams()
             sph_h_out.Init(out_order);
         }
 
-        Eigen::MatrixXd Sh_matrix_mod;
-        Sh_matrix_mod.setZero(Sph_coord.rows(),AMBI_CHANNELS);
+        Sh_matrix_mod.setZero();
 
-        Eigen::VectorXd pre_emphasis;
-        pre_emphasis.setOnes(Sph_coord.rows());
+        pre_emphasis.setOnes();
 
-        Eigen::MatrixXd Sph_coord_mod = Sph_coord;
+        Sph_coord_mod = Sph_coord; // same size -> no reallocation
 
         // warping parameters - use inverse parameters! (see paper)
         double phi_alpha = -((double)phi_param*1.8f - 0.9f);
@@ -522,24 +523,22 @@ void Ambix_warpAudioProcessor::calcParams()
             // rotate
             // Sph_mod(i,0) = Sph(i,0);
 
-            Eigen::VectorXd Ymn(out_ambi_channels); // Ymn result
-
             sph_h_out.Calc(Sph_coord_mod(i,0),Sph_coord_mod(i,1)); // phi theta
-            sph_h_out.Get(Ymn);
 
             // Sh_matrix_mod.row(i) = Ymn;
-            Sh_matrix_mod.block(i,0,1,out_ambi_channels) = Ymn.transpose();
+            Sh_matrix_mod.block(i,0,1,out_ambi_channels) = sph_h_out.Ymn.transpose();
         }
 
         // apply preemphasis if wanted
         if (preemp_param > 0.5f)
         {
-            Sh_matrix_mod = pre_emphasis.asDiagonal() * Sh_matrix_mod;
+            // == pre_emphasis.asDiagonal() * Sh_matrix_mod, in place (row i scaled by pre_emphasis(i))
+            Sh_matrix_mod.array().colwise() *= pre_emphasis.array();
         }
 
         // calculate new transformation matrix
 
-        Sh_transf = Sh_matrix_inv * Sh_matrix_mod;
+        Sh_transf.noalias() = Sh_matrix_inv * Sh_matrix_mod;
 
         // threshold coefficients
         for (int i = 0; i < Sh_transf.size(); i++)

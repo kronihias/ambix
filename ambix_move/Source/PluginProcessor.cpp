@@ -553,15 +553,16 @@ void Ambix_moveAudioProcessor::calcParams()
                                      sqrt (Carth_coord (i, 0) * Carth_coord (i, 0)
                                          + Carth_coord (i, 1) * Carth_coord (i, 1)));
 
-            Eigen::VectorXd Ymn (in_ambi_channels);
             sph_h_in.Calc (az, el);
-            sph_h_in.Get  (Ymn);
 
-            Sh_matrix.block (i, 0, 1, in_ambi_channels) = Ymn.transpose();
+            Sh_matrix.block (i, 0, 1, in_ambi_channels) = sph_h_in.Ymn.transpose();
         }
 
         Sh_matrix_inv = (Sh_matrix.transpose() * Sh_matrix)
                             .colPivHouseholderQr().inverse() * Sh_matrix.transpose();
+
+        // sized once here so the recompute branch below never allocates
+        Sh_matrix_mod.setZero (numsamples, AMBI_CHANNELS);
 
         _initialized = true;
     }
@@ -681,8 +682,7 @@ void Ambix_moveAudioProcessor::calcParams()
                 Rot = RotZ * RotY * RotX; // rpy
         }
 
-        Eigen::MatrixXd Sh_matrix_mod;
-        Sh_matrix_mod.setZero (numsamples, AMBI_CHANNELS);
+        Sh_matrix_mod.setZero(); // keeps size (numsamples x AMBI_CHANNELS) from init
 
         for (int i = 0; i < numsamples; ++i)
         {
@@ -718,11 +718,9 @@ void Ambix_moveAudioProcessor::calcParams()
             // documented for future use.
             const double gain = R / safeDist;
 
-            Eigen::VectorXd Ymn (out_ambi_channels);
             sph_h_out.Calc (newAz, newEl);
-            sph_h_out.Get  (Ymn);
 
-            Sh_matrix_mod.block (i, 0, 1, out_ambi_channels) = gain * Ymn.transpose();
+            Sh_matrix_mod.block (i, 0, 1, out_ambi_channels) = gain * sph_h_out.Ymn.transpose();
         }
 
         // Final transformation matrix.
@@ -735,7 +733,8 @@ void Ambix_moveAudioProcessor::calcParams()
         // indexing convention. At zero translation Sh_transf is the identity
         // (symmetric), which is why the missing transpose only manifests as a
         // bug once the listener is actually moved.
-        Sh_transf = (Sh_matrix_inv * Sh_matrix_mod).transpose();
+        // (A * B)^T == B^T * A^T, written with noalias() so no temporary is allocated.
+        Sh_transf.noalias() = Sh_matrix_mod.transpose() * Sh_matrix_inv.transpose();
 
         // threshold tiny values to zero (lets the inner loop in processBlock
         // skip them entirely)

@@ -190,7 +190,7 @@ public:
 
     int _AmbiChannels;
 
-    bool configLoaded; // is a configuration successfully loaded?
+    std::atomic<bool> configLoaded; // is a configuration successfully loaded?
 
     void DebugPrint(String debugText);
 
@@ -251,9 +251,11 @@ private:
 
     int ConvBufferSize;
 
-    bool isProcessing;
+    std::atomic<bool> isProcessing; // handshake with the loader thread, see LoadConfiguration
 
-    float _gain; // output gain
+    std::atomic<float> _gain; // output gain, applied to the speakers in processBlock
+
+    float _appliedGain; // audio thread only
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_binauralAudioProcessor)

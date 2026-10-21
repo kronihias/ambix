@@ -30,6 +30,7 @@
 #define TRUNCATE 0.001 // -60dB
 
 #include "AmbisonicConfig.h"
+#include <atomic>
 
 //==============================================================================
 /**
@@ -118,7 +119,7 @@ private:
 
     bool single_sided;
 
-    bool param_changed; // mod_depth or offset changed
+    std::atomic<bool> param_changed; // mod_depth or offset changed
 
     int Q;
 

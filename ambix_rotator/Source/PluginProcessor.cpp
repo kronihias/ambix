@@ -400,6 +400,7 @@ void Ambix_rotatorAudioProcessor::prepareToPlay (double sampleRate, int samplesP
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     // calcParams();
+    output_buffer.setSize (jmax (getTotalNumInputChannels(), getTotalNumOutputChannels()), samplesPerBlock);
 }
 
 void Ambix_rotatorAudioProcessor::releaseResources()
@@ -409,9 +410,12 @@ void Ambix_rotatorAudioProcessor::releaseResources()
 }
 
 
+// bounded stack matrix for the per-order rotation blocks (no heap allocation on the audio thread)
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, 0, 2*AMBI_ORDER+1, 2*AMBI_ORDER+1> RMat;
+
 // functions to compute terms U, V, W of Eq.8.1 (Table II)
 // function to compute term P of U,V,W (Table II)
-double P(int i, int l, int mu, int m_, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
+double P(int i, int l, int mu, int m_, const Eigen::Matrix3d& R_1, const RMat& R_lm1)
 {
   double ret = 0.;
 
@@ -431,12 +435,12 @@ double P(int i, int l, int mu, int m_, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_
   return ret;
 }
 
-double U(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
+double U(int l, int m, int n, const Eigen::Matrix3d& R_1, const RMat& R_lm1)
 {
   return P(0, l, m, n, R_1, R_lm1);
 }
 
-double V(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
+double V(int l, int m, int n, const Eigen::Matrix3d& R_1, const RMat& R_lm1)
 {
   double ret = 0.;
   if (m == 0)
@@ -465,7 +469,7 @@ double V(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
   return ret;
 }
 
-double W(int l, int m, int n, Eigen::Matrix3d& R_1, Eigen::MatrixXd& R_lm1)
+double W(int l, int m, int n, const Eigen::Matrix3d& R_1, const RMat& R_lm1)
 {
   double ret = 0.;
 
@@ -751,7 +755,7 @@ void Ambix_rotatorAudioProcessor::calcParams()
   // set first order
   Sh_transf.block(1, 1, 3, 3) = R_1;
 
-  Eigen::MatrixXd R_lm1 = R_1;
+  RMat R_lm1 = R_1;
 
   // recursivly generate higher orders
   int maxOrder = AMBI_ORDER;
@@ -759,9 +763,10 @@ void Ambix_rotatorAudioProcessor::calcParams()
   maxOrder = ambiOrderFromChannels (getTotalNumInputChannels());
   if (maxOrder < 1) maxOrder = AMBI_ORDER;
 #endif
+  maxOrder = jmin (maxOrder, AMBI_ORDER); // RMat and Sh_transf are bounded by AMBI_ORDER
   for (int l=2; l<=maxOrder; l++)
   {
-    Eigen::MatrixXd R_l = Eigen::MatrixXd::Zero(2*l+1, 2*l+1);
+    RMat R_l = RMat::Zero(2*l+1, 2*l+1);
     for (int m=-l;m <= l; m++)
     {
       for (int n=-l;n <= l; n++)
@@ -824,7 +829,9 @@ void Ambix_rotatorAudioProcessor::numChannelsChanged()
 
 void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)
 {
-    if (_new_params)
+    const bool newParams = _new_params.exchange (false);
+
+    if (newParams)
     {
         _Sh_transf = Sh_transf; // buffer old values
         calcParams(); // calc new transformation matrix
@@ -832,7 +839,7 @@ void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
 
     int NumSamples = buffer.getNumSamples();
 
-    output_buffer.setSize(buffer.getNumChannels(), NumSamples);
+    output_buffer.setSize(buffer.getNumChannels(), NumSamples, false, false, true);
     output_buffer.clear();
 
     int num_out_ch = jmin(AMBI_CHANNELS,getTotalNumOutputChannels());
@@ -848,7 +855,7 @@ void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
         int in_end = jmin((n+1)*(n+1), num_in_ch);
         for (int in = in_start; in < in_end; in++)
         {
-            if (!_new_params)
+            if (!newParams)
             {
                 if (Sh_transf(in, out) != 0.f)
                     output_buffer.addFrom(out, 0, buffer, in, 0, NumSamples, (float)Sh_transf(in, out));
@@ -858,9 +865,6 @@ void Ambix_rotatorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
             }
         }
     }
-
-    if (_new_params)
-        _new_params = false;
 
     buffer = output_buffer;
 
@@ -898,7 +902,7 @@ void Ambix_rotatorAudioProcessor::getStateInformation (MemoryBlock& destData)
     {
         xml.setAttribute (String(i), getParameter(i));
     }
-    xml.setAttribute("_q_changed", _q_changed);
+    xml.setAttribute("_q_changed", _q_changed.load());
 
     // then use this helper function to stuff it into the binary blob and return it..
     copyXmlToBinary (xml, destData);

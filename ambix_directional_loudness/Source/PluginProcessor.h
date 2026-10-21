@@ -257,7 +257,7 @@ private:
 
     bool _initialized;
 
-    bool _param_changed; // param changed need recalculation
+    std::atomic<bool> _param_changed; // param changed need recalculation
 
     AudioSampleBuffer output_buffer;
 
@@ -294,6 +294,7 @@ private:
     std::vector<float> grid_energy_smoothed_;
     std::vector<float> grid_energy_post_smoothed_;
     mutable juce::SpinLock grid_energy_lock_;
+    int copyGridEnergy (const std::vector<float>& src, std::vector<float>& out) const;
 
     // Pre-allocated scratch — sized in calcParams() once the grid and channel
     // count are known. Must not allocate inside processBlock.

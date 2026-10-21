@@ -306,6 +306,7 @@ void Ambix_rotator_zAudioProcessor::calcParams()
     maxOrder = ambiOrderFromChannels (getTotalNumInputChannels());
     if (maxOrder < 1) maxOrder = AMBI_ORDER;
 #endif
+    maxOrder = jmin (maxOrder, AMBI_ORDER); // cos_z/sin_z hold AMBI_ORDER+1 entries, never grow them here
     for (int i = 2; i <= maxOrder; i++) {
 
         cos_z.set(i, 2 * cos_z[1] * cos_z[i-1] - cos_z[i-2]);
@@ -335,14 +336,16 @@ void Ambix_rotator_zAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     int NumSamples = buffer.getNumSamples();
 
     // resize buffer if necessary
-    output_buffer.setSize((std::max)(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples);
+    output_buffer.setSize((std::max)(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples, false, false, true);
 
     // clear output buffer
     output_buffer.clear();
 
     // save old parameters for interpolation (start ramp)
-    _cos_z = cos_z;
-    _sin_z = sin_z;
+    // copy in place (Array::operator= reallocates)
+    jassert (_cos_z.size() == cos_z.size() && _sin_z.size() == sin_z.size());
+    FloatVectorOperations::copy (_cos_z.getRawDataPointer(), cos_z.getRawDataPointer(), jmin (_cos_z.size(), cos_z.size()));
+    FloatVectorOperations::copy (_sin_z.getRawDataPointer(), sin_z.getRawDataPointer(), jmin (_sin_z.size(), sin_z.size()));
 
     // calculate new parameters (end ramp)
     calcParams();

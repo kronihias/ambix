@@ -60,8 +60,6 @@ void SphericalHarmonic::Calc(double phi, double theta)
 {
     if (_phi != phi || _theta != theta)
     {
-        Eigen::VectorXd Nmn, Chb, Pmn;
-
         // sin -> ambix convention -> elevation
         // cos -> mtx_spherical_harmonics -> zenith
 
@@ -72,11 +70,9 @@ void SphericalHarmonic::Calc(double phi, double theta)
 
         Chebyshev.Calc(_order, phi);
 
-        Norm.Get(Nmn);
-        Legendre.Get(Pmn);
-        Chebyshev.Get(Chb);
-
-        Ymn = Nmn.cwiseProduct(Pmn).cwiseProduct(Chb);
+        // read the members directly - copying them out allocated three
+        // vectors per angle change, on the audio thread for most callers
+        Ymn = Norm.Nmn.cwiseProduct(Legendre.Legendre).cwiseProduct(Chebyshev.Chebyshev);
 
         _phi = phi;
         _theta = theta;

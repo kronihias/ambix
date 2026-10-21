@@ -91,8 +91,6 @@ public:
 
     void CalcParams();
 
-    Eigen::MatrixXd Pn; // Unassociated Legendre
-
     enum Parameters
 	{
 		ApplyParam,

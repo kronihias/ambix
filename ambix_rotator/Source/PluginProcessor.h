@@ -139,10 +139,10 @@ private:
     float q3_param;
     float qinvert_param;
 
-    bool _q_changed; // flag for telling calcParams which parameters to use for calculating rotationmatrix
+    std::atomic<bool> _q_changed; // flag for telling calcParams which parameters to use for calculating rotationmatrix
 
     bool _initialized;
-    bool _new_params;
+    std::atomic<bool> _new_params;
     
     AudioSampleBuffer output_buffer;
     

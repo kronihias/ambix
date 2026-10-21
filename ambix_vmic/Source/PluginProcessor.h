@@ -26,6 +26,7 @@
 #include "SphFilter/SphFilter.h"
 
 #include <Eigen/Eigen>
+#include <atomic>
 
 #include "AmbisonicConfig.h"
 
@@ -210,7 +211,7 @@ private:
 
     bool _initialized;
 
-    bool _param_changed; // param changed need recalculation
+    std::atomic<bool> _param_changed; // param changed need recalculation
 
     AudioSampleBuffer output_buffer;
 

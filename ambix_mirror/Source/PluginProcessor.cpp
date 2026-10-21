@@ -565,12 +565,16 @@ void Ambix_mirrorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBu
 
 
     // save old parameters for interpolation (start ramp)
-    _gain_factors = gain_factors;
+    // copy in place (Array::operator= reallocates)
+    jassert (_gain_factors.size() == gain_factors.size());
+    FloatVectorOperations::copy (_gain_factors.getRawDataPointer(), gain_factors.getRawDataPointer(), jmin (_gain_factors.size(), gain_factors.size()));
 
     calcParams();
 
 
-    for (int acn = 0; acn < getTotalNumInputChannels(); acn++)
+    const int numCh = jmin ((int) AMBI_CHANNELS, getTotalNumInputChannels());
+
+    for (int acn = 0; acn < numCh; acn++)
     {
         buffer.applyGainRamp(acn, 0, NumSamples, _gain_factors.getUnchecked(acn), gain_factors.getUnchecked(acn));
 
