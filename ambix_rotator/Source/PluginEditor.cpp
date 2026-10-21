@@ -19,7 +19,6 @@
 
 //[Headers] You can add your own extra header files here...
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 //[/Headers]
 
 #include "PluginEditor.h"
@@ -59,7 +58,8 @@ namespace {
 //==============================================================================
 Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rotatorAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-    _changed(true)
+    _changed(true),
+    paramWatcher(*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
 
@@ -256,6 +256,11 @@ Ambix_rotatorAudioProcessorEditor::Ambix_rotatorAudioProcessorEditor (Ambix_rota
 
 Ambix_rotatorAudioProcessorEditor::~Ambix_rotatorAudioProcessorEditor()
 {
+    // closed mid-drag: don't leave the host's gesture open
+    if (gestureSlider != nullptr)
+        if (auto* param = parameterFor (gestureSlider))
+            param->endChangeGesture();
+
     Ambix_rotatorAudioProcessor* ourProcessor = getProcessor();
 
     // remove me as listener for changes
@@ -344,29 +349,126 @@ void Ambix_rotatorAudioProcessorEditor::resized()
 void Ambix_rotatorAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
     _changed = true;
-    // sendChangeMessage() also fires on every parameter change, so repaint only
-    // when the channel count (ambisonic order) actually changes - otherwise we
-    // would redraw the whole editor on every automation step.
+    // repaint (the order in the title) only when the channel count actually
+    // changes; parameter changes are polled in timerCallback()
     const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
                       |  getAudioProcessor()->getTotalNumOutputChannels();
     if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }
 }
 
+ambix::Parameter* Ambix_rotatorAudioProcessorEditor::parameterFor (Slider* s) const
+{
+    auto& p = *getProcessor();
+
+    if (s == &sld_yaw)   return ambix::Parameter::at (p, Ambix_rotatorAudioProcessor::YawParam);
+    if (s == &sld_pitch) return ambix::Parameter::at (p, Ambix_rotatorAudioProcessor::PitchParam);
+    if (s == &sld_roll)  return ambix::Parameter::at (p, Ambix_rotatorAudioProcessor::RollParam);
+
+    return nullptr;
+}
+
+// one-shot change outside a drag (button, text box, key): a gesture of its own
+void Ambix_rotatorAudioProcessorEditor::setInGesture (int index, float value)
+{
+    auto* param = ambix::Parameter::at (*getProcessor(), index);
+    param->beginChangeGesture();
+    param->setValueNotifyingHost (value);
+    param->endChangeGesture();
+}
+
+// being dragged or typed into: don't refresh it from the processor
+bool Ambix_rotatorAudioProcessorEditor::isBusy (Slider& s) const
+{
+    if (&s == gestureSlider)
+        return true;
+
+    for (auto* child : s.getChildren())
+        if (auto* label = dynamic_cast<Label*> (child))
+            if (label->isBeingEdited())
+                return true;
+
+    return false;
+}
+
+void Ambix_rotatorAudioProcessorEditor::sliderDragStarted (Slider* s)
+{
+    if (auto* param = parameterFor (s))
+    {
+        gestureSlider = s;
+        param->beginChangeGesture();
+    }
+}
+
+void Ambix_rotatorAudioProcessorEditor::sliderDragEnded (Slider* s)
+{
+    if (auto* param = parameterFor (s))
+    {
+        param->endChangeGesture();
+
+        if (gestureSlider == s)
+            gestureSlider = nullptr;
+    }
+}
+
+TextEditor* Ambix_rotatorAudioProcessorEditor::qText (int i)
+{
+    TextEditor* boxes[4] = { &txt_q0, &txt_q1, &txt_q2, &txt_q3 };
+    return boxes[i];
+}
+
+// a q text box that is being typed into keeps its text until it's entered
+// (return / focus lost) or loses focus; it's refreshed then
+void Ambix_rotatorAudioProcessorEditor::refreshQText (int i)
+{
+    TextEditor& txt = *qText(i);
+
+    if (qTyped[i] && txt.hasKeyboardFocus(true))
+    {
+        qPending[i] = true;
+        return;
+    }
+
+    qPending[i] = false;
+    qTyped[i] = false;
+
+    const float v = ambix::Parameter::at (*getProcessor(), Ambix_rotatorAudioProcessor::Q0Param + i)->get();
+    txt.setText(String(v*2. - 1.).substring(0, 6), dontSendNotification);
+}
+
+void Ambix_rotatorAudioProcessorEditor::textEditorTextChanged(TextEditor &editorChanged)
+{
+    for (int i = 0; i < 4; i++)
+        if (&editorChanged == qText(i))
+            qTyped[i] = true;
+}
+
 void Ambix_rotatorAudioProcessorEditor::timerCallback()
 {
-    if (_changed)
+    for (int i = 0; i < 4; i++)
+        if (qPending[i])
+            refreshQText(i);
+
+    // parameters are polled; the change broadcaster still reports channel changes
+    const bool paramsChanged = paramWatcher.changed();
+
+    if (_changed || paramsChanged || refreshPending)
     {
         _changed = false;
+        refreshPending = false;
 
         Ambix_rotatorAudioProcessor* ourProcessor = getProcessor();
+        auto value = [ourProcessor] (int index) { return ambix::Parameter::at (*ourProcessor, index)->get(); };
 
-        sld_yaw.setValue(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::YawParam)*360.f-180.f, dontSendNotification);
+        if (isBusy(sld_yaw)) refreshPending = true;
+        else sld_yaw.setValue(value(Ambix_rotatorAudioProcessor::YawParam)*360.f-180.f, dontSendNotification);
 
-        sld_pitch.setValue(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::PitchParam)*360.f-180.f, dontSendNotification);
+        if (isBusy(sld_pitch)) refreshPending = true;
+        else sld_pitch.setValue(value(Ambix_rotatorAudioProcessor::PitchParam)*360.f-180.f, dontSendNotification);
 
-        sld_roll.setValue(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::RollParam)*360.f-180.f, dontSendNotification);
+        if (isBusy(sld_roll)) refreshPending = true;
+        else sld_roll.setValue(value(Ambix_rotatorAudioProcessor::RollParam)*360.f-180.f, dontSendNotification);
 
-        if (ourProcessor->getParameter(Ambix_rotatorAudioProcessor::RotOrderParam) <= 0.5f)
+        if (value(Ambix_rotatorAudioProcessor::RotOrderParam) <= 0.5f)
         {
             toggleButton.setToggleState(true, dontSendNotification);
             toggleButton2.setToggleState(false, dontSendNotification);
@@ -377,12 +479,10 @@ void Ambix_rotatorAudioProcessorEditor::timerCallback()
             toggleButton2.setToggleState(true, dontSendNotification);
         }
 
-        txt_q0.setText(String(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Q0Param)*2. - 1.).substring(0, 6), dontSendNotification);
-        txt_q1.setText(String(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Q1Param)*2. - 1.).substring(0, 6), dontSendNotification);
-        txt_q2.setText(String(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Q2Param)*2. - 1.).substring(0, 6), dontSendNotification);
-        txt_q3.setText(String(ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Q3Param)*2. - 1.).substring(0, 6), dontSendNotification);
+        for (int i = 0; i < 4; i++)
+            refreshQText(i);
 
-        if (ourProcessor->getParameter(Ambix_rotatorAudioProcessor::Qinvert) <= 0.5f)
+        if (value(Ambix_rotatorAudioProcessor::Qinvert) <= 0.5f)
           tgl_qinvert.setToggleState(false, dontSendNotification);
         else
           tgl_qinvert.setToggleState(true, dontSendNotification);
@@ -406,45 +506,51 @@ void Ambix_rotatorAudioProcessorEditor::timerCallback()
 
 void Ambix_rotatorAudioProcessorEditor::sliderValueChanged (Slider* sliderThatWasMoved)
 {
-    Ambix_rotatorAudioProcessor* ourProcessor = getProcessor();
+    auto* param = parameterFor (sliderThatWasMoved);
 
-    if (sliderThatWasMoved == &sld_yaw)
+    if (param == nullptr)
+        return;
+
+    const float value = (sliderWrap(*sliderThatWasMoved)+180.f)/360.f;
+
+    // drags, wheel, text entry and double-click arrive inside the slider's
+    // drag notifications; anything else (keys, the wrap's own async
+    // setValue) gets a gesture of its own
+    if (sliderThatWasMoved == gestureSlider)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::YawParam, (sliderWrap(sld_yaw)+180.f)/360.f);
+        param->setValueNotifyingHost(value);
     }
-    else if (sliderThatWasMoved == &sld_pitch)
+    else
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::PitchParam, (sliderWrap(sld_pitch)+180.f)/360.f);
-    }
-    else if (sliderThatWasMoved == &sld_roll)
-    {
-        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::RollParam, (sliderWrap(sld_roll)+180.f)/360.f);
+        param->beginChangeGesture();
+        param->setValueNotifyingHost(value);
+        param->endChangeGesture();
     }
 
 }
 
 void Ambix_rotatorAudioProcessorEditor::buttonClicked (Button* buttonThatWasClicked)
 {
-    Ambix_rotatorAudioProcessor* ourProcessor = getProcessor();
-
     if (buttonThatWasClicked == &toggleButton)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::RotOrderParam, 0.f);
+        setInGesture(Ambix_rotatorAudioProcessor::RotOrderParam, 0.f);
     }
     else if (buttonThatWasClicked == &toggleButton2)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::RotOrderParam, 1.f);
+        setInGesture(Ambix_rotatorAudioProcessor::RotOrderParam, 1.f);
     }
     else if (buttonThatWasClicked == &tgl_qinvert)
     {
-      setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Qinvert, (float)tgl_qinvert.getToggleState());
+      setInGesture(Ambix_rotatorAudioProcessor::Qinvert, (float)tgl_qinvert.getToggleState());
     }
 
 }
 
 void Ambix_rotatorAudioProcessorEditor::textEditorReturnKeyPressed(TextEditor &editorChanged)
 {
-  Ambix_rotatorAudioProcessor* ourProcessor = getProcessor();
+  for (int i = 0; i < 4; i++)
+    if (&editorChanged == qText(i))
+      qTyped[i] = false; // entered: refreshed again from now on
 
   float val = editorChanged.getText().getFloatValue();
 
@@ -456,18 +562,18 @@ void Ambix_rotatorAudioProcessorEditor::textEditorReturnKeyPressed(TextEditor &e
 
   if (&editorChanged == &txt_q0)
   {
-    setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Q0Param, val);
+    setInGesture(Ambix_rotatorAudioProcessor::Q0Param, val);
   } else if (&editorChanged == &txt_q1)
   {
-    setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Q1Param, val);
+    setInGesture(Ambix_rotatorAudioProcessor::Q1Param, val);
   }
   else if (&editorChanged == &txt_q2)
   {
-    setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Q2Param, val);
+    setInGesture(Ambix_rotatorAudioProcessor::Q2Param, val);
   }
   else if (&editorChanged == &txt_q3)
   {
-    setParameterNotifyingHost(ourProcessor, Ambix_rotatorAudioProcessor::Q3Param, val);
+    setInGesture(Ambix_rotatorAudioProcessor::Q3Param, val);
   }
 
 }

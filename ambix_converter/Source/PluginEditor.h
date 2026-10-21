@@ -36,7 +36,8 @@
 class Ambix_converterAudioProcessorEditor  : public AudioProcessorEditor,
                                             public ComboBox::Listener,
                                             public Button::Listener,
-                                            public ChangeListener
+                                            public ChangeListener,
+                                            private Timer
 {
 public:
     //==============================================================================
@@ -54,6 +55,10 @@ public:
 
     void changeListenerCallback (ChangeBroadcaster *source) override;
 
+    // polls the parameters (the processor no longer posts change messages
+    // for them)
+    void timerCallback() override;
+
 private:
     Ambix_converterAudioProcessor* getProcessor() const
     {
@@ -62,6 +67,11 @@ private:
     LookAndFeel_V3 globalLaF;
     TooltipWindow tooltipWindow;
     int lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
+
+    ambix::ParameterChangeWatcher paramWatcher;
+
+    // one host gesture around one value, for combo boxes, toggles and presets
+    void setParam (int index, float value);
 
 
     //==============================================================================

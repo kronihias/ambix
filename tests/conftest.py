@@ -31,9 +31,12 @@ import pytest
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VST3_DIR  = os.path.join(REPO_ROOT, "_build", "vst3")
+# AMBIX_BUILD_DIR points the suite at another build tree, so several builds
+# (one per branch or worktree) can be tested side by side.
+BUILD_DIR = os.environ.get("AMBIX_BUILD_DIR", os.path.join(REPO_ROOT, "_build"))
+VST3_DIR  = os.path.join(BUILD_DIR, "vst3")
 _TESTHOST_EXE = "ambix_testhost.exe" if os.name == "nt" else "ambix_testhost"
-TESTHOST_BIN = os.path.join(REPO_ROOT, "_build", "testhost", _TESTHOST_EXE)
+TESTHOST_BIN = os.path.join(BUILD_DIR, "testhost", _TESTHOST_EXE)
 
 GOLDEN_DIR = os.path.join(os.path.dirname(__file__), "golden")
 
@@ -142,9 +145,19 @@ def plugin_mirror():
     return _load("ambix_mirror")
 
 
-@pytest.fixture(scope="session")
+# Module scope, unlike the others: ambix_rotator and ambix_rotator_z both
+# listen for OSC on UDP 7120, and whichever instance is alive first holds the
+# port. Releasing ambix_rotator after its own tests lets test_rotator_z's OSC
+# tests reach the plugin they are about.
+@pytest.fixture(scope="module")
 def plugin_rotator():
-    return _load("ambix_rotator")
+    wrapper = _load("ambix_rotator")
+    yield wrapper
+    # pytest can hold on to fixture values past teardown; drop the instance
+    # itself so its OSC receiver closes the port now.
+    wrapper.__dict__["_plugin"] = None
+    import gc
+    gc.collect()
 
 
 @pytest.fixture(scope="session")

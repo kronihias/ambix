@@ -18,7 +18,6 @@
 */
 
 #include "PluginEditor.h"
-#include "../../common/JuceCompat.h"
 
 
 #define Q(x) #x
@@ -27,7 +26,8 @@
 //==============================================================================
 Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_binauralAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-    _width(0)
+    _width(0),
+    paramWatcher(*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
     tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
@@ -182,7 +182,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
     txt_preset.setCaretPosition(txt_preset.getTotalNumChars()-1);
     txt_preset.setTooltip(txt_preset.getText());
 
-    sld_gain.setValue(ParamToDB(ownerFilter->getParameter(0)), dontSendNotification);
+    sld_gain.setValue(ParamToDB(ownerFilter->gain_param->get()), dontSendNotification);
 
     startTimer (100);
 
@@ -194,6 +194,10 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
     //[Destructor_pre]. You can add your own custom destruction code here..
     //[/Destructor_pre]
     stopTimer();
+
+    // closed mid-drag: don't leave the host's gesture open
+    if (gainGesture)
+        getProcessor()->gain_param->endChangeGesture();
 
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
 
@@ -296,7 +300,27 @@ void Ambix_binauralAudioProcessorEditor::resized()
 
 void Ambix_binauralAudioProcessorEditor::timerCallback()
 {
+    // the gain is polled, so host automation shows up as well
+    if (paramWatcher.changed() || gainRefreshPending)
+        refreshGainSlider();
+
     UpdateMeters();
+}
+
+// not while it's dragged or typed into; it's refreshed once it's free
+void Ambix_binauralAudioProcessorEditor::refreshGainSlider()
+{
+    bool busy = gainGesture;
+
+    for (auto* child : sld_gain.getChildren())
+        if (auto* label = dynamic_cast<Label*> (child))
+            if (label->isBeingEdited())
+                busy = true;
+
+    gainRefreshPending = busy;
+
+    if (! busy)
+        sld_gain.setValue(ParamToDB(getProcessor()->gain_param->get()), dontSendNotification);
 }
 
 bool Ambix_binauralAudioProcessorEditor::isInterestedInFileDrag(StringArray const& files)
@@ -496,7 +520,36 @@ void Ambix_binauralAudioProcessorEditor::sliderValueChanged (Slider* sliderThatW
 
     if (sliderThatWasMoved == &sld_gain)
     {
-        setParameterNotifyingHost(ourProcessor, 0, DbToParam(sld_gain.getValue()));
+        auto* param = ourProcessor->gain_param;
+
+        // drags, wheel, text entry and double-click arrive inside the
+        // slider's drag notifications; anything else (keys) gets a gesture
+        // of its own
+        if (! gainGesture)
+            param->beginChangeGesture();
+
+        param->setValueNotifyingHost(DbToParam(sld_gain.getValue()));
+
+        if (! gainGesture)
+            param->endChangeGesture();
+    }
+}
+
+void Ambix_binauralAudioProcessorEditor::sliderDragStarted (Slider* slider)
+{
+    if (slider == &sld_gain)
+    {
+        gainGesture = true;
+        getProcessor()->gain_param->beginChangeGesture();
+    }
+}
+
+void Ambix_binauralAudioProcessorEditor::sliderDragEnded (Slider* slider)
+{
+    if (slider == &sld_gain)
+    {
+        getProcessor()->gain_param->endChangeGesture();
+        gainGesture = false;
     }
 }
 
@@ -622,9 +675,7 @@ void Ambix_binauralAudioProcessorEditor::UpdateMeters()
 
 void Ambix_binauralAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
-    Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-
-    sld_gain.setValue(ParamToDB(ourProcessor->getParameter(0)), dontSendNotification);
+    refreshGainSlider();
 
     UpdateText();
     DrawMeters();

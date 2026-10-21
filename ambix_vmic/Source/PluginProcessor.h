@@ -26,8 +26,10 @@
 #include "SphFilter/SphFilter.h"
 
 #include <Eigen/Eigen>
+#include <atomic>
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 
 #define PARAMS_PER_FILTER 7
 
@@ -121,7 +123,8 @@ inline float Deg180ToParam(float deg)
 /**
 */
 class Ambix_vmicAudioProcessor  : public AudioProcessor,
-                                  public ChangeBroadcaster
+                                  public ambix::ParameterOwner,
+                                  public ChangeBroadcaster // numChannelsChanged() only
 {
 public:
     //==============================================================================
@@ -148,13 +151,9 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
+    // the parameter objects: PARAMS_PER_FILTER per filter, in Parameters order
+    ambix::Parameter& getParam (int index) const { return *params[index]; }
+    ambix::Parameter& getParam (int filter, int param) const { return *params[PARAMS_PER_FILTER*filter + param]; }
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -195,22 +194,18 @@ public:
 
 private:
 
+    // legacy setParameter() body minus the change message: flags the
+    // transformation matrix for recalculation
+    void parameterValueSet (int index, float newValue) override;
+
     void calcParams();
 
-
-    ArrayParam shape;
-    ArrayParam width;
-    ArrayParam height;
-    ArrayParam gain;
-    ArrayParam window;
-    ArrayParam transition;
-
-    SphCoordParam center_sph;
-
+    // owned by AudioProcessor; calcParams() reads them once per change
+    ambix::Parameter* params[PARAMS_PER_FILTER*NUM_FILTERS_VMIC] {};
 
     bool _initialized;
 
-    bool _param_changed; // param changed need recalculation
+    std::atomic<bool> _param_changed; // param changed need recalculation
 
     AudioSampleBuffer output_buffer;
 

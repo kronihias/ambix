@@ -18,14 +18,14 @@
 */
 
 #include "PluginEditor.h"
-#include "../../common/JuceCompat.h"
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)
 
 //==============================================================================
 Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_converterAudioProcessor* ownerFilter)
-    : AudioProcessorEditor (ownerFilter)
+    : AudioProcessorEditor (ownerFilter),
+      paramWatcher (*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
     tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
@@ -215,8 +215,10 @@ Ambix_converterAudioProcessorEditor::Ambix_converterAudioProcessorEditor (Ambix_
     //[Constructor] You can add your own custom stuff here..
     //startTimer (500); // timer is deprecated - use changelistener!
     //[/Constructor]
-    ownerFilter->addChangeListener(this);
+    ownerFilter->addChangeListener(this); // channel count changes
+    paramWatcher.changed(); // getParamsFromHost() below primes the editor
     getParamsFromHost();
+    startTimer (40);
 }
 
 Ambix_converterAudioProcessorEditor::~Ambix_converterAudioProcessorEditor()
@@ -324,7 +326,7 @@ void Ambix_converterAudioProcessorEditor::getParamsFromHost()
 
 
 	// input channel sequence box
-    float value = ourProcessor->getParameter(Ambix_converterAudioProcessor::InSeqParam);
+    float value = ourProcessor->getParam (Ambix_converterAudioProcessor::InSeqParam).get();
 	if (value < 0.33f) {
 		box_in_ch_seq.setSelectedId(1, dontSendNotification);
 	} else if (value >= 0.33 && value < 0.66f) {
@@ -334,7 +336,7 @@ void Ambix_converterAudioProcessorEditor::getParamsFromHost()
 	}
 
 	// output channel sequence box
-    value = ourProcessor->getParameter(Ambix_converterAudioProcessor::OutSeqParam);
+    value = ourProcessor->getParam (Ambix_converterAudioProcessor::OutSeqParam).get();
 	if (value < 0.33f) {
 		box_out_ch_seq.setSelectedId(1, dontSendNotification);
 	} else if (value >= 0.33 && value < 0.66f) {
@@ -344,7 +346,7 @@ void Ambix_converterAudioProcessorEditor::getParamsFromHost()
 	}
 
 	// input normalization scheme box
-    value = ourProcessor->getParameter(Ambix_converterAudioProcessor::InNormParam);
+    value = ourProcessor->getParam (Ambix_converterAudioProcessor::InNormParam).get();
 	if (value < 0.33f) {
 		box_in_norm.setSelectedId(1, dontSendNotification);
 	} else if (value >= 0.33 && value < 0.66f) {
@@ -354,7 +356,7 @@ void Ambix_converterAudioProcessorEditor::getParamsFromHost()
 	}
 
 	// output normalization scheme box
-    value = ourProcessor->getParameter(Ambix_converterAudioProcessor::OutNormParam);
+    value = ourProcessor->getParam (Ambix_converterAudioProcessor::OutNormParam).get();
 	if (value < 0.33f) {
 		box_out_norm.setSelectedId(1, dontSendNotification);
 	} else if (value >= 0.33 && value < 0.66f) {
@@ -364,22 +366,22 @@ void Ambix_converterAudioProcessorEditor::getParamsFromHost()
 	}
 
     // condon shortley phase
-    tgl_invert_cs.setToggleState((ourProcessor->getParameter(Ambix_converterAudioProcessor::FlipCsParam) > 0.5f), dontSendNotification);
+    tgl_invert_cs.setToggleState((ourProcessor->getParam (Ambix_converterAudioProcessor::FlipCsParam).get() > 0.5f), dontSendNotification);
 
     // flip
-    tgl_flip.setToggleState((ourProcessor->getParameter(Ambix_converterAudioProcessor::FlipParam) > 0.5f), dontSendNotification);
+    tgl_flip.setToggleState((ourProcessor->getParam (Ambix_converterAudioProcessor::FlipParam).get() > 0.5f), dontSendNotification);
 
     // flop
-    tgl_flop.setToggleState((ourProcessor->getParameter(Ambix_converterAudioProcessor::FlopParam) > 0.5f), dontSendNotification);
+    tgl_flop.setToggleState((ourProcessor->getParam (Ambix_converterAudioProcessor::FlopParam).get() > 0.5f), dontSendNotification);
 
     // flip
-    tgl_flap.setToggleState((ourProcessor->getParameter(Ambix_converterAudioProcessor::FlapParam) > 0.5f), dontSendNotification);
+    tgl_flap.setToggleState((ourProcessor->getParam (Ambix_converterAudioProcessor::FlapParam).get() > 0.5f), dontSendNotification);
 
     // in_2d
-    tgl_in_2d.setToggleState((ourProcessor->getParameter(Ambix_converterAudioProcessor::In2DParam) > 0.5f), dontSendNotification);
+    tgl_in_2d.setToggleState((ourProcessor->getParam (Ambix_converterAudioProcessor::In2DParam).get() > 0.5f), dontSendNotification);
 
     // out_2d
-    tgl_out_2d.setToggleState((ourProcessor->getParameter(Ambix_converterAudioProcessor::Out2DParam) > 0.5f), dontSendNotification);
+    tgl_out_2d.setToggleState((ourProcessor->getParam (Ambix_converterAudioProcessor::Out2DParam).get() > 0.5f), dontSendNotification);
 
 }
 
@@ -402,28 +404,28 @@ void Ambix_converterAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxTha
         //[UserComboBoxCode_box_in_ch_seq] -- add your combo box handling code here..
 
         float value = (float)box_in_ch_seq.getSelectedItemIndex() * 0.333f;
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, value);
+        setParam (Ambix_converterAudioProcessor::InSeqParam, value);
         //[/UserComboBoxCode_box_in_ch_seq]
     }
     else if (comboBoxThatHasChanged == &box_out_ch_seq)
     {
         //[UserComboBoxCode_box_out_ch_seq] -- add your combo box handling code here..
         float value = (float)box_out_ch_seq.getSelectedItemIndex() * 0.333f;
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, value);
+        setParam (Ambix_converterAudioProcessor::OutSeqParam, value);
         //[/UserComboBoxCode_box_out_ch_seq]
     }
     else if (comboBoxThatHasChanged == &box_in_norm)
     {
         //[UserComboBoxCode_box_in_norm] -- add your combo box handling code here..
         float value = (float)box_in_norm.getSelectedItemIndex() * 0.333f;
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, value);
+        setParam (Ambix_converterAudioProcessor::InNormParam, value);
         //[/UserComboBoxCode_box_in_norm]
     }
     else if (comboBoxThatHasChanged == &box_out_norm)
     {
         //[UserComboBoxCode_box_out_norm] -- add your combo box handling code here..
         float value = (float)box_out_norm.getSelectedItemIndex() * 0.333f;
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, value);
+        setParam (Ambix_converterAudioProcessor::OutNormParam, value);
         //[/UserComboBoxCode_box_out_norm]
     }
     else if (comboBoxThatHasChanged == &box_presets)
@@ -442,235 +444,235 @@ void Ambix_converterAudioProcessorEditor::comboBoxChanged (ComboBox* comboBoxTha
         ourProcessor->box_presets_text = box_presets.getText();
 
         if (box_presets.getSelectedId() == 1) { // .amb -> ambix
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_fuma);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_fuma);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_fuma);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_fuma);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 2) { // ambix -> .amb
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_fuma);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_fuma);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_fuma);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_fuma);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 3) { // UA -> ambix
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_n3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_n3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_sid);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_sid);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 4) { // ambix -> UA
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_n3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_n3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_sid);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_sid);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 5) { // Wigware/B2X -> ambix
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_fuma);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_fuma);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_fuma);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_fuma);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 6) { // ambix -> Wigware/B2X
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_fuma);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_fuma);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_fuma);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_fuma);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 7) { // iem_ambi -> ambix
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_sid);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_sid);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 8) { // ambix -> iem_ambi
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_sid);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_sid);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 9) { // ICST -> ambix
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_fuma);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_fuma);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 10) { // ambix -> ICST
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_fuma);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_fuma);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 11) { // mtx_spherical_harmonics -> ambix
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_n3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_n3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f); // ! dont ! flip condon shortley phase
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f); // ! dont ! flip condon shortley phase
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 1.f); // flip negative m
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 1.f); // flip negative m
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
 
         }
 
 
         if (box_presets.getSelectedId() == 12) { // ambix -> mtx_spherical_harmonics
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_n3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_n3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f); // !dont! flip condon shortley phase
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f); // !dont! flip condon shortley phase
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, 1.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipParam, 1.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
         if (box_presets.getSelectedId() == 13) { // flat
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::InNormParam, norm_sn3d);
+            setParam (Ambix_converterAudioProcessor::OutNormParam, norm_sn3d);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::InSeqParam, seq_acn);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::InSeqParam, seq_acn);
+            setParam (Ambix_converterAudioProcessor::OutSeqParam, seq_acn);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlipCsParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlopParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::FlapParam, 0.f);
 
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, 0.f);
-            setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::In2DParam, 0.f);
+            setParam (Ambix_converterAudioProcessor::Out2DParam, 0.f);
         }
 
 
@@ -689,37 +691,49 @@ void Ambix_converterAudioProcessorEditor::buttonClicked (Button* buttonThatWasCl
 
     if (buttonThatWasClicked == &tgl_invert_cs)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipCsParam, (float)tgl_invert_cs.getToggleState());
+        setParam (Ambix_converterAudioProcessor::FlipCsParam, (float)tgl_invert_cs.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_flip)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlipParam, (float)tgl_flip.getToggleState());
+        setParam (Ambix_converterAudioProcessor::FlipParam, (float)tgl_flip.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_flop)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlopParam, (float)tgl_flop.getToggleState());
+        setParam (Ambix_converterAudioProcessor::FlopParam, (float)tgl_flop.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_flap)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::FlapParam, (float)tgl_flap.getToggleState());
+        setParam (Ambix_converterAudioProcessor::FlapParam, (float)tgl_flap.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_in_2d)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::In2DParam, (float)tgl_in_2d.getToggleState());
+        setParam (Ambix_converterAudioProcessor::In2DParam, (float)tgl_in_2d.getToggleState());
     }
     else if (buttonThatWasClicked == &tgl_out_2d)
     {
-        setParameterNotifyingHost(ourProcessor, Ambix_converterAudioProcessor::Out2DParam, (float)tgl_out_2d.getToggleState());
+        setParam (Ambix_converterAudioProcessor::Out2DParam, (float)tgl_out_2d.getToggleState());
     }
 
+}
+
+void Ambix_converterAudioProcessorEditor::setParam (int index, float value)
+{
+    auto& param = getProcessor()->getParam (index);
+    param.beginChangeGesture();
+    param.setValueNotifyingHost (value);
+    param.endChangeGesture();
+}
+
+void Ambix_converterAudioProcessorEditor::timerCallback()
+{
+    if (paramWatcher.changed())
+        getParamsFromHost();
 }
 
 void Ambix_converterAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
     getParamsFromHost();
-    // sendChangeMessage() also fires on every parameter change, so repaint only
-    // when the channel count (ambisonic order) actually changes - otherwise we
-    // would redraw the whole editor on every automation step.
+    // repaint only when the channel count (ambisonic order) actually changes
     const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
                       |  getAudioProcessor()->getTotalNumOutputChannels();
     if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }

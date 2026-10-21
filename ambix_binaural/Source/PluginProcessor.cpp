@@ -61,12 +61,16 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
     _load_ir(true),
     SampleRate(44100),
     isProcessing(false),
-    _gain(0.5f),
+    _appliedGain(-1.f),
     _storeConfigDataInProject(1),
     _readyToSaveConfiguration(false),
     Thread("ambix_binaural")
 
 {
+    // stored only - processBlock() applies it to the speakers
+    addParameter (gain_param = new ambix::Parameter (*this, 0, "OutGain", 0.5f,
+        [] (float v, int) { String text; text = String(ParamToDB(v)).substring(0, 5); text << " dB"; return text; }));
+
     presetDir = presetDir.getSpecialLocation(File::userApplicationDataDirectory).getChildFile("ambix/binaural_presets");
     std::cout << "Recursive search dir:" << presetDir.getFullPathName() << std::endl;
 
@@ -97,6 +101,12 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
 
 Ambix_binauralAudioProcessor::~Ambix_binauralAudioProcessor()
 {
+    // the loader must not outlive the processor (LoadConfiguration checks
+    // threadShouldExit() between IRs)
+    signalThreadShouldExit();
+    notify();
+    stopThread(30000);
+
 #if BINAURAL_DECODER
     #if WITH_ZITA_CONVOLVER
         zita_conv.stop_process();
@@ -152,40 +162,6 @@ void Ambix_binauralAudioProcessor::LoadPresetByName(String presetName)
 const String Ambix_binauralAudioProcessor::getName() const
 {
     return JucePlugin_Name;
-}
-
-int Ambix_binauralAudioProcessor::getNumParameters()
-{
-    return 1;
-}
-
-float Ambix_binauralAudioProcessor::getParameter (int index)
-{
-    return _gain;
-}
-
-void Ambix_binauralAudioProcessor::setParameter (int index, float newValue)
-{
-    _gain = jlimit(0.f, 1.f, newValue);
-
-    int NumSpeakers = _AmbiSpeakers.size();
-
-    for (int i=0; i < NumSpeakers; i++) {
-        _AmbiSpeakers.getUnchecked(i)->setGainFactor(ParamToRMS(_gain));
-    }
-}
-
-const String Ambix_binauralAudioProcessor::getParameterName (int index)
-{
-    return String("OutGain");
-}
-
-const String Ambix_binauralAudioProcessor::getParameterText (int index)
-{
-    String text;
-    text = String(ParamToDB(_gain)).substring(0, 5);
-    text << " dB";
-    return text;
 }
 
 const String Ambix_binauralAudioProcessor::getInputChannelName (int channelIndex) const
@@ -342,7 +318,8 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
 {
     isProcessing = true;
 
-    if (!configLoaded)
+    // a host sending more samples than prepared would overrun ambi_spk_buffer_
+    if (!configLoaded || buffer.getNumSamples() > ambi_spk_buffer_.getNumSamples())
     {
         // if nothing is loaded just clear the buffer...
         buffer.clear();
@@ -350,6 +327,14 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
     } else {
 
         int NumSpeakers = _AmbiSpeakers.size();
+
+        const float gain = gain_param->get();
+        if (gain != _appliedGain)
+        {
+            for (int i=0; i < NumSpeakers; i++)
+                _AmbiSpeakers.getUnchecked(i)->setGainFactor(ParamToRMS(gain));
+            _appliedGain = gain;
+        }
 
         ambi_spk_buffer_.clear();
 
@@ -398,7 +383,8 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
                 }
                 //std::cout << "new samples: " << NumSamples << " Samples, out level: " << buffer.getMagnitude(0, NumSamples) << std::endl;
             #else
-                mtxconv_.processBlock(ambi_spk_buffer_, buffer, NumSamples, true);
+                // only block on the convolver threads when rendering offline
+                mtxconv_.processBlock(ambi_spk_buffer_, buffer, NumSamples, isNonRealtime());
             #endif
         }
 #else
@@ -417,6 +403,12 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
 
 void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
 {
+    {
+        // also when called directly (editor), so a reload reloads this one
+        const ScopedLock sl (loadRequestLock);
+        requestedConfigFile = configFile;
+    }
+
     if (!configFile.existsAsFile())
     {
 
@@ -431,6 +423,10 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
 
     // unload first....
     if (configLoaded) {
+
+        // clear the flag *before* waiting: a block starting after this sees
+        // !configLoaded, one already running is caught by isProcessing
+        configLoaded = false;
 
         while (isProcessing) {
             Sleep(1);
@@ -929,7 +925,7 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
                     ///////////////////
                     // finally add speaker with decoder row
 
-                    _AmbiSpeakers.add(new AmbiSpeaker(getSampleRate(), getBlockSize(), ParamToRMS(_gain) ));
+                    _AmbiSpeakers.add(new AmbiSpeaker(getSampleRate(), getBlockSize(), ParamToRMS(gain_param->get()) ));
                     _AmbiSpeakers.getLast()->setDecoderRow(DecoderRow);
 
                     _AmbiChannels = jmax(_AmbiChannels, DecoderRow.size());
@@ -981,23 +977,33 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
         zita_conv.start_process(CONVPROC_SCHEDULER_PRIORITY, CONVPROC_SCHEDULER_CLASS);
 
     #else
-        mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192, safemode_);
-
-        // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
-        for (int i=0; i < conv_data.getNumIRs(); i++)
+        // without "load IRs" the convolver keeps running with the old filters -
+        // adding them again would grow its filter arrays under the worker threads
+        if (_load_ir)
         {
-            if (threadShouldExit())
-                return;
+            mtxconv_.Configure(conv_data.getNumInputChannels(), conv_data.getNumOutputChannels(), BufferSize, conv_data.getMaxLength(), ConvBufferSize, 8192, safemode_);
 
-            mtxconv_.AddFilter(conv_data.getInCh(i), conv_data.getOutCh(i), *conv_data.getIR(i));
+            // std::cout << "configure: numins: " << conv_data.getNumInputChannels()
+            for (int i=0; i < conv_data.getNumIRs(); i++)
+            {
+                if (threadShouldExit())
+                    return;
+
+                mtxconv_.AddFilter(conv_data.getInCh(i), conv_data.getOutCh(i), *conv_data.getIR(i));
+            }
+
+            mtxconv_.StartProc();
         }
-
-        mtxconv_.StartProc();
     #endif
 
 #endif
 
     ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
+
+    // the speakers were built with the gain as it was then - have processBlock
+    // apply the current one (the audio thread doesn't touch _appliedGain
+    // while !configLoaded)
+    _appliedGain = -1.f;
 
     configLoaded = true;
 
@@ -1078,20 +1084,55 @@ void Ambix_binauralAudioProcessor::UnloadConfiguration()
 
 void Ambix_binauralAudioProcessor::run()
 {
-    LoadConfiguration(_desConfigFile);
+    // Stays up between loads, so a request can't fall into the gap between
+    // "nothing pending" and the thread exiting.
+    while (! threadShouldExit())
+    {
+        File next;
+        {
+            const ScopedLock sl (loadRequestLock);
+            if (loadPending)
+            {
+                next = pendingConfigFile;
+                loadPending = false;
+            }
+        }
+
+        if (next != File())
+            LoadConfiguration(next);
+        else
+            wait(-1); // until LoadConfigurationAsync() notifies
+    }
 }
 
 void Ambix_binauralAudioProcessor::LoadConfigurationAsync(File configFile)
 {
     DebugPrint("Loading preset...\n\n");
-    _desConfigFile = configFile;
-    startThread(Thread::Priority::normal);
+
+    {
+        const ScopedLock sl (loadRequestLock);
+        pendingConfigFile = requestedConfigFile = configFile;
+        loadPending = true;
+    }
+
+    if (isThreadRunning())
+        notify();
+    else
+        startThread(Thread::Priority::normal);
 }
 
 void Ambix_binauralAudioProcessor::ReloadConfiguration()
 {
-    if (configLoaded)
-        LoadConfigurationAsync(_configFile);
+    // Reload what was last asked for, also while that is still loading: the
+    // running load may have started with the old sample rate / block size.
+    File file;
+    {
+        const ScopedLock sl (loadRequestLock);
+        file = requestedConfigFile;
+    }
+
+    if (file.existsAsFile())
+        LoadConfigurationAsync(file);
 }
 
 bool Ambix_binauralAudioProcessor::SaveConfiguration(File zipFile)
@@ -1217,7 +1258,7 @@ void Ambix_binauralAudioProcessor::getStateInformation (MemoryBlock& destData)
     xml.setAttribute ("activePreset", activePreset);
     xml.setAttribute ("presetDir", presetDir.getFullPathName());
     xml.setAttribute("ConvBufferSize", (int)ConvBufferSize);
-    xml.setAttribute("Gain", _gain);
+    xml.setAttribute("Gain", gain_param->get());
     xml.setAttribute("storeConfigDataInProject", _storeConfigDataInProject.get());
 
     // add .zip configuration as base64 dump
@@ -1253,7 +1294,7 @@ void Ambix_binauralAudioProcessor::setStateInformation (const void* data, int si
 
             ConvBufferSize = xmlState->getIntAttribute("ConvBufferSize", ConvBufferSize);
 
-            _gain = jlimit(0.f, 1.f, (float)xmlState->getDoubleAttribute("Gain", 0.5f));
+            gain_param->restore(jlimit(0.f, 1.f, (float)xmlState->getDoubleAttribute("Gain", 0.5f)));
 
             _storeConfigDataInProject.set(xmlState->getIntAttribute("storeConfigDataInProject", 0)); // -> default: don't store convolver data for existing projects
 

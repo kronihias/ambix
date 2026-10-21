@@ -18,7 +18,6 @@
  */
 
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 
 #define Q(x) #x
@@ -27,7 +26,8 @@
 //==============================================================================
 Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wideningAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-      _changed (true)
+      _changed (true),
+      paramWatcher (*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
     tooltipWindow.setMillisecondsBeforeTipAppears (700);
@@ -95,19 +95,37 @@ Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wi
     btn_single_sided.setTooltip ("single-sided mode (causal FIR, no latency)");
 
     // --- Drag callback from visualizer ---
+    // one gesture per drag, however many touches start one
+    visualizer.onModDepthDragStarted = [this]
+    {
+        if (! depthGesture)
+        {
+            depthGesture = true;
+            ambix::Parameter::at (*getProcessor(), Ambix_wideningAudioProcessor::ModDepthParam)->beginChangeGesture();
+        }
+    };
+
+    visualizer.onModDepthDragEnded = [this]
+    {
+        if (depthGesture)
+        {
+            depthGesture = false;
+            ambix::Parameter::at (*getProcessor(), Ambix_wideningAudioProcessor::ModDepthParam)->endChangeGesture();
+        }
+    };
+
     visualizer.onModDepthDragged = [this] (float normModDepth)
     {
-        auto* p = getProcessor();
-        setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::ModDepthParam, normModDepth);
+        ambix::Parameter::at (*getProcessor(), Ambix_wideningAudioProcessor::ModDepthParam)->setValueNotifyingHost (normModDepth);
     };
 
     // --- Scroll wheel callback from visualizer (adjusts Mod T) ---
     visualizer.onModTScrolled = [this] (float delta)
     {
-        auto* p = getProcessor();
-        float currentNorm = p->getParameter (Ambix_wideningAudioProcessor::ModTParam);
+        auto* param = ambix::Parameter::at (*getProcessor(), Ambix_wideningAudioProcessor::ModTParam);
+        float currentNorm = param->get();
         float newNorm = juce::jlimit (0.0f, 1.0f, currentNorm + delta);
-        setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::ModTParam, newNorm);
+        setInGesture (param, newNorm);
     };
 
     // --- Register for processor change notifications ---
@@ -127,6 +145,14 @@ Ambix_wideningAudioProcessorEditor::Ambix_wideningAudioProcessorEditor (Ambix_wi
 
 Ambix_wideningAudioProcessorEditor::~Ambix_wideningAudioProcessorEditor()
 {
+    // closed mid-drag: don't leave the host's gesture open
+    if (gestureSlider != nullptr)
+        if (auto* param = parameterFor (gestureSlider))
+            param->endChangeGesture();
+
+    if (visualizer.onModDepthDragEnded)
+        visualizer.onModDepthDragEnded();
+
     getProcessor()->removeChangeListener (this);
     stopTimer();
     setLookAndFeel (nullptr);
@@ -213,37 +239,97 @@ void Ambix_wideningAudioProcessorEditor::resized()
 }
 
 //==============================================================================
+ambix::Parameter* Ambix_wideningAudioProcessorEditor::parameterFor (Slider* s) const
+{
+    auto& p = *getProcessor();
+
+    if (s == &sld_mod_depth)  return ambix::Parameter::at (p, Ambix_wideningAudioProcessor::ModDepthParam);
+    if (s == &sld_mod_t)      return ambix::Parameter::at (p, Ambix_wideningAudioProcessor::ModTParam);
+    if (s == &sld_rot_offset) return ambix::Parameter::at (p, Ambix_wideningAudioProcessor::RotOffsetParam);
+
+    return nullptr;
+}
+
+// one-shot change outside a drag (button, wheel, key): a gesture of its own
+void Ambix_wideningAudioProcessorEditor::setInGesture (ambix::Parameter* p, float value)
+{
+    p->beginChangeGesture();
+    p->setValueNotifyingHost (value);
+    p->endChangeGesture();
+}
+
+// being dragged or typed into: don't refresh it from the processor
+bool Ambix_wideningAudioProcessorEditor::isBusy (Slider& s) const
+{
+    if (&s == gestureSlider)
+        return true;
+
+    for (auto* child : s.getChildren())
+        if (auto* label = dynamic_cast<Label*> (child))
+            if (label->isBeingEdited())
+                return true;
+
+    return false;
+}
+
+void Ambix_wideningAudioProcessorEditor::sliderDragStarted (Slider* s)
+{
+    if (auto* param = parameterFor (s))
+    {
+        gestureSlider = s;
+        param->beginChangeGesture();
+    }
+}
+
+void Ambix_wideningAudioProcessorEditor::sliderDragEnded (Slider* s)
+{
+    if (auto* param = parameterFor (s))
+    {
+        param->endChangeGesture();
+
+        if (gestureSlider == s)
+            gestureSlider = nullptr;
+    }
+}
+
 void Ambix_wideningAudioProcessorEditor::sliderValueChanged (Slider* s)
 {
-    auto* p = getProcessor();
+    auto* param = parameterFor (s);
+
+    if (param == nullptr)
+        return;
+
+    float value = 0.f;
 
     if (s == &sld_mod_depth)
-        setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::ModDepthParam,
-                                   (float) sld_mod_depth.getValue() / 360.0f);
+        value = (float) sld_mod_depth.getValue() / 360.0f;
     else if (s == &sld_mod_t)
-        setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::ModTParam,
-                                   (float) (sld_mod_t.getValue() - 0.2) / 69.8f);
+        value = (float) (sld_mod_t.getValue() - 0.2) / 69.8f;
     else if (s == &sld_rot_offset)
-        setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::RotOffsetParam,
-                                   (float) (sld_rot_offset.getValue() + 180.0) / 360.0f);
+        value = (float) (sld_rot_offset.getValue() + 180.0) / 360.0f;
+
+    // drags, wheel, text entry and double-click arrive inside the slider's
+    // drag notifications; anything else (keys) gets a gesture of its own
+    if (s == gestureSlider)
+        param->setValueNotifyingHost (value);
+    else
+        setInGesture (param, value);
 }
 
 void Ambix_wideningAudioProcessorEditor::buttonClicked (Button* b)
 {
     if (b == &btn_single_sided)
     {
-        auto* p = getProcessor();
-        setParameterNotifyingHost (p, Ambix_wideningAudioProcessor::SingleSideParam,
-                                   btn_single_sided.getToggleState() ? 1.0f : 0.0f);
+        setInGesture (ambix::Parameter::at (*getProcessor(), Ambix_wideningAudioProcessor::SingleSideParam),
+                      btn_single_sided.getToggleState() ? 1.0f : 0.0f);
     }
 }
 
 void Ambix_wideningAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster*)
 {
     _changed = true;
-    // sendChangeMessage() also fires on every parameter change, so repaint only
-    // when the channel count (ambisonic order) actually changes - otherwise we
-    // would redraw the whole editor on every automation step.
+    // repaint (the order in the title) only when the channel count actually
+    // changes; parameter changes are polled in timerCallback()
     const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
                       |  getAudioProcessor()->getTotalNumOutputChannels();
     if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }
@@ -251,17 +337,28 @@ void Ambix_wideningAudioProcessorEditor::changeListenerCallback (ChangeBroadcast
 
 void Ambix_wideningAudioProcessorEditor::timerCallback()
 {
-    auto* p = getProcessor();
+    // a control skipped below (dragged / edited) is refreshed once it's free
+    if (! paramWatcher.changed() && ! refreshPending)
+        return;
 
-    float modDepth = p->getParameter (Ambix_wideningAudioProcessor::ModDepthParam);
-    float modT = p->getParameter (Ambix_wideningAudioProcessor::ModTParam);
-    float rotOffset = p->getParameter (Ambix_wideningAudioProcessor::RotOffsetParam);
-    float singleSided = p->getParameter (Ambix_wideningAudioProcessor::SingleSideParam);
+    refreshPending = false;
+
+    auto& p = *getProcessor();
+
+    float modDepth = ambix::Parameter::at (p, Ambix_wideningAudioProcessor::ModDepthParam)->get();
+    float modT = ambix::Parameter::at (p, Ambix_wideningAudioProcessor::ModTParam)->get();
+    float rotOffset = ambix::Parameter::at (p, Ambix_wideningAudioProcessor::RotOffsetParam)->get();
+    float singleSided = ambix::Parameter::at (p, Ambix_wideningAudioProcessor::SingleSideParam)->get();
 
     // Update sliders from processor state
-    sld_mod_depth.setValue (modDepth * 360.0, dontSendNotification);
-    sld_mod_t.setValue (modT * 69.8 + 0.2, dontSendNotification);
-    sld_rot_offset.setValue (rotOffset * 360.0 - 180.0, dontSendNotification);
+    if (isBusy (sld_mod_depth)) refreshPending = true;
+    else sld_mod_depth.setValue (modDepth * 360.0, dontSendNotification);
+
+    if (isBusy (sld_mod_t)) refreshPending = true;
+    else sld_mod_t.setValue (modT * 69.8 + 0.2, dontSendNotification);
+
+    if (isBusy (sld_rot_offset)) refreshPending = true;
+    else sld_rot_offset.setValue (rotOffset * 360.0 - 180.0, dontSendNotification);
     btn_single_sided.setToggleState (singleSided > 0.5f, dontSendNotification);
 
     // Update visualizations

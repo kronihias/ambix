@@ -18,7 +18,6 @@
  */
 
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 
 #define Q(x) #x
@@ -27,7 +26,8 @@
 //==============================================================================
 Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-      _changed (true)
+      _changed (true),
+      paramWatcher (*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
     tooltipWindow.setMillisecondsBeforeTipAppears (700);
@@ -135,15 +135,24 @@ Ambix_warpAudioProcessorEditor::Ambix_warpAudioProcessorEditor (Ambix_warpAudioP
     btn_redo.setEnabled (false);
 
     // --- Drag callback from visualizer ---
-    visualizer.onGestureEnded = [this] () { saveUndoState(); };
+    visualizer.onGestureStarted = [this] ()
+    {
+        beginGesture (P::PhiParam);
+        beginGesture (P::ThetaParam);
+    };
+    visualizer.onGestureEnded = [this] ()
+    {
+        endGesture (P::PhiParam);
+        endGesture (P::ThetaParam);
+        saveUndoState();
+    };
     visualizer.onWarpDragged = [this] (float phiNorm, float thetaNorm)
     {
-        auto* p = getProcessor();
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::PhiParam, phiNorm);
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::ThetaParam, thetaNorm);
+        setParametersFromEditor ({ { P::PhiParam, phiNorm }, { P::ThetaParam, thetaNorm } });
     };
 
     // --- Register for processor change notifications ---
+    // (channel count changes only; parameters are polled from the timer)
     getProcessor()->addChangeListener (this);
 
     // --- Window size ---
@@ -165,6 +174,11 @@ Ambix_warpAudioProcessorEditor::~Ambix_warpAudioProcessorEditor()
 {
     getProcessor()->removeChangeListener (this);
     stopTimer();
+
+    // don't leave a gesture open in the host
+    for (int i = 0; i < P::totalNumParams; ++i)
+        endGesture (i);
+
     setLookAndFeel (nullptr);
 }
 
@@ -268,53 +282,108 @@ void Ambix_warpAudioProcessorEditor::resized()
 //==============================================================================
 void Ambix_warpAudioProcessorEditor::sliderValueChanged (Slider* s)
 {
-    auto* p = getProcessor();
-
     if (s == &sld_phi)
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::PhiParam,
-                                   (float) (sld_phi.getValue() + 0.9) / 1.8f);
+        setParameterFromEditor (P::PhiParam,
+                                (float) (sld_phi.getValue() + 0.9) / 1.8f);
     else if (s == &sld_theta)
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::ThetaParam,
-                                   (float) (sld_theta.getValue() + 0.9) / 1.8f);
+        setParameterFromEditor (P::ThetaParam,
+                                (float) (sld_theta.getValue() + 0.9) / 1.8f);
     else if (s == &sld_in_order)
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::InOrderParam,
-                                   (float) sld_in_order.getValue() / (float) sld_in_order.getMaximum());
+        setParameterFromEditor (P::InOrderParam,
+                                (float) sld_in_order.getValue() / (float) sld_in_order.getMaximum());
     else if (s == &sld_out_order)
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::OutOrderParam,
-                                   (float) sld_out_order.getValue() / (float) sld_out_order.getMaximum());
+        setParameterFromEditor (P::OutOrderParam,
+                                (float) sld_out_order.getValue() / (float) sld_out_order.getMaximum());
 
 }
 
-void Ambix_warpAudioProcessorEditor::sliderDragStarted (Slider*)
+int Ambix_warpAudioProcessorEditor::paramForSlider (Slider* s) const
 {
+    if (s == &sld_phi)       return P::PhiParam;
+    if (s == &sld_theta)     return P::ThetaParam;
+    if (s == &sld_in_order)  return P::InOrderParam;
+    if (s == &sld_out_order) return P::OutOrderParam;
+    return -1;
 }
 
-void Ambix_warpAudioProcessorEditor::sliderDragEnded (Slider*)
+void Ambix_warpAudioProcessorEditor::beginGesture (int index)
 {
+    if (index >= 0 && ! gestureOpen[index])
+    {
+        gestureOpen[index] = true;
+        getProcessor()->param (index).beginChangeGesture();
+    }
+}
+
+void Ambix_warpAudioProcessorEditor::endGesture (int index)
+{
+    if (index >= 0 && gestureOpen[index])
+    {
+        gestureOpen[index] = false;
+        getProcessor()->param (index).endChangeGesture();
+    }
+}
+
+void Ambix_warpAudioProcessorEditor::setParameterFromEditor (int index, float newValue)
+{
+    const bool ownGesture = ! gestureOpen[index];
+
+    if (ownGesture) beginGesture (index);
+    getProcessor()->param (index).setValueNotifyingHost (newValue);
+    if (ownGesture) endGesture (index);
+}
+
+void Ambix_warpAudioProcessorEditor::setParametersFromEditor (const std::vector<std::pair<int, float>>& values)
+{
+    std::vector<int> own;
+
+    for (auto& v : values)
+    {
+        if (! gestureOpen[v.first])
+        {
+            beginGesture (v.first);
+            own.push_back (v.first);
+        }
+    }
+
+    for (auto& v : values)
+        getProcessor()->param (v.first).setValueNotifyingHost (v.second);
+
+    for (auto index : own)
+        endGesture (index);
+}
+
+void Ambix_warpAudioProcessorEditor::sliderDragStarted (Slider* s)
+{
+    beginGesture (paramForSlider (s));
+}
+
+void Ambix_warpAudioProcessorEditor::sliderDragEnded (Slider* s)
+{
+    endGesture (paramForSlider (s));
+
     if (! undoInProgress)
         saveUndoState();
 }
 
 void Ambix_warpAudioProcessorEditor::buttonClicked (Button* b)
 {
-    auto* p = getProcessor();
-
     if (b == &btn_preemp)
     {
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::PreEmpParam,
-                                   btn_preemp.getToggleState() ? 1.0f : 0.0f);
+        setParameterFromEditor (P::PreEmpParam,
+                                btn_preemp.getToggleState() ? 1.0f : 0.0f);
         if (! undoInProgress) saveUndoState();
     }
     else if (b == &btn_phi_curve)
     {
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::PhiCurveParam,
-                                   btn_phi_curve.getToggleState() ? 1.0f : 0.0f);
+        setParameterFromEditor (P::PhiCurveParam,
+                                btn_phi_curve.getToggleState() ? 1.0f : 0.0f);
         if (! undoInProgress) saveUndoState();
     }
     else if (b == &btn_theta_curve)
     {
-        setParameterNotifyingHost (p, Ambix_warpAudioProcessor::ThetaCurveParam,
-                                   btn_theta_curve.getToggleState() ? 1.0f : 0.0f);
+        setParameterFromEditor (P::ThetaCurveParam,
+                                btn_theta_curve.getToggleState() ? 1.0f : 0.0f);
         if (! undoInProgress) saveUndoState();
     }
     else if (b == &btn_undo)
@@ -324,8 +393,10 @@ void Ambix_warpAudioProcessorEditor::buttonClicked (Button* b)
             undoInProgress = true;
             --undoIndex;
             auto& snap = undoHistory[(size_t) undoIndex];
-            for (int i = 0; i < Ambix_warpAudioProcessor::totalNumParams; ++i)
-                setParameterNotifyingHost (p, i, snap.params[i]);
+            std::vector<std::pair<int, float>> values;
+            for (int i = 0; i < P::totalNumParams; ++i)
+                values.push_back ({ i, snap.params[i] });
+            setParametersFromEditor (values);
             undoInProgress = false;
         }
     }
@@ -336,8 +407,10 @@ void Ambix_warpAudioProcessorEditor::buttonClicked (Button* b)
             undoInProgress = true;
             ++undoIndex;
             auto& snap = undoHistory[(size_t) undoIndex];
-            for (int i = 0; i < Ambix_warpAudioProcessor::totalNumParams; ++i)
-                setParameterNotifyingHost (p, i, snap.params[i]);
+            std::vector<std::pair<int, float>> values;
+            for (int i = 0; i < P::totalNumParams; ++i)
+                values.push_back ({ i, snap.params[i] });
+            setParametersFromEditor (values);
             undoInProgress = false;
         }
     }
@@ -346,9 +419,7 @@ void Ambix_warpAudioProcessorEditor::buttonClicked (Button* b)
 void Ambix_warpAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster*)
 {
     _changed = true;
-    // sendChangeMessage() also fires on every parameter change, so repaint only
-    // when the channel count (ambisonic order) actually changes - otherwise we
-    // would redraw the whole editor on every automation step.
+    // only numChannelsChanged() broadcasts: repaint the order in the title
     const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
                       |  getAudioProcessor()->getTotalNumOutputChannels();
     if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }
@@ -357,14 +428,6 @@ void Ambix_warpAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster*)
 void Ambix_warpAudioProcessorEditor::timerCallback()
 {
     auto* p = getProcessor();
-
-    float phi = p->getParameter (Ambix_warpAudioProcessor::PhiParam);
-    float phiC = p->getParameter (Ambix_warpAudioProcessor::PhiCurveParam);
-    float theta = p->getParameter (Ambix_warpAudioProcessor::ThetaParam);
-    float thetaC = p->getParameter (Ambix_warpAudioProcessor::ThetaCurveParam);
-    float inOrd = p->getParameter (Ambix_warpAudioProcessor::InOrderParam);
-    float outOrd = p->getParameter (Ambix_warpAudioProcessor::OutOrderParam);
-    float preEmp = p->getParameter (Ambix_warpAudioProcessor::PreEmpParam);
 
     // Update order slider range based on active channel count
     int maxOrder = AMBI_ORDER;
@@ -375,29 +438,53 @@ void Ambix_warpAudioProcessorEditor::timerCallback()
             maxOrder = activeOrder;
     }
 #endif
-    sld_in_order.setRange (0, maxOrder, 1);
-    sld_out_order.setRange (0, maxOrder, 1);
 
-    // Update sliders from processor state
-    sld_phi.setValue (phi * 1.8 - 0.9, dontSendNotification);
-    sld_theta.setValue (theta * 1.8 - 0.9, dontSendNotification);
-    sld_in_order.setValue (round (inOrd * maxOrder), dontSendNotification);
-    sld_out_order.setValue (round (outOrd * maxOrder), dontSendNotification);
-    btn_preemp.setToggleState (preEmp > 0.5f, dontSendNotification);
+    // Only touch the controls when a parameter (or the order range) changed:
+    // the host, a state restore or this editor.
+    const bool maxOrderChanged = maxOrder != lastMaxOrder_;
+    lastMaxOrder_ = maxOrder;
 
-    // Update curve toggles and their labels
-    btn_phi_curve.setToggleState (phiC > 0.5f, dontSendNotification);
-    btn_phi_curve.setButtonText (phiC > 0.5f ? "180 / 0 deg" : "-90 / 90 deg");
+    if (paramWatcher.changed() || maxOrderChanged)
+    {
+        float phi = p->param (P::PhiParam).get();
+        float phiC = p->param (P::PhiCurveParam).get();
+        float theta = p->param (P::ThetaParam).get();
+        float thetaC = p->param (P::ThetaCurveParam).get();
+        float inOrd = p->param (P::InOrderParam).get();
+        float outOrd = p->param (P::OutOrderParam).get();
+        float preEmp = p->param (P::PreEmpParam).get();
 
-    btn_theta_curve.setToggleState (thetaC > 0.5f, dontSendNotification);
-    btn_theta_curve.setButtonText (thetaC > 0.5f ? "equator" : "northpole");
+        // a slider the user is dragging is the source of its value
+        auto syncSlider = [] (Slider& sld, double v)
+        {
+            if (! sld.isMouseButtonDown())
+                sld.setValue (v, dontSendNotification);
+        };
+
+        sld_in_order.setRange (0, maxOrder, 1);
+        sld_out_order.setRange (0, maxOrder, 1);
+
+        // Update sliders from processor state
+        syncSlider (sld_phi, phi * 1.8 - 0.9);
+        syncSlider (sld_theta, theta * 1.8 - 0.9);
+        syncSlider (sld_in_order, round (inOrd * maxOrder));
+        syncSlider (sld_out_order, round (outOrd * maxOrder));
+        btn_preemp.setToggleState (preEmp > 0.5f, dontSendNotification);
+
+        // Update curve toggles and their labels
+        btn_phi_curve.setToggleState (phiC > 0.5f, dontSendNotification);
+        btn_phi_curve.setButtonText (phiC > 0.5f ? "180 / 0 deg" : "-90 / 90 deg");
+
+        btn_theta_curve.setToggleState (thetaC > 0.5f, dontSendNotification);
+        btn_theta_curve.setButtonText (thetaC > 0.5f ? "equator" : "northpole");
+
+        // Update visualization (internally checks if params actually changed)
+        visualizer.setWarpParams (phi, phiC, theta, thetaC);
+    }
 
     // Update undo/redo button states
     btn_undo.setEnabled (undoIndex > 0);
     btn_redo.setEnabled (undoIndex < (int) undoHistory.size() - 1);
-
-    // Update visualization (internally checks if params actually changed)
-    visualizer.setWarpParams (phi, phiC, theta, thetaC);
 }
 
 void Ambix_warpAudioProcessorEditor::saveUndoState()
@@ -405,7 +492,7 @@ void Ambix_warpAudioProcessorEditor::saveUndoState()
     auto* p = getProcessor();
     ParamSnapshot snap;
     for (int i = 0; i < Ambix_warpAudioProcessor::totalNumParams; ++i)
-        snap.params[i] = p->getParameter (i);
+        snap.params[i] = p->param (i).get();
 
     // If we're not at the end of the history, truncate the redo tail
     if (undoIndex >= 0 && undoIndex < (int) undoHistory.size() - 1)

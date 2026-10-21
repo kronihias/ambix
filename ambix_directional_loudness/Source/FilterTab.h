@@ -39,6 +39,8 @@ public:
 
     void buttonClicked (Button* buttonThatWasClicked) override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void sliderDragStarted (Slider* slider) override;
+    void sliderDragEnded (Slider* slider) override;
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
 
     void setFilter(float az, float el, bool shape, float width, float height, float gain, bool solo);
@@ -65,6 +67,16 @@ private:
     TooltipWindow tooltipWindow;
 
     Ambix_directional_loudnessAudioProcessor* _myProcessor;
+
+    // the parameter a slider controls (nullptr for none)
+    ambix::Parameter* paramFor (Slider* slider) const;
+
+    // a value from the UI: inside a drag the drag's gesture covers it,
+    // otherwise (text box, double-click reset, combo box, solo button) it
+    // gets a gesture of its own
+    void setParam (Slider* slider, ambix::Parameter& param, float value);
+
+    Slider* dragging = nullptr; // the slider in a drag, if any
 };
 
 #endif /* defined(__ambix_directional_loudness__FilterTab__) */

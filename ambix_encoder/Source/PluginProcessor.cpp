@@ -18,7 +18,6 @@
  */
 
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 
 namespace
@@ -139,6 +138,8 @@ Ambix_encoderAudioProcessor::Ambix_encoderAudioProcessor():
         source_params[i].solo = 0.f;
     }
 
+    addParameters();
+
     Ambix_encoderAudioProcessor::s_ID++;
     m_id = Ambix_encoderAudioProcessor::s_ID;
 
@@ -197,6 +198,11 @@ Ambix_encoderAudioProcessor::~Ambix_encoderAudioProcessor()
 int Ambix_encoderAudioProcessor::getActiveSources() const
 {
     return normToCount (num_active_sources_param, kMaxSources);
+}
+
+int Ambix_encoderAudioProcessor::activeSourcesFromNorm (float v)
+{
+    return normToCount (v, kMaxSources);
 }
 
 float Ambix_encoderAudioProcessor::getSourceMeter (int idx) const
@@ -354,14 +360,14 @@ juce::Result Ambix_encoderAudioProcessor::loadConfigurationFromString (const juc
     // Switch to unlinked mode — per-source positions only mean something
     // when each source has its own params — and set the active count via
     // the host so DAW automation lanes stay in sync.
-    setParameterNotifyingHost (this, LinkedParam,           0.f);
-    setParameterNotifyingHost (this, NumActiveSourcesParam, countToNorm (newActiveSources, kMaxSources));
+    setParameterFromUi (LinkedParam,           0.f);
+    setParameterFromUi (NumActiveSourcesParam, countToNorm (newActiveSources, kMaxSources));
 
     // Default-mute every active source first; channels referenced in the
     // file unmute themselves below. Channels absent from the file (gaps)
     // stay muted, matching IEM MultiEncoder's behaviour.
     for (int i = 0; i < newActiveSources; ++i)
-        setParameterNotifyingHost (this, sourceParamIndex (i, SrcMute), 1.f);
+        setParameterFromUi (sourceParamIndex (i, SrcMute), 1.f);
 
     for (int i = 0; i < elements->size(); ++i)
     {
@@ -379,12 +385,12 @@ juce::Result Ambix_encoderAudioProcessor::loadConfigurationFromString (const juc
         const float gain = (float) (double) el.getProperty ("Gain", 1.0);
         const bool muteFromGain = gain <= 0.001f;
 
-        setParameterNotifyingHost (this, sourceParamIndex (ch, SrcAz),
-                                   juce::jlimit (0.f, 1.f, (az  + 180.f) / 360.f));
-        setParameterNotifyingHost (this, sourceParamIndex (ch, SrcEl),
-                                   juce::jlimit (0.f, 1.f, (ele + 180.f) / 360.f));
-        setParameterNotifyingHost (this, sourceParamIndex (ch, SrcMute),
-                                   muteFromGain ? 1.f : 0.f);
+        setParameterFromUi (sourceParamIndex (ch, SrcAz),
+                            juce::jlimit (0.f, 1.f, (az  + 180.f) / 360.f));
+        setParameterFromUi (sourceParamIndex (ch, SrcEl),
+                            juce::jlimit (0.f, 1.f, (ele + 180.f) / 360.f));
+        setParameterFromUi (sourceParamIndex (ch, SrcMute),
+                            muteFromGain ? 1.f : 0.f);
     }
 
     return juce::Result::ok();
@@ -446,12 +452,20 @@ void Ambix_encoderAudioProcessor::linkedToUnlinkedSnapshot()
 {
     // Capture the linked-mode auto-spread into each source's per-source params
     // so the user's first frame in unlinked mode shows the same layout.
+    // Written like the legacy code wrote the members: silently (no host
+    // notification), but through the parameter objects so they - and with
+    // them the host's reads and the saved state - hold the snapshot.
+    auto setSilently = [this] (int src, int sub, float v)
+    {
+        paramObjs[(size_t) sourceParamIndex (src, sub)]->restore (v);
+    };
+
     const int active = getActiveSources();
     if (active == 1)
     {
-        source_params[0].az   = azimuth_param;
-        source_params[0].el   = elevation_param;
-        source_params[0].size = size_param;
+        setSilently (0, SrcAz,   azimuth_param);
+        setSilently (0, SrcEl,   elevation_param);
+        setSilently (0, SrcSize, size_param);
     }
     else
     {
@@ -461,9 +475,9 @@ void Ambix_encoderAudioProcessor::linkedToUnlinkedSnapshot()
                         + (float)i * width_param / (float)(active - 1);
             if (angle < 0.f)  angle += 1.f;
             if (angle > 1.f)  angle -= 1.f;
-            source_params[i].az   = angle;
-            source_params[i].el   = elevation_param;
-            source_params[i].size = size_param;
+            setSilently (i, SrcAz,   angle);
+            setSilently (i, SrcEl,   elevation_param);
+            setSilently (i, SrcSize, size_param);
         }
     }
 }
@@ -652,9 +666,9 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
             else if (message[i].getType() == OSCTypes::int32)
                 val[i] = (float)message[i].getInt32();
         }
-        setParameterNotifyingHost (this, AzimuthParam,   jlimit(0.f, 1.f, (val[2]+180.f)/360.f));
-        setParameterNotifyingHost (this, ElevationParam, jlimit(0.f, 1.f, (val[3]+180.f)/360.f));
-        setParameterNotifyingHost (this, SizeParam,      jlimit(0.f, 1.f, val[4]));
+        paramObjs[AzimuthParam]->setValueNotifyingHost (jlimit(0.f, 1.f, (val[2]+180.f)/360.f));
+        paramObjs[ElevationParam]->setValueNotifyingHost (jlimit(0.f, 1.f, (val[3]+180.f)/360.f));
+        paramObjs[SizeParam]->setValueNotifyingHost (jlimit(0.f, 1.f, val[4]));
         return;
     }
 
@@ -662,33 +676,33 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
     if (address == "/ambix_encoder/linked")
     {
         const int v = firstInt (1);
-        setParameterNotifyingHost (this, LinkedParam, v ? 1.f : 0.f);
+        paramObjs[LinkedParam]->setValueNotifyingHost (v ? 1.f : 0.f);
         return;
     }
     if (address == "/ambix_encoder/active_sources")
     {
         const int n = juce::jlimit (1, kMaxSources, firstInt (1));
-        setParameterNotifyingHost (this, NumActiveSourcesParam, countToNorm (n, kMaxSources));
+        paramObjs[NumActiveSourcesParam]->setValueNotifyingHost (countToNorm (n, kMaxSources));
         return;
     }
     if (address == "/ambix_encoder/azimuth")
     {
-        setParameterNotifyingHost (this, AzimuthParam, jlimit(0.f, 1.f, (firstFloat(0.f)+180.f)/360.f));
+        paramObjs[AzimuthParam]->setValueNotifyingHost (jlimit(0.f, 1.f, (firstFloat(0.f)+180.f)/360.f));
         return;
     }
     if (address == "/ambix_encoder/elevation")
     {
-        setParameterNotifyingHost (this, ElevationParam, jlimit(0.f, 1.f, (firstFloat(0.f)+180.f)/360.f));
+        paramObjs[ElevationParam]->setValueNotifyingHost (jlimit(0.f, 1.f, (firstFloat(0.f)+180.f)/360.f));
         return;
     }
     if (address == "/ambix_encoder/width")
     {
-        setParameterNotifyingHost (this, WidthParam, jlimit(0.f, 1.f, firstFloat(0.f)/360.f));
+        paramObjs[WidthParam]->setValueNotifyingHost (jlimit(0.f, 1.f, firstFloat(0.f)/360.f));
         return;
     }
     if (address == "/ambix_encoder/size")
     {
-        setParameterNotifyingHost (this, SizeParam, jlimit(0.f, 1.f, firstFloat(0.f)));
+        paramObjs[SizeParam]->setValueNotifyingHost (jlimit(0.f, 1.f, firstFloat(0.f)));
         return;
     }
 
@@ -732,19 +746,19 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
             if (sub == "azimuth")
             {
                 const float newCentreAz = wrapAz (v - offsetDeg);
-                setParameterNotifyingHost (this, AzimuthParam,
+                paramObjs[AzimuthParam]->setValueNotifyingHost (
                                            jlimit (0.f, 1.f, (newCentreAz + 180.f) / 360.f));
             }
             else if (sub == "elevation")
             {
                 // All linked sources share elevation, so the dragged value
                 // *is* the new global elevation.
-                setParameterNotifyingHost (this, ElevationParam,
+                paramObjs[ElevationParam]->setValueNotifyingHost (
                                            jlimit (0.f, 1.f, (v + 180.f) / 360.f));
             }
             else if (sub == "size")
             {
-                setParameterNotifyingHost (this, SizeParam, jlimit (0.f, 1.f, v));
+                paramObjs[SizeParam]->setValueNotifyingHost (jlimit (0.f, 1.f, v));
             }
             // mute/solo are per-source even in linked mode — fall through
             // to the unlinked path so the rest of the cases (mute, solo)
@@ -758,20 +772,20 @@ void Ambix_encoderAudioProcessor::oscMessageReceived (const OSCMessage& message)
         // Per-source params (always applied regardless of linked state for
         // mute/solo; az/el/size only reach here in unlinked mode).
         if (sub == "azimuth")
-            setParameterNotifyingHost (this, sourceParamIndex (idx, SrcAz),
+            paramObjs[(size_t) sourceParamIndex (idx, SrcAz)]->setValueNotifyingHost (
                                        jlimit(0.f, 1.f, (wrapAz (v) + 180.f) / 360.f));
         else if (sub == "elevation")
             // Per-source elevation uses the same [0,1] → [-180°, +180°]
             // encoding as azimuth — the physical range is ±90° but the
             // param space is symmetric so mouse and OSC paths stay simple.
-            setParameterNotifyingHost (this, sourceParamIndex (idx, SrcEl),
+            paramObjs[(size_t) sourceParamIndex (idx, SrcEl)]->setValueNotifyingHost (
                                        jlimit(0.f, 1.f, (v + 180.f) / 360.f));
         else if (sub == "size")
-            setParameterNotifyingHost (this, sourceParamIndex (idx, SrcSize), jlimit(0.f, 1.f, v));
+            paramObjs[(size_t) sourceParamIndex (idx, SrcSize)]->setValueNotifyingHost (jlimit(0.f, 1.f, v));
         else if (sub == "mute")
-            setParameterNotifyingHost (this, sourceParamIndex (idx, SrcMute), v >= 0.5f ? 1.f : 0.f);
+            paramObjs[(size_t) sourceParamIndex (idx, SrcMute)]->setValueNotifyingHost (v >= 0.5f ? 1.f : 0.f);
         else if (sub == "solo")
-            setParameterNotifyingHost (this, sourceParamIndex (idx, SrcSolo), v >= 0.5f ? 1.f : 0.f);
+            paramObjs[(size_t) sourceParamIndex (idx, SrcSolo)]->setValueNotifyingHost (v >= 0.5f ? 1.f : 0.f);
         return;
     }
 }
@@ -1054,6 +1068,9 @@ void Ambix_encoderAudioProcessor::prepareToPlay (double sampleRate, int samplesP
 {
     SampleRate = sampleRate;
 
+    // allocate here so processBlock only ever shrinks/regrows within this size
+    InputBuffer.setSize (juce::jmax (MAX_INPUT_CHANNELS, getTotalNumInputChannels()), samplesPerBlock);
+
     _my_meter_dsp.setAudioParams ((int) SampleRate, samplesPerBlock);
     _my_meter_dsp.setParams (0.5f, 20.0f);
 
@@ -1107,7 +1124,7 @@ void Ambix_encoderAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiB
     const int active = juce::jmin (getActiveSources(), numIn, kMaxSources);
 
     if (InputBuffer.getNumSamples() != NumSamples || InputBuffer.getNumChannels() != numIn)
-        InputBuffer.setSize (juce::jmax (1, numIn), NumSamples);
+        InputBuffer.setSize (juce::jmax (1, numIn), NumSamples, false, false, true);
 
     InputBuffer.clear();
     for (int i = 0; i < juce::jmin (numIn, kMaxSources); ++i)
@@ -1261,8 +1278,10 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
 {
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    for (int i = 0; i < getNumParameters(); ++i)
-        xml.setAttribute (String(i), getParameter(i));
+    // Same attributes, in the same order and format, as the legacy
+    // index-based API wrote.
+    for (int i = 0; i < kTotalParams; ++i)
+        xml.setAttribute (String(i), paramObjs[(size_t) i]->get());
 
     xml.setAttribute ("mID", m_id);
 
@@ -1338,8 +1357,8 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
             for (int oldIdx = 0; oldIdx < 10; ++oldIdx)
             {
                 if (xmlState->hasAttribute (String (oldIdx)))
-                    setParameter (kLegacyRemap[oldIdx],
-                                  xmlState->getDoubleAttribute (String (oldIdx)));
+                    paramObjs[(size_t) kLegacyRemap[oldIdx]]->restore (
+                                  (float) xmlState->getDoubleAttribute (String (oldIdx)));
             }
             // WidthParam, LinkedParam, NumActiveSourcesParam and all per-source
             // slots stay at their constructor defaults (linked mode, 1 active
@@ -1348,10 +1367,12 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
         }
         else
         {
-            for (int i = 0; i < getNumParameters(); ++i)
+            // restore(): the legacy setParameter() semantics - side effects
+            // run (incl. Set* driving Az/El), no host notification of its own.
+            for (int i = 0; i < kTotalParams; ++i)
             {
                 if (xmlState->hasAttribute (String(i)))
-                    setParameter (i, xmlState->getDoubleAttribute (String(i)));
+                    paramObjs[(size_t) i]->restore ((float) xmlState->getDoubleAttribute (String(i)));
             }
         }
         if (xmlState->hasAttribute ("mID"))
@@ -1402,7 +1423,8 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
             editor_width  = xmlState->getIntAttribute (wTag, editor_width);
             editor_height = xmlState->getIntAttribute (hTag, editor_height);
         }
-        applyParamsToEncoders();
+        // No applyParamsToEncoders() here: it raced the audio thread, and
+        // processBlock() recomputes the encoder targets every block anyway.
     }
 }
 

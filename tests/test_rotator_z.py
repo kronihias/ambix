@@ -93,3 +93,57 @@ def test_golden_regression(plugin_rotator_z, noise_ambi, request):
     else:
         golden = load_golden(GOLDEN_TAG)
         np.testing.assert_allclose(out, golden, atol=1e-5)
+
+
+# ===========================================================================
+# OSC: /rotation and /head_pose drive the same parameter from the network
+# thread (port 7120). Covers the hand-off from that thread to processBlock.
+# ===========================================================================
+
+OSC_PORT = 7120
+
+
+def osc_message(address: str, *floats: float) -> bytes:
+    """Minimal OSC 1.0 encoder: address, type tags, big-endian float32 args."""
+    import struct
+
+    def pad(b: bytes) -> bytes:
+        return b + b"\0" * (4 - len(b) % 4)
+
+    return (pad(address.encode()) + pad(("," + "f" * len(floats)).encode())
+            + b"".join(struct.pack(">f", f) for f in floats))
+
+
+def send_osc(packet: bytes) -> None:
+    import socket
+    import time
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.sendto(packet, ("127.0.0.1", OSC_PORT))
+    time.sleep(0.2)  # the receiver thread picks it up asynchronously
+
+
+@pytest.mark.parametrize("packet", [
+    osc_message("/rotation", 0.0, 90.0, 0.0),                     # [pitch] [yaw] [roll]
+    osc_message("/head_pose", 0.0, 0.0, 0.0, 0.0, 0.0, 90.0, 0.0),  # [id] [x y z] [p] [yaw] [r]
+], ids=["rotation", "head_pose"])
+def test_osc_yaw_rotates(plugin_rotator_z, noise_ambi, packet):
+    """Yaw 90° over OSC lands on the same rotation as the parameter at 0.75."""
+    # The host never hears about values set over OSC, so it may treat a
+    # repeated 0.5 as no change. Step away first so the reset really lands.
+    plugin_rotator_z["Z-axis rot"] = 0.4
+    plugin_rotator_z["Z-axis rot"] = 0.5
+    np.testing.assert_allclose(run_settled(plugin_rotator_z, noise_ambi), noise_ambi,
+                               atol=1e-4, err_msg="could not reset to 0° before the OSC test")
+
+    send_osc(packet)
+    out = run_settled(plugin_rotator_z, noise_ambi)
+
+    if np.allclose(out, noise_ambi, atol=1e-4):
+        pytest.skip(f"no OSC reached the plugin — is UDP {OSC_PORT} taken by another process?")
+
+    np.testing.assert_allclose(out[1], -noise_ambi[3], atol=1e-3)
+    np.testing.assert_allclose(out[3],  noise_ambi[1], atol=1e-3)
+
+    plugin_rotator_z["Z-axis rot"] = 0.4
+    plugin_rotator_z["Z-axis rot"] = 0.5

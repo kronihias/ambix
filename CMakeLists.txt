@@ -151,6 +151,15 @@ apply_juce_patch(
 apply_juce_patch(
     "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_network_advertiser.patch")
 
+# VST3 bypass parameter ID. With the legacy setParameter() API, JUCE's wrapper
+# gives its own bypass parameter the ID numParameters; once a plug-in uses
+# parameter objects it switches to 'byps', which would orphan bypass
+# automation in existing sessions. Opt-in via JUCE_VST3_KEEP_LEGACY_BYPASS_ID
+# (set for every plug-in in Subproject.cmake). tests/test_parameters.py pins
+# the IDs.
+apply_juce_patch(
+    "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_vst3_legacy_bypass_id.patch")
+
 # GCC 9 compatibility (e.g. Ubuntu 20.04): two source-level fixes for JUCE 8.
 #  1. juce_graphics_Harfbuzz.cpp fakes __has_builtin(x)=1 on GCC < 10, which
 #     makes libstdc++ 9's <utility> take a Clang-only builtin path. Include

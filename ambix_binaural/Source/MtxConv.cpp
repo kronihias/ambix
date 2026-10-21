@@ -61,11 +61,11 @@ void MtxConvMaster::WriteLog(String &text)
 void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf, int numsamples, bool forcesync)
 {
 
-    if (configuration_)
-    {
+    // never wait for Cleanup() here - it frees memory while holding lock_
+    const ScopedTryLock myScopedLock (lock_);
 
-        // lock configuration
-        const ScopedLock myScopedLock (lock_);
+    if (configuration_ && myScopedLock.isLocked())
+    {
 
         /////////////////////////
         // write to input ring buffer

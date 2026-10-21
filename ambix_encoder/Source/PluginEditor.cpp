@@ -14,7 +14,6 @@
  */
 
 #include "PluginEditor.h"
-#include "../../common/JuceCompat.h"
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)
@@ -118,8 +117,8 @@ void SourceTableRow::refreshFromProcessor()
     num_size.setValue (pos.size,  juce::dontSendNotification);
 
     using Proc = Ambix_encoderAudioProcessor;
-    const bool soloed = processor.getParameter (Proc::sourceParamIndex (idx, Proc::SrcSolo)) >= 0.5f;
-    const bool muted  = processor.getParameter (Proc::sourceParamIndex (idx, Proc::SrcMute)) >= 0.5f;
+    const bool soloed = processor.getParamValue (Proc::sourceParamIndex (idx, Proc::SrcSolo)) >= 0.5f;
+    const bool muted  = processor.getParamValue (Proc::sourceParamIndex (idx, Proc::SrcMute)) >= 0.5f;
     if (btn_solo.getToggleState() != soloed) btn_solo.setToggleState (soloed, juce::dontSendNotification);
     if (btn_mute.getToggleState() != muted)  btn_mute.setToggleState (muted,  juce::dontSendNotification);
 }
@@ -168,35 +167,61 @@ void SourceTableRow::paint (juce::Graphics& g)
     g.fillRect (getLocalBounds());
 }
 
+SourceTableRow::~SourceTableRow()
+{
+    // rebuilt while a number box is being dragged: close the gesture
+    if (dragParam >= 0)
+        processor.endGesture (dragParam);
+}
+
+int SourceTableRow::paramFor (juce::Slider* s) const
+{
+    using Proc = Ambix_encoderAudioProcessor;
+    if (s == &num_az)   return Proc::sourceParamIndex (idx, Proc::SrcAz);
+    if (s == &num_el)   return Proc::sourceParamIndex (idx, Proc::SrcEl);
+    if (s == &num_size) return Proc::sourceParamIndex (idx, Proc::SrcSize);
+    return -1;
+}
+
+void SourceTableRow::sliderDragStarted (juce::Slider* s)
+{
+    if (dragParam >= 0)
+        processor.endGesture (dragParam);
+    dragParam = paramFor (s);
+    if (dragParam >= 0)
+        processor.beginGesture (dragParam);
+}
+
+void SourceTableRow::sliderDragEnded (juce::Slider*)
+{
+    if (dragParam >= 0)
+        processor.endGesture (dragParam);
+    dragParam = -1;
+}
+
 void SourceTableRow::sliderValueChanged (juce::Slider* s)
 {
     if (! editable) return; // table is read-only in linked mode
 
+    // Inside a drag this only sets the value (the gesture is open); a typed
+    // value gets its own begin / end.
     if (s == &num_az)
-        setParameterNotifyingHost (&processor,
-            Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz),
-            (float)((s->getValue() + 180.) / 360.));
+        processor.setParameterFromUi (paramFor (s), (float)((s->getValue() + 180.) / 360.));
     else if (s == &num_el)
-        setParameterNotifyingHost (&processor,
-            Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl),
-            (float)((s->getValue() + 180.) / 360.));
+        processor.setParameterFromUi (paramFor (s), (float)((s->getValue() + 180.) / 360.));
     else if (s == &num_size)
-        setParameterNotifyingHost (&processor,
-            Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcSize),
-            (float) s->getValue());
+        processor.setParameterFromUi (paramFor (s), (float) s->getValue());
 }
 
 void SourceTableRow::buttonClicked (juce::Button* b)
 {
     using Proc = Ambix_encoderAudioProcessor;
     if (b == &btn_solo)
-        setParameterNotifyingHost (&processor,
-            Proc::sourceParamIndex (idx, Proc::SrcSolo),
-            btn_solo.getToggleState() ? 1.f : 0.f);
+        processor.setParameterFromUi (Proc::sourceParamIndex (idx, Proc::SrcSolo),
+                                      btn_solo.getToggleState() ? 1.f : 0.f);
     else if (b == &btn_mute)
-        setParameterNotifyingHost (&processor,
-            Proc::sourceParamIndex (idx, Proc::SrcMute),
-            btn_mute.getToggleState() ? 1.f : 0.f);
+        processor.setParameterFromUi (Proc::sourceParamIndex (idx, Proc::SrcMute),
+                                      btn_mute.getToggleState() ? 1.f : 0.f);
 }
 
 //==============================================================================
@@ -248,13 +273,14 @@ void SourceTableHeader::mouseDown (const juce::MouseEvent& e)
     // the user later raises the active count, sources shouldn't come
     // back in a stale soloed/muted state).
     for (int i = 0; i < Proc::kMaxSources; ++i)
-        setParameterNotifyingHost (processor, Proc::sourceParamIndex (i, sub), 0.f);
+        processor->setParameterFromUi (Proc::sourceParamIndex (i, sub), 0.f);
 }
 
 //==============================================================================
 Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_encoderAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-    changed_(true)
+    changed_(true),
+    paramWatcher (*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
     tooltipWindow.setMillisecondsBeforeTipAppears (700);
@@ -502,7 +528,11 @@ Ambix_encoderAudioProcessorEditor::Ambix_encoderAudioProcessorEditor (Ambix_enco
 Ambix_encoderAudioProcessorEditor::~Ambix_encoderAudioProcessorEditor()
 {
     if (auto* p = getProcessor())
+    {
         p->removeChangeListener (this);
+        for (auto index : dragGestures)
+            p->endGesture (index);
+    }
     setLookAndFeel (nullptr);
 }
 
@@ -748,24 +778,59 @@ void Ambix_encoderAudioProcessorEditor::resized()
     resizer.setBounds (W - 16, H - 16, 16, 16);
 }
 
+int Ambix_encoderAudioProcessorEditor::paramForSlider (juce::Slider* s) const
+{
+    using Proc = Ambix_encoderAudioProcessor;
+    if (s == &sld_el)      return Proc::ElevationParam;
+    if (s == &sld_az)      return Proc::AzimuthParam;
+    if (s == &sld_size)    return Proc::SizeParam;
+    if (s == &sld_width)   return Proc::WidthParam;
+    if (s == &sld_az_move) return Proc::AzimuthMvParam;
+    if (s == &sld_el_move) return Proc::ElevationMvParam;
+    if (s == &sld_speed)   return Proc::SpeedParam;
+    return -1;
+}
+
+void Ambix_encoderAudioProcessorEditor::sliderDragStarted (juce::Slider* slider)
+{
+    const int index = paramForSlider (slider);
+    if (index >= 0 && ! dragGestures.contains (index))
+    {
+        dragGestures.add (index);
+        getProcessor()->beginGesture (index);
+    }
+}
+
+void Ambix_encoderAudioProcessorEditor::sliderDragEnded (juce::Slider* slider)
+{
+    const int index = paramForSlider (slider);
+    if (index >= 0 && dragGestures.contains (index))
+    {
+        dragGestures.removeFirstMatchingValue (index);
+        getProcessor()->endGesture (index);
+    }
+}
+
 void Ambix_encoderAudioProcessorEditor::sliderValueChanged (juce::Slider* sliderThatWasMoved)
 {
     Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
 
+    // Inside a drag the gesture is already open; a typed value or a
+    // double-click reset gets its own begin / end.
     if (sliderThatWasMoved == &sld_el)
-        setParameterNotifyingHost (ourProcessor, Ambix_encoderAudioProcessor::ElevationParam, (sliderWrap(sld_el) + 180) / 360.f);
+        ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::ElevationParam, (sliderWrap(sld_el) + 180) / 360.f);
     else if (sliderThatWasMoved == &sld_az)
-        setParameterNotifyingHost (ourProcessor, Ambix_encoderAudioProcessor::AzimuthParam,   (sliderWrap(sld_az) + 180) / 360.f);
+        ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::AzimuthParam,   (sliderWrap(sld_az) + 180) / 360.f);
     else if (sliderThatWasMoved == &sld_size)
-        setParameterNotifyingHost (ourProcessor, Ambix_encoderAudioProcessor::SizeParam, (float) sld_size.getValue());
+        ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::SizeParam, (float) sld_size.getValue());
     else if (sliderThatWasMoved == &sld_width)
-        setParameterNotifyingHost (ourProcessor, Ambix_encoderAudioProcessor::WidthParam, (float) sld_width.getValue() / 360.f);
+        ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::WidthParam, (float) sld_width.getValue() / 360.f);
     else if (sliderThatWasMoved == &sld_az_move)
-        setParameterNotifyingHost (ourProcessor, Ambix_encoderAudioProcessor::AzimuthMvParam, (float) sld_az_move.getValue());
+        ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::AzimuthMvParam, (float) sld_az_move.getValue());
     else if (sliderThatWasMoved == &sld_el_move)
-        setParameterNotifyingHost (ourProcessor, Ambix_encoderAudioProcessor::ElevationMvParam, (float) sld_el_move.getValue());
+        ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::ElevationMvParam, (float) sld_el_move.getValue());
     else if (sliderThatWasMoved == &sld_speed)
-        setParameterNotifyingHost (ourProcessor, Ambix_encoderAudioProcessor::SpeedParam, (float) sld_speed.getValue() / 360.f);
+        ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::SpeedParam, (float) sld_speed.getValue() / 360.f);
 }
 
 void Ambix_encoderAudioProcessorEditor::comboBoxChanged (juce::ComboBox* box)
@@ -785,8 +850,7 @@ void Ambix_encoderAudioProcessorEditor::comboBoxChanged (juce::ComboBox* box)
         cmb_active_sources.setSelectedId (n, juce::dontSendNotification);   // reflect clamp
 
         const float norm = (float)(n - 1) / (float)(Ambix_encoderAudioProcessor::kMaxSources - 1);
-        setParameterNotifyingHost (getProcessor(),
-                                   Ambix_encoderAudioProcessor::NumActiveSourcesParam, norm);
+        getProcessor()->setParameterFromUi (Ambix_encoderAudioProcessor::NumActiveSourcesParam, norm);
         rebuildTable();
     }
 }
@@ -797,21 +861,24 @@ void Ambix_encoderAudioProcessorEditor::timerCallback()
 
     if (myScopedTryLock.isLocked())
     {
-        if (changed_)
+        // Parameter changes are polled (the audio thread can't post change
+        // messages); changed_ still covers the non-parameter broadcasts.
+        const bool paramsChanged = paramWatcher.changed();
+        if (changed_ || paramsChanged)
         {
             changed_ = false;
 
             Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
 
-            sld_az.setValue ((ourProcessor->getParameter (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * 360.f, juce::dontSendNotification);
-            sld_el.setValue ((ourProcessor->getParameter (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, juce::dontSendNotification);
-            sld_size.setValue (ourProcessor->getParameter (Ambix_encoderAudioProcessor::SizeParam), juce::dontSendNotification);
-            sld_width.setValue (ourProcessor->getParameter (Ambix_encoderAudioProcessor::WidthParam) * 360.f, juce::dontSendNotification);
-            sld_speed.setValue (ourProcessor->getParameter (Ambix_encoderAudioProcessor::SpeedParam) * 360, juce::dontSendNotification);
+            sld_az.setValue ((ourProcessor->getParamValue (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * 360.f, juce::dontSendNotification);
+            sld_el.setValue ((ourProcessor->getParamValue (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f, juce::dontSendNotification);
+            sld_size.setValue (ourProcessor->getParamValue (Ambix_encoderAudioProcessor::SizeParam), juce::dontSendNotification);
+            sld_width.setValue (ourProcessor->getParamValue (Ambix_encoderAudioProcessor::WidthParam) * 360.f, juce::dontSendNotification);
+            sld_speed.setValue (ourProcessor->getParamValue (Ambix_encoderAudioProcessor::SpeedParam) * 360, juce::dontSendNotification);
 
-            float azimuth_mv_param   = ourProcessor->getParameter (Ambix_encoderAudioProcessor::AzimuthMvParam);
-            float elevation_mv_param = ourProcessor->getParameter (Ambix_encoderAudioProcessor::ElevationMvParam);
-            float speed_param        = ourProcessor->getParameter (Ambix_encoderAudioProcessor::SpeedParam);
+            float azimuth_mv_param   = ourProcessor->getParamValue (Ambix_encoderAudioProcessor::AzimuthMvParam);
+            float elevation_mv_param = ourProcessor->getParamValue (Ambix_encoderAudioProcessor::ElevationMvParam);
+            float speed_param        = ourProcessor->getParamValue (Ambix_encoderAudioProcessor::SpeedParam);
 
             sld_az_move.setValue (azimuth_mv_param,   juce::dontSendNotification);
             sld_el_move.setValue (elevation_mv_param, juce::dontSendNotification);
@@ -847,8 +914,8 @@ void Ambix_encoderAudioProcessorEditor::timerCallback()
 
             // The channel count can change at runtime in the standalone when
             // the user picks a different number of in/out channels. Only react
-            // when it actually changes - sendChangeMessage() also fires on
-            // every parameter change, so an unconditional repaint here would
+            // when it actually changes - this block also runs on every
+            // parameter change, so an unconditional repaint here would
             // redraw the whole editor (incl. the sphere) on every automation
             // step. React only on a real change: refresh the source-selector
             // range and repaint the "O<n>" order title.
@@ -992,9 +1059,8 @@ void Ambix_encoderAudioProcessorEditor::buttonClicked (juce::Button* buttonThatW
     else if (buttonThatWasClicked == &btn_linked_toggle)
     {
         const bool nowLinked = btn_linked_toggle.getToggleState();
-        setParameterNotifyingHost (ourProcessor,
-                                   Ambix_encoderAudioProcessor::LinkedParam,
-                                   nowLinked ? 1.f : 0.f);
+        ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::LinkedParam,
+                                          nowLinked ? 1.f : 0.f);
         btn_linked_toggle.setButtonText (nowLinked ? "Linked" : "Unlinked");
         for (auto* row : table_rows)
             row->setEditable (! nowLinked);

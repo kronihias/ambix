@@ -18,7 +18,6 @@
  */
 
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 #include "t_design.h"
 
@@ -60,9 +59,9 @@ void Ambix_moveAudioProcessor::oscMessageReceived (const OSCMessage& message)
         for (int i = 0; i < jmin (3, message.size()); ++i)
             val[i] = readFloat (message[i], 0.f);
 
-        setParameterNotifyingHost (this, PitchParam, paramFromDeg (val[0]));
-        setParameterNotifyingHost (this, YawParam,   paramFromDeg (val[1]));
-        setParameterNotifyingHost (this, RollParam,  paramFromDeg (val[2]));
+        params[PitchParam]->setValueNotifyingHost (paramFromDeg (val[0]));
+        params[YawParam]->setValueNotifyingHost (paramFromDeg (val[1]));
+        params[RollParam]->setValueNotifyingHost (paramFromDeg (val[2]));
     }
     else if (addr == OSCAddressPattern ("/quaternion"))
     {
@@ -71,10 +70,10 @@ void Ambix_moveAudioProcessor::oscMessageReceived (const OSCMessage& message)
         for (int i = 0; i < jmin (4, message.size()); ++i)
             val[i] = readFloat (message[i], 0.f);
 
-        setParameterNotifyingHost (this, Q0Param, jlimit (0.f, 1.f, (val[0] + 1.f) * 0.5f));
-        setParameterNotifyingHost (this, Q1Param, jlimit (0.f, 1.f, (val[1] + 1.f) * 0.5f));
-        setParameterNotifyingHost (this, Q2Param, jlimit (0.f, 1.f, (val[2] + 1.f) * 0.5f));
-        setParameterNotifyingHost (this, Q3Param, jlimit (0.f, 1.f, (val[3] + 1.f) * 0.5f));
+        params[Q0Param]->setValueNotifyingHost (jlimit (0.f, 1.f, (val[0] + 1.f) * 0.5f));
+        params[Q1Param]->setValueNotifyingHost (jlimit (0.f, 1.f, (val[1] + 1.f) * 0.5f));
+        params[Q2Param]->setValueNotifyingHost (jlimit (0.f, 1.f, (val[2] + 1.f) * 0.5f));
+        params[Q3Param]->setValueNotifyingHost (jlimit (0.f, 1.f, (val[3] + 1.f) * 0.5f));
     }
     else if (addr == OSCAddressPattern ("/xyz")
           || addr == OSCAddressPattern ("/translation"))
@@ -84,9 +83,9 @@ void Ambix_moveAudioProcessor::oscMessageReceived (const OSCMessage& message)
         for (int i = 0; i < jmin (3, message.size()); ++i)
             val[i] = readFloat (message[i], 0.f);
 
-        setParameterNotifyingHost (this, XParam, xParamFromMeters (val[0]));
-        setParameterNotifyingHost (this, YParam, xParamFromMeters (val[1]));
-        setParameterNotifyingHost (this, ZParam, xParamFromMeters (val[2]));
+        params[XParam]->setValueNotifyingHost (xParamFromMeters (val[0]));
+        params[YParam]->setValueNotifyingHost (xParamFromMeters (val[1]));
+        params[ZParam]->setValueNotifyingHost (xParamFromMeters (val[2]));
     }
     else if (addr == OSCAddressPattern ("/6dof"))
     {
@@ -95,13 +94,13 @@ void Ambix_moveAudioProcessor::oscMessageReceived (const OSCMessage& message)
         for (int i = 0; i < jmin (7, message.size()); ++i)
             val[i] = readFloat (message[i], 0.f);
 
-        setParameterNotifyingHost (this, XParam, xParamFromMeters (val[0]));
-        setParameterNotifyingHost (this, YParam, xParamFromMeters (val[1]));
-        setParameterNotifyingHost (this, ZParam, xParamFromMeters (val[2]));
-        setParameterNotifyingHost (this, Q0Param, jlimit (0.f, 1.f, (val[3] + 1.f) * 0.5f));
-        setParameterNotifyingHost (this, Q1Param, jlimit (0.f, 1.f, (val[4] + 1.f) * 0.5f));
-        setParameterNotifyingHost (this, Q2Param, jlimit (0.f, 1.f, (val[5] + 1.f) * 0.5f));
-        setParameterNotifyingHost (this, Q3Param, jlimit (0.f, 1.f, (val[6] + 1.f) * 0.5f));
+        params[XParam]->setValueNotifyingHost (xParamFromMeters (val[0]));
+        params[YParam]->setValueNotifyingHost (xParamFromMeters (val[1]));
+        params[ZParam]->setValueNotifyingHost (xParamFromMeters (val[2]));
+        params[Q0Param]->setValueNotifyingHost (jlimit (0.f, 1.f, (val[3] + 1.f) * 0.5f));
+        params[Q1Param]->setValueNotifyingHost (jlimit (0.f, 1.f, (val[4] + 1.f) * 0.5f));
+        params[Q2Param]->setValueNotifyingHost (jlimit (0.f, 1.f, (val[5] + 1.f) * 0.5f));
+        params[Q3Param]->setValueNotifyingHost (jlimit (0.f, 1.f, (val[6] + 1.f) * 0.5f));
     }
 }
 #endif
@@ -112,31 +111,134 @@ Ambix_moveAudioProcessor::Ambix_moveAudioProcessor() :
         .withInput  ("Input",  AMBI_CH_SET (AMBI_CHANNELS), true)
         .withOutput ("Output", AMBI_CH_SET (AMBI_CHANNELS), true)
     ),
-    x_param (0.5f),       _x_param (-10.f),
-    y_param (0.5f),       _y_param (-10.f),
-    z_param (0.5f),       _z_param (-10.f),
-    radius_param (0.f),   _radius_param (-10.f),
-    yaw_param (0.5f),     _yaw_param (-10.f),
-    pitch_param (0.5f),   _pitch_param (-10.f),
-    roll_param (0.5f),    _roll_param (-10.f),
-    rot_order_param (0.f), _rot_order_param (-10.f),
-    q0_param (0.5f),      _q0_param (-10.f),
-    q1_param (0.5f),      _q1_param (-10.f),
-    q2_param (0.5f),      _q2_param (-10.f),
-    q3_param (0.5f),      _q3_param (-10.f),
-    qinvert_param (0.f),  _qinvert_param (-10.f),
+    _x_param (-10.f),
+    _y_param (-10.f),
+    _z_param (-10.f),
+    _radius_param (-10.f),
+    _yaw_param (-10.f),
+    _pitch_param (-10.f),
+    _roll_param (-10.f),
+    _rot_order_param (-10.f),
+    _q0_param (-10.f),
+    _q1_param (-10.f),
+    _q2_param (-10.f),
+    _q3_param (-10.f),
+    _qinvert_param (-10.f),
     _q_changed (false),
-    transl_enabled_param (1.f), _transl_enabled_param (-10.f),
-    rot_enabled_param    (1.f), _rot_enabled_param    (-10.f),
-    in_order_param (1.f),
-    out_order_param (1.f),
-    in_order (AMBI_ORDER),
+    _transl_enabled_param (-10.f),
+    _rot_enabled_param    (-10.f),
     _in_order (-1),
-    out_order (AMBI_ORDER),
     _out_order (-1),
     _initialized (false),
     output_buffer (AMBI_CHANNELS, 256)
 {
+    // legacy display texts, as getParameterText() built them
+    auto metres      = [] (float v, int) -> String { return String (xMetersFromParam (v), 3) + " m"; };
+    auto radiusText  = [] (float v, int) -> String { return String (radiusMetersFromParam (v), 2) + " m"; };
+    auto degrees     = [] (float v, int) -> String { return String (degFromParam (v), 1) + " deg"; };
+    auto rotOrder    = [] (float v, int) -> String { return (v < 0.5f) ? "yaw-pitch-roll" : "roll-pitch-yaw"; };
+    auto quat        = [] (float v, int) -> String { return String (v * 2. - 1., 4); };
+    auto inverse     = [] (float v, int) -> String { return (v < 0.5f) ? "" : "inverse"; };
+    auto orderText   = [this] (float v, int) -> String { return String (orderForDisplay (v)); };
+    auto onOff       = [] (float v, int) -> String { return (v > 0.5f) ? "on" : "bypass"; };
+
+    auto add = [this] (int index, const char* name, float initial, ambix::Parameter::TextFunction text)
+    {
+        addParameter (params[index] = new ambix::Parameter (*this, index, name, initial, std::move (text)));
+    };
+
+    add (XParam,             "X",                           0.5f, metres);
+    add (YParam,             "Y",                           0.5f, metres);
+    add (ZParam,             "Z",                           0.5f, metres);
+    add (RadiusParam,        "Reference radius",            0.f,  radiusText);
+    add (YawParam,           "Yaw",                         0.5f, degrees);
+    add (PitchParam,         "Pitch",                       0.5f, degrees);
+    add (RollParam,          "Roll",                        0.5f, degrees);
+    add (RotOrderParam,      "Rotation order",              0.f,  rotOrder);
+    add (Q0Param,            "Quaternion q0",               0.5f, quat);
+    add (Q1Param,            "Quaternion q1",               0.5f, quat);
+    add (Q2Param,            "Quaternion q2",               0.5f, quat);
+    add (Q3Param,            "Quaternion q3",               0.5f, quat);
+    add (QinvertParam,       "Inverse Quaternion Rotation", 0.f,  inverse);
+    add (InOrderParam,       "Ambi In order",               1.f,  orderText);
+    add (OutOrderParam,      "Ambi Out order",              1.f,  orderText);
+    add (TranslEnabledParam, "Translation enabled",         1.f,  onOff);
+    add (RotEnabledParam,    "Rotation enabled",            1.f,  onOff);
+
+    // Parse the t-design sampling points (240 points on the unit sphere)
+    {
+        const String t_design_txt (t_design::des_3_240_21_txt);
+
+        String::CharPointerType lineChar = t_design_txt.getCharPointer();
+
+        int n = 0;
+        int numsamples = 0;
+        int curr_n = 0;
+        int max_n  = lineChar.length();
+
+        while (curr_n < max_n)
+        {
+            double value;
+            sscanf (lineChar, "%lf\n%n", &value, &n);
+            lineChar += n;
+            curr_n += n;
+            numsamples++;
+        }
+
+        numsamples /= 3; // x,y,z triples
+
+        Carth_coord.resize (numsamples, 3);
+
+        lineChar = t_design_txt.getCharPointer();
+
+        for (int i = 0; i < numsamples; ++i)
+        {
+            double x, y, z;
+            sscanf (lineChar, "%lf%lf%lf%n", &x, &y, &z, &n);
+            Carth_coord (i, 0) = x;
+            Carth_coord (i, 1) = y;
+            Carth_coord (i, 2) = z;
+            lineChar += n;
+        }
+    }
+
+    const int numsamples = (int) Carth_coord.rows();
+
+    // For every possible input order, the undistorted SH basis at the
+    // sampling points and its pseudo-inverse - this stays fixed regardless
+    // of listener position.
+    Sh_matrix_inv_for_order.resize (AMBI_ORDER + 1);
+
+    for (int order = 0; order <= AMBI_ORDER; ++order)
+    {
+        SphericalHarmonic sph_h_in;
+        sph_h_in.Init (order);
+
+        Eigen::MatrixXd Sh_matrix;
+        Sh_matrix.setZero (numsamples, AMBI_CHANNELS);
+
+        const int in_ambi_channels = (order + 1) * (order + 1);
+        for (int i = 0; i < numsamples; ++i)
+        {
+            const double az = atan2 (Carth_coord (i, 1), Carth_coord (i, 0));
+            const double el = atan2 (Carth_coord (i, 2),
+                                     sqrt (Carth_coord (i, 0) * Carth_coord (i, 0)
+                                         + Carth_coord (i, 1) * Carth_coord (i, 1)));
+
+            sph_h_in.Calc (az, el);
+
+            Sh_matrix.block (i, 0, 1, in_ambi_channels) = sph_h_in.Ymn.transpose();
+        }
+
+        Sh_matrix_inv_for_order[(size_t) order] = (Sh_matrix.transpose() * Sh_matrix)
+                                                      .colPivHouseholderQr().inverse() * Sh_matrix.transpose();
+
+        sph_h_out_for_order[(size_t) order].Init (order);
+    }
+
+    // sized once here so calcParams() never allocates
+    Sh_matrix_mod.setZero (numsamples, AMBI_CHANNELS);
+
     // start as identity (pass-through) until calcParams() runs
     Sh_transf  = Eigen::MatrixXd::Identity (AMBI_CHANNELS, AMBI_CHANNELS);
     _Sh_transf = Eigen::MatrixXd::Identity (AMBI_CHANNELS, AMBI_CHANNELS);
@@ -158,6 +260,12 @@ Ambix_moveAudioProcessor::Ambix_moveAudioProcessor() :
 
 Ambix_moveAudioProcessor::~Ambix_moveAudioProcessor()
 {
+#ifdef WITH_OSC
+    // Stop the OSC thread first: its callback would otherwise run into a
+    // processor that is already being taken apart (pure virtual call).
+    OSCReceiver::removeListener (this);
+    OSCReceiver::disconnect();
+#endif
 }
 
 #ifdef WITH_OSC
@@ -218,135 +326,39 @@ const String Ambix_moveAudioProcessor::getName() const
     return JucePlugin_Name;
 }
 
-int Ambix_moveAudioProcessor::getNumParameters()
-{
-    return totalNumParams;
-}
-
-float Ambix_moveAudioProcessor::getParameter (int index)
+void Ambix_moveAudioProcessor::parameterValueSet (int index, float newValue)
 {
     switch (index)
     {
-        case XParam:        return x_param;
-        case YParam:        return y_param;
-        case ZParam:        return z_param;
-        case RadiusParam:   return radius_param;
-
-        case YawParam:      return yaw_param;
-        case PitchParam:    return pitch_param;
-        case RollParam:     return roll_param;
-        case RotOrderParam: return rot_order_param;
-
-        case Q0Param:       return q0_param;
-        case Q1Param:       return q1_param;
-        case Q2Param:       return q2_param;
-        case Q3Param:       return q3_param;
-        case QinvertParam:  return qinvert_param;
-
-        case InOrderParam:       return in_order_param;
-        case OutOrderParam:      return out_order_param;
-        case TranslEnabledParam: return transl_enabled_param;
-        case RotEnabledParam:    return rot_enabled_param;
-        default:                 return 0.0f;
-    }
-}
-
-void Ambix_moveAudioProcessor::setParameter (int index, float newValue)
-{
-    newValue = juce::jlimit (0.f, 1.f, newValue);
-
-    switch (index)
-    {
-        case XParam:        x_param = newValue;      break;
-        case YParam:        y_param = newValue;      break;
-        case ZParam:        z_param = newValue;      break;
-        case RadiusParam:   radius_param = newValue; break;
-
-        case YawParam:      yaw_param   = newValue; _q_changed = false; break;
-        case PitchParam:    pitch_param = newValue; _q_changed = false; break;
-        case RollParam:     roll_param  = newValue; _q_changed = false; break;
-        case RotOrderParam: rot_order_param = newValue; _q_changed = false; break;
-
-        case Q0Param:       q0_param = newValue; _q_changed = true; break;
-        case Q1Param:       q1_param = newValue; _q_changed = true; break;
-        case Q2Param:       q2_param = newValue; _q_changed = true; break;
-        case Q3Param:       q3_param = newValue; _q_changed = true; break;
-        case QinvertParam:  qinvert_param = newValue; _q_changed = true; break;
-
-        case InOrderParam:
-            in_order_param = newValue;
-            in_order = (int) round (in_order_param * AMBI_ORDER);
-            _initialized = false; // reinit SH basis at new order
+        case YawParam:
+        case PitchParam:
+        case RollParam:
+        case RotOrderParam:
+            _q_changed = false;
             break;
 
-        case OutOrderParam:
-            out_order_param = newValue;
-            out_order = (int) round (out_order_param * AMBI_ORDER);
+        case Q0Param:
+        case Q1Param:
+        case Q2Param:
+        case Q3Param:
+        case QinvertParam:
+            _q_changed = true;
             break;
-
-        case TranslEnabledParam: transl_enabled_param = newValue; break;
-        case RotEnabledParam:    rot_enabled_param    = newValue; break;
 
         default:
             break;
     }
-    sendChangeMessage();
 }
 
-const String Ambix_moveAudioProcessor::getParameterName (int index)
+int Ambix_moveAudioProcessor::orderForDisplay (float orderParam)
 {
-    switch (index)
-    {
-        case XParam:        return "X";
-        case YParam:        return "Y";
-        case ZParam:        return "Z";
-        case RadiusParam:   return "Reference radius";
-        case YawParam:      return "Yaw";
-        case PitchParam:    return "Pitch";
-        case RollParam:     return "Roll";
-        case RotOrderParam: return "Rotation order";
-        case Q0Param:       return "Quaternion q0";
-        case Q1Param:       return "Quaternion q1";
-        case Q2Param:       return "Quaternion q2";
-        case Q3Param:       return "Quaternion q3";
-        case QinvertParam:  return "Inverse Quaternion Rotation";
-        case InOrderParam:       return "Ambi In order";
-        case OutOrderParam:      return "Ambi Out order";
-        case TranslEnabledParam: return "Translation enabled";
-        case RotEnabledParam:    return "Rotation enabled";
-        default:            break;
-    }
-    return String();
-}
-
-const String Ambix_moveAudioProcessor::getParameterText (int index)
-{
-    String text;
-    switch (index)
-    {
-        case XParam:        text = String (xMetersFromParam (x_param), 3) + " m"; break;
-        case YParam:        text = String (xMetersFromParam (y_param), 3) + " m"; break;
-        case ZParam:        text = String (xMetersFromParam (z_param), 3) + " m"; break;
-        case RadiusParam:   text = String (radiusMetersFromParam (radius_param), 2) + " m"; break;
-
-        case YawParam:      text = String (degFromParam (yaw_param),   1) + " deg"; break;
-        case PitchParam:    text = String (degFromParam (pitch_param), 1) + " deg"; break;
-        case RollParam:     text = String (degFromParam (roll_param),  1) + " deg"; break;
-        case RotOrderParam: text = (rot_order_param < 0.5f) ? "yaw-pitch-roll" : "roll-pitch-yaw"; break;
-
-        case Q0Param:       text = String (q0_param * 2. - 1., 4); break;
-        case Q1Param:       text = String (q1_param * 2. - 1., 4); break;
-        case Q2Param:       text = String (q2_param * 2. - 1., 4); break;
-        case Q3Param:       text = String (q3_param * 2. - 1., 4); break;
-        case QinvertParam:  text = (qinvert_param < 0.5f) ? "" : "inverse"; break;
-
-        case InOrderParam:       text = String (in_order); break;
-        case OutOrderParam:      text = String (out_order); break;
-        case TranslEnabledParam: text = (transl_enabled_param > 0.5f) ? "on" : "bypass"; break;
-        case RotEnabledParam:    text = (rot_enabled_param    > 0.5f) ? "on" : "bypass"; break;
-        default: break;
-    }
-    return text;
+    int order = (int) round (orderParam * AMBI_ORDER);
+#ifdef UNIVERSAL_AMBISONIC
+    int activeOrder = ambiOrderFromChannels (getTotalNumInputChannels());
+    if (activeOrder > 0)
+        order = juce::jmin (order, activeOrder);
+#endif
+    return order;
 }
 
 bool Ambix_moveAudioProcessor::isQuaternionActive()
@@ -361,6 +373,16 @@ void Ambix_moveAudioProcessor::getLookForward (float out[3])
     // vector that maps onto head-frame +X (forward) is the first column of
     // Rot, since  h = (1,0,0) = w * Rot  =>  w = (1,0,0) * Rot^T  = col 0.
     Eigen::Matrix3d Rot = Eigen::Matrix3d::Identity();
+
+    const float yaw_param       = params[YawParam]->get();
+    const float pitch_param     = params[PitchParam]->get();
+    const float roll_param      = params[RollParam]->get();
+    const float rot_order_param = params[RotOrderParam]->get();
+    const float q0_param        = params[Q0Param]->get();
+    const float q1_param        = params[Q1Param]->get();
+    const float q2_param        = params[Q2Param]->get();
+    const float q3_param        = params[Q3Param]->get();
+    const float qinvert_param   = params[QinvertParam]->get();
 
     if (_q_changed)
     {
@@ -491,79 +513,45 @@ void Ambix_moveAudioProcessor::releaseResources()
 
 void Ambix_moveAudioProcessor::calcParams()
 {
+    // one atomic read per parameter and block
+    const float x_param              = params[XParam]->get();
+    const float y_param              = params[YParam]->get();
+    const float z_param              = params[ZParam]->get();
+    const float radius_param         = params[RadiusParam]->get();
+    const float yaw_param            = params[YawParam]->get();
+    const float pitch_param          = params[PitchParam]->get();
+    const float roll_param           = params[RollParam]->get();
+    const float rot_order_param      = params[RotOrderParam]->get();
+    const float q0_param             = params[Q0Param]->get();
+    const float q1_param             = params[Q1Param]->get();
+    const float q2_param             = params[Q2Param]->get();
+    const float q3_param             = params[Q3Param]->get();
+    const float qinvert_param        = params[QinvertParam]->get();
+    const float transl_enabled_param = params[TranslEnabledParam]->get();
+    const float rot_enabled_param    = params[RotEnabledParam]->get();
+
+    // The orders this computation uses, from the parameters as they are now
+    // (they may be set from another thread meanwhile), capped to the active
+    // channel count from the host. Computed afresh each block rather than
+    // written back, so a concurrent set can't be lost.
+    int inOrder  = (int) round (params[InOrderParam]->get()  * AMBI_ORDER);
+    int outOrder = (int) round (params[OutOrderParam]->get() * AMBI_ORDER);
+
 #ifdef UNIVERSAL_AMBISONIC
-    // Cap order to active channel count from host
-    int activeOrder = ambiOrderFromChannels (getTotalNumInputChannels());
+    const int activeOrder = ambiOrderFromChannels (getTotalNumInputChannels());
     if (activeOrder > 0)
     {
-        in_order  = juce::jmin (in_order,  activeOrder);
-        out_order = juce::jmin (out_order, activeOrder);
+        inOrder  = juce::jmin (inOrder,  activeOrder);
+        outOrder = juce::jmin (outOrder, activeOrder);
     }
 #endif
 
-    if (! _initialized)
+    if (! _initialized.exchange (true) || inOrder != _in_order)
     {
-        sph_h_in.Init (in_order);
+        // pick the pseudo-inverse built for this input order (constructor)
+        Sh_matrix_inv = &Sh_matrix_inv_for_order[(size_t) inOrder];
 
-        // Parse the t-design sampling points (240 points on the unit sphere)
-        const String t_design_txt (t_design::des_3_240_21_txt);
-
-        String::CharPointerType lineChar = t_design_txt.getCharPointer();
-
-        int n = 0;
-        int numsamples = 0;
-        int curr_n = 0;
-        int max_n  = lineChar.length();
-
-        while (curr_n < max_n)
-        {
-            double value;
-            sscanf (lineChar, "%lf\n%n", &value, &n);
-            lineChar += n;
-            curr_n += n;
-            numsamples++;
-        }
-
-        numsamples /= 3; // x,y,z triples
-
-        Carth_coord.resize (numsamples, 3);
-
-        lineChar = t_design_txt.getCharPointer();
-
-        for (int i = 0; i < numsamples; ++i)
-        {
-            double x, y, z;
-            sscanf (lineChar, "%lf%lf%lf%n", &x, &y, &z, &n);
-            Carth_coord (i, 0) = x;
-            Carth_coord (i, 1) = y;
-            Carth_coord (i, 2) = z;
-            lineChar += n;
-        }
-
-        // Build the undistorted SH basis at the sampling points and compute its
-        // pseudo-inverse — this stays fixed regardless of listener position.
-        Eigen::MatrixXd Sh_matrix;
-        Sh_matrix.setZero (numsamples, AMBI_CHANNELS);
-
-        const int in_ambi_channels = (in_order + 1) * (in_order + 1);
-        for (int i = 0; i < numsamples; ++i)
-        {
-            const double az = atan2 (Carth_coord (i, 1), Carth_coord (i, 0));
-            const double el = atan2 (Carth_coord (i, 2),
-                                     sqrt (Carth_coord (i, 0) * Carth_coord (i, 0)
-                                         + Carth_coord (i, 1) * Carth_coord (i, 1)));
-
-            Eigen::VectorXd Ymn (in_ambi_channels);
-            sph_h_in.Calc (az, el);
-            sph_h_in.Get  (Ymn);
-
-            Sh_matrix.block (i, 0, 1, in_ambi_channels) = Ymn.transpose();
-        }
-
-        Sh_matrix_inv = (Sh_matrix.transpose() * Sh_matrix)
-                            .colPivHouseholderQr().inverse() * Sh_matrix.transpose();
-
-        _initialized = true;
+        Sh_matrix_mod.setZero(); // keeps size (numsamples x AMBI_CHANNELS)
     }
 
     // Recompute the transformation matrix only if any relevant parameter changed
@@ -583,16 +571,16 @@ void Ambix_moveAudioProcessor::calcParams()
         (qinvert_param        != _qinvert_param)        ||
         (transl_enabled_param != _transl_enabled_param) ||
         (rot_enabled_param    != _rot_enabled_param)    ||
-        (in_order             != _in_order)             ||
-        (out_order            != _out_order);
+        (inOrder              != _in_order)             ||
+        (outOrder             != _out_order);
 
     if (anyChanged)
     {
-        if (_out_order != out_order)
-            sph_h_out.Init (out_order);
+        if (_out_order != outOrder)
+            sph_h_out = &sph_h_out_for_order[(size_t) outOrder]; // initialised in the constructor
 
         const int numsamples       = (int) Carth_coord.rows();
-        const int out_ambi_channels = (out_order + 1) * (out_order + 1);
+        const int out_ambi_channels = (outOrder + 1) * (outOrder + 1);
 
         const double R  = radiusMetersFromParam (radius_param);
         // When translation is bypassed the listener stays at the origin.
@@ -681,8 +669,7 @@ void Ambix_moveAudioProcessor::calcParams()
                 Rot = RotZ * RotY * RotX; // rpy
         }
 
-        Eigen::MatrixXd Sh_matrix_mod;
-        Sh_matrix_mod.setZero (numsamples, AMBI_CHANNELS);
+        Sh_matrix_mod.setZero(); // keeps size (numsamples x AMBI_CHANNELS) from init
 
         for (int i = 0; i < numsamples; ++i)
         {
@@ -718,11 +705,9 @@ void Ambix_moveAudioProcessor::calcParams()
             // documented for future use.
             const double gain = R / safeDist;
 
-            Eigen::VectorXd Ymn (out_ambi_channels);
-            sph_h_out.Calc (newAz, newEl);
-            sph_h_out.Get  (Ymn);
+            sph_h_out->Calc (newAz, newEl);
 
-            Sh_matrix_mod.block (i, 0, 1, out_ambi_channels) = gain * Ymn.transpose();
+            Sh_matrix_mod.block (i, 0, 1, out_ambi_channels) = gain * sph_h_out->Ymn.transpose();
         }
 
         // Final transformation matrix.
@@ -735,7 +720,8 @@ void Ambix_moveAudioProcessor::calcParams()
         // indexing convention. At zero translation Sh_transf is the identity
         // (symmetric), which is why the missing transpose only manifests as a
         // bug once the listener is actually moved.
-        Sh_transf = (Sh_matrix_inv * Sh_matrix_mod).transpose();
+        // (A * B)^T == B^T * A^T, written with noalias() so no temporary is allocated.
+        Sh_transf.noalias() = Sh_matrix_mod.transpose() * Sh_matrix_inv->transpose();
 
         // threshold tiny values to zero (lets the inner loop in processBlock
         // skip them entirely)
@@ -760,8 +746,8 @@ void Ambix_moveAudioProcessor::calcParams()
         _qinvert_param        = qinvert_param;
         _transl_enabled_param = transl_enabled_param;
         _rot_enabled_param    = rot_enabled_param;
-        _in_order             = in_order;
-        _out_order            = out_order;
+        _in_order             = inOrder;
+        _out_order            = outOrder;
     }
 }
 
@@ -831,10 +817,12 @@ void Ambix_moveAudioProcessor::getStateInformation (MemoryBlock& destData)
 {
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    for (int i = 0; i < getNumParameters(); ++i)
-        xml.setAttribute (String (i), getParameter (i));
+    // same attributes and order as the legacy index-based API wrote, so
+    // projects stay readable by older versions
+    for (int i = 0; i < totalNumParams; ++i)
+        xml.setAttribute (String (i), params[i]->get());
 
-    xml.setAttribute ("_q_changed", _q_changed);
+    xml.setAttribute ("_q_changed", _q_changed.load());
 #ifdef WITH_OSC
     xml.setAttribute ("osc_in_port", osc_in_port);
     xml.setAttribute ("osc_enabled", osc_enabled);
@@ -849,8 +837,9 @@ void Ambix_moveAudioProcessor::setStateInformation (const void* data, int sizeIn
 
     if (xmlState != nullptr && xmlState->hasTagName ("MYPLUGINSETTINGS"))
     {
-        for (int i = 0; i < getNumParameters(); ++i)
-            setParameter (i, xmlState->getDoubleAttribute (String (i)));
+        // restore() runs the side effects like the legacy setParameter() did
+        for (int i = 0; i < totalNumParams; ++i)
+            params[i]->restore ((float) xmlState->getDoubleAttribute (String (i)));
 
         if (xmlState->hasAttribute ("_q_changed"))
             _q_changed = xmlState->getBoolAttribute ("_q_changed");

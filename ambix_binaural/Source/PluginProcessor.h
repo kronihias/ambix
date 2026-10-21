@@ -25,6 +25,7 @@
 #include "AmbiSpeaker.h"
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 
 #if BINAURAL_DECODER
     #if WITH_ZITA_CONVOLVER
@@ -107,7 +108,8 @@ inline float DbToParam(float db)
 */
 class Ambix_binauralAudioProcessor  : public AudioProcessor,
                                       public ChangeBroadcaster,
-                                      public Thread
+                                      public Thread,
+                                      public ambix::ParameterOwner
 {
 public:
     //==============================================================================
@@ -134,14 +136,6 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
-
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
     bool isInputChannelStereoPair (int index) const override;
@@ -162,6 +156,8 @@ public:
     //==============================================================================
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    ambix::Parameter* gain_param; // output gain, applied to the speakers in processBlock
 
     // use a thread to load a configuration
     void run() override;
@@ -190,7 +186,7 @@ public:
 
     int _AmbiChannels;
 
-    bool configLoaded; // is a configuration successfully loaded?
+    std::atomic<bool> configLoaded; // is a configuration successfully loaded?
 
     void DebugPrint(String debugText);
 
@@ -223,7 +219,15 @@ private:
 
     void DeleteTemporaryFiles();
 
-    File _desConfigFile;
+    // Load requests for the loader thread (message and loader thread only).
+    // A request that arrives while a load is running is kept and loaded next,
+    // instead of being dropped: a host that restores a project and then
+    // activates the plugin asks for a reload at the real sample rate while the
+    // first load (started before the rate was known) is still running.
+    CriticalSection loadRequestLock;
+    File pendingConfigFile;   // next file to load, if loadPending
+    File requestedConfigFile; // last file asked for - what a reload reloads
+    bool loadPending = false;
 
     File _tempConfigZipFile;
     Array<File> _cleanUpFilesOnExit;
@@ -251,9 +255,11 @@ private:
 
     int ConvBufferSize;
 
-    bool isProcessing;
+    std::atomic<bool> isProcessing; // handshake with the loader thread, see LoadConfiguration
 
-    float _gain; // output gain
+    void parameterValueSet (int, float) override {} // gain is only stored
+
+    float _appliedGain; // audio thread only
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_binauralAudioProcessor)
