@@ -19,8 +19,8 @@ get wrong:
 
 Scenarios marked "offline" process the way a host renders, for plugins
 whose real-time output legitimately depends on timing (binaural's convolver
-drops late partitions rather than wait for them). "audio_from_step" leaves a
-start-up transient out of the audio comparison.
+drops late partitions rather than wait for them). "late_state" restores the
+state after activating instead of before.
 
 Each scenario runs through `ambix_bustest --step ...` on one instance. After
 every step it records latency, per-channel output RMS and correlation, and
@@ -273,11 +273,6 @@ SCENARIOS = {
             "steps": [[W(4000)], [(0, 0.3)], [(0, 0.8)], [(0, 0.0)], [(0, 0.5)]],
             "sound_from_step": 0,
             "offline": True,
-            # step 0 is the convolver's start-up: its worker threads have just
-            # started, and the first blocks differ per platform (Windows CI
-            # reproducibly, while every later step matches bit for bit). Not
-            # parameter behaviour, so its audio isn't compared.
-            "audio_from_step": 1,
         },
     },
 
@@ -325,6 +320,8 @@ def run_scenario(binary, plugin, scenario):
         # late in real time (it must not wait on them); offline it waits, so
         # the output can't depend on how busy the machine is
         cmd += ["--offline"]
+    if scenario.get("late_state"):
+        cmd += ["--late-state"]
     if "arr" in scenario:
         n_in, n_out = scenario["arr"]
         cmd += ["--in-arr", hex(mask(n_in)), "--out-arr", hex(mask(n_out))]
@@ -389,7 +386,6 @@ def close(a, b):
 def test_scenario(scenario):
     plugin, name, current, golden = scenario
     where = f"{plugin}/{name}"
-    audio_from = SCENARIOS[plugin][name].get("audio_from_step", 0)
 
     assert current["channels"] == golden["channels"], f"{where}: bus widths"
     assert len(current["steps"]) == len(golden["steps"])
@@ -405,6 +401,26 @@ def test_scenario(scenario):
             assert gv == pytest.approx(value, abs=VALUE_TOL), f"{at}: parameter {pid} is {gv}, was {value}"
             assert gt == text, f"{at}: parameter {pid} shows {gt!r}, was {text!r}"
 
-        if i >= audio_from:
-            assert close(got["rms"], want["rms"]) and close(got["proj"], want["proj"]), (
-                f"{at}: output differs")
+        assert close(got["rms"], want["rms"]) and close(got["proj"], want["proj"]), (
+            f"{at}: output differs")
+
+
+# ---------------------------------------------------------------------------
+# A project restores the same, whenever the host restores it
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("plugin", ["ambix_binaural", "ambix_decoder"])
+def test_restore_before_or_after_activation(plugin, bustest_bin):
+    """Hosts restore a project before or after activating the plugin. Both
+    must end up with the same configuration. Binaural used to start loading
+    on restore, before it knew the sample rate, and drop the reload that
+    activation asked for while that load was running - its IRs then stayed
+    at their file rate (44.1 kHz) instead of the 48 kHz it ran at."""
+    spec = SCENARIOS[plugin]["gain_with_config"]
+    before = run_scenario(bustest_bin, plugin, spec)
+    after = run_scenario(bustest_bin, plugin, {**spec, "late_state": True})
+
+    for i, (a, b) in enumerate(zip(before["steps"], after["steps"])):
+        assert close(a["rms"], b["rms"]) and close(a["proj"], b["proj"]), (
+            f"{plugin} step {i}: restoring before activation sounds different "
+            f"from restoring after ({a['rms']} vs {b['rms']})")

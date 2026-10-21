@@ -219,7 +219,15 @@ private:
 
     void DeleteTemporaryFiles();
 
-    File _desConfigFile;
+    // Load requests for the loader thread (message and loader thread only).
+    // A request that arrives while a load is running is kept and loaded next,
+    // instead of being dropped: a host that restores a project and then
+    // activates the plugin asks for a reload at the real sample rate while the
+    // first load (started before the rate was known) is still running.
+    CriticalSection loadRequestLock;
+    File pendingConfigFile;   // next file to load, if loadPending
+    File requestedConfigFile; // last file asked for - what a reload reloads
+    bool loadPending = false;
 
     File _tempConfigZipFile;
     Array<File> _cleanUpFilesOnExit;

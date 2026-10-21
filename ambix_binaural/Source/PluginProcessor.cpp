@@ -101,6 +101,12 @@ Ambix_binauralAudioProcessor::Ambix_binauralAudioProcessor() :
 
 Ambix_binauralAudioProcessor::~Ambix_binauralAudioProcessor()
 {
+    // the loader must not outlive the processor (LoadConfiguration checks
+    // threadShouldExit() between IRs)
+    signalThreadShouldExit();
+    notify();
+    stopThread(30000);
+
 #if BINAURAL_DECODER
     #if WITH_ZITA_CONVOLVER
         zita_conv.stop_process();
@@ -397,6 +403,12 @@ void Ambix_binauralAudioProcessor::processBlock (AudioSampleBuffer& buffer, Midi
 
 void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
 {
+    {
+        // also when called directly (editor), so a reload reloads this one
+        const ScopedLock sl (loadRequestLock);
+        requestedConfigFile = configFile;
+    }
+
     if (!configFile.existsAsFile())
     {
 
@@ -1072,20 +1084,55 @@ void Ambix_binauralAudioProcessor::UnloadConfiguration()
 
 void Ambix_binauralAudioProcessor::run()
 {
-    LoadConfiguration(_desConfigFile);
+    // Stays up between loads, so a request can't fall into the gap between
+    // "nothing pending" and the thread exiting.
+    while (! threadShouldExit())
+    {
+        File next;
+        {
+            const ScopedLock sl (loadRequestLock);
+            if (loadPending)
+            {
+                next = pendingConfigFile;
+                loadPending = false;
+            }
+        }
+
+        if (next != File())
+            LoadConfiguration(next);
+        else
+            wait(-1); // until LoadConfigurationAsync() notifies
+    }
 }
 
 void Ambix_binauralAudioProcessor::LoadConfigurationAsync(File configFile)
 {
     DebugPrint("Loading preset...\n\n");
-    _desConfigFile = configFile;
-    startThread(Thread::Priority::normal);
+
+    {
+        const ScopedLock sl (loadRequestLock);
+        pendingConfigFile = requestedConfigFile = configFile;
+        loadPending = true;
+    }
+
+    if (isThreadRunning())
+        notify();
+    else
+        startThread(Thread::Priority::normal);
 }
 
 void Ambix_binauralAudioProcessor::ReloadConfiguration()
 {
-    if (configLoaded)
-        LoadConfigurationAsync(_configFile);
+    // Reload what was last asked for, also while that is still loading: the
+    // running load may have started with the old sample rate / block size.
+    File file;
+    {
+        const ScopedLock sl (loadRequestLock);
+        file = requestedConfigFile;
+    }
+
+    if (file.existsAsFile())
+        LoadConfigurationAsync(file);
 }
 
 bool Ambix_binauralAudioProcessor::SaveConfiguration(File zipFile)
