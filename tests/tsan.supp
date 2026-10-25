@@ -1,5 +1,0 @@
-# Known ambix_binaural races: preset name and debug text are plain Strings
-# written by the loader thread, read on the message thread.
-race:Ambix_binauralAudioProcessor::getStateInformation
-race:Ambix_binauralAudioProcessor::DebugPrint
-race:juce::AudioProcessor::getSampleRate

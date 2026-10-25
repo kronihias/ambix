@@ -175,6 +175,10 @@ public:
     Atomic<int> _readyToSaveConfiguration;
 
     unsigned int getBufferSize();
+    String getDebugText();
+    String getActivePreset();
+    String getPresetText();
+    File getConfigFile();
     unsigned int getConvBufferSize();
     void setConvBufferSize(unsigned int bufsize);
 
@@ -218,6 +222,7 @@ public:
 private:
 
     void DeleteTemporaryFiles();
+    File getTempConfigZipFile();
 
     // Load requests (message and loader thread only). One arriving mid-load is
     // queued, not dropped: a host restoring a project asks for a reload at the
@@ -248,10 +253,14 @@ private:
     bool safemode_; // this will add some latency for hosts that might send partial blocks, done automatically based on host type
 #endif
 
-    double SampleRate;
-    int BufferSize;
+    std::atomic<double> SampleRate;
+    std::atomic<int> BufferSize;
 
-    int ConvBufferSize;
+    std::atomic<int> ConvBufferSize;
+
+    // activePreset, box_preset_str, _DebugText, _configFile, _tempConfigZipFile
+    // and _cleanUpFilesOnExit: the loader thread writes them too
+    CriticalSection sharedLock;
 
     std::atomic<bool> isProcessing; // handshake with the loader thread, see LoadConfiguration
 

@@ -178,7 +178,7 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     UpdatePresets();
 
-    txt_preset.setText(ownerFilter->box_preset_str);
+    txt_preset.setText(ownerFilter->getPresetText());
     txt_preset.setCaretPosition(txt_preset.getTotalNumChars()-1);
     txt_preset.setTooltip(txt_preset.getText());
 
@@ -354,9 +354,9 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
 #endif
     num_ch.setText(String(ourProcessor->_AmbiChannels), dontSendNotification);
 
-    txt_debug.setText(ourProcessor->_DebugText, true);
+    txt_debug.setText(ourProcessor->getDebugText(), true);
 
-    txt_preset.setText(ourProcessor->box_preset_str);
+    txt_preset.setText(ourProcessor->getPresetText());
     txt_preset.setCaretPosition(txt_preset.getTotalNumChars()-1);
     txt_preset.setTooltip(txt_preset.getText());
 
@@ -391,6 +391,7 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
 void Ambix_binauralAudioProcessorEditor::UpdatePresets()
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
+    const File configFile = ourProcessor->getConfigFile();
 
     popup_submenu.clear(); // contains submenus
 
@@ -418,7 +419,7 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
         // add item to submenu
         // check if this preset is loaded
 
-        if (ourProcessor->_configFile == ourProcessor->_presetFiles.getUnchecked(i))
+        if (configFile == ourProcessor->_presetFiles.getUnchecked(i))
         {
             popup_submenu.getLast()->addItem(i+1, ourProcessor->_presetFiles.getUnchecked(i).getFileNameWithoutExtension(), true, true);
         } else {
@@ -430,7 +431,7 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
 
     // add all subdirs to main menu
     for (int i=0; i < popup_submenu.size(); i++) {
-        if (Subdirs.getReference(i) == ourProcessor->_configFile.getParentDirectory().getFileName())
+        if (Subdirs.getReference(i) == configFile.getParentDirectory().getFileName())
         {
             popup_presets.addSubMenu(Subdirs.getReference(i), *popup_submenu.getUnchecked(i), true, nullptr, true);
         } else {
@@ -439,7 +440,7 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
 
     }
 
-    if (ourProcessor->activePreset.isNotEmpty())
+    if (ourProcessor->getActivePreset().isNotEmpty())
     {
         popup_presets.addSeparator();
         popup_presets.addItem(-2, String("save preset to .zip file..."), ourProcessor->_readyToSaveConfiguration.get());
@@ -481,7 +482,7 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
     else if (result == -2)
     {
         FileChooser myChooser("Save the loaded preset as .zip file...",
-            ourProcessor->lastDir.getChildFile(ourProcessor->activePreset),
+            ourProcessor->lastDir.getChildFile(ourProcessor->getActivePreset()),
             "*.zip");
         if (myChooser.browseForFileToSave(true))
         {

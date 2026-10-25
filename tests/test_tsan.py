@@ -1,8 +1,7 @@
 """ambix_binaural under ThreadSanitizer.
 
 The binaural loads presets on a background thread while the host keeps
-calling in; TSan catches races there that a normal run rarely hits. Known
-races are suppressed in tests/tsan.supp.
+calling in; TSan catches races there that a normal run rarely hits.
 
 Needs a separate build tree (AMBIX_TSAN_BUILD_DIR, default _build_tsan):
 
@@ -27,12 +26,17 @@ TSAN_BUILD_DIR = os.environ.get("AMBIX_TSAN_BUILD_DIR", os.path.join(REPO_ROOT, 
 BUSTEST = os.path.join(TSAN_BUILD_DIR, "testhost",
                        "ambix_bustest.exe" if os.name == "nt" else "ambix_bustest")
 BINAURAL = os.path.join(TSAN_BUILD_DIR, "vst3", "ambix_binaural.vst3")
-SUPPRESSIONS = os.path.join(os.path.dirname(__file__), "tsan.supp")
+
+# Block-size changes make the plug-in reload on the loader thread, while the
+# host keeps processing and reading the state.
+SCENARIOS = {
+    "after_load": ["wait=3000", "block=512", "wait=3000", "block=256", "wait=3000"],
+    "during_load": ["block=512", "block=128", "wait=200", "block=1024", "wait=3000"],
+}
 
 
-def test_block_size_change_reloads_without_races():
-    """A host changing the block size makes the plug-in reload its preset on
-    the loader thread; prepareToPlay must not touch what that rebuilds."""
+@pytest.mark.parametrize("steps", SCENARIOS.values(), ids=SCENARIOS.keys())
+def test_reload_without_races(steps):
     if not (os.path.isfile(BUSTEST) and os.path.exists(BINAURAL)):
         pytest.skip(f"no ThreadSanitizer build at {TSAN_BUILD_DIR}")
 
@@ -45,11 +49,10 @@ def test_block_size_change_reloads_without_races():
             f.write(xml_state(state))
 
         cmd = [BUSTEST, "--plugin", BINAURAL, "--state-in", state_path]
-        for step in ["wait=3000", "block=512", "wait=3000", "block=256", "wait=3000"]:
+        for step in steps:
             cmd += ["--step", step]
 
-        env = dict(os.environ, TSAN_OPTIONS=f"suppressions={SUPPRESSIONS}")
-        run = subprocess.run(cmd, capture_output=True, text=True, timeout=600, env=env)
+        run = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
     reports = [line for line in run.stderr.splitlines() if line.startswith("SUMMARY: ThreadSanitizer")]
     assert not reports, "\n".join(reports) + "\n\n" + run.stderr[-6000:]
