@@ -30,12 +30,40 @@ Ambix_maxreAudioProcessor::Ambix_maxreAudioProcessor() :
         .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
         .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
-    apply_param(0.5f),
     _apply_param(0.5f),
-    order_param(1.f),
-    order(AMBI_ORDER),
     _order(-1)
 {
+    // legacy setParameter() stored apply quantised to 0 / 0.5 / 1
+    auto snapApply = [] (float v) -> float
+    {
+        if (v < 0.33f)
+            return 0.f;
+        else if ((v >= 0.33f) && (v < 0.66f))
+            return 0.5f;
+        return 1.f;
+    };
+
+    auto applyText = [] (float v, int) -> String
+    {
+        if (v < 0.33f)
+        {
+            return "inverse max_re weight";
+        } else if ((v >= 0.33f) && (v < 0.66f))
+        {
+            return "no weighting";
+        } else {
+            return "max_re weight";
+        }
+    };
+
+    auto orderText = [] (float v, int) -> String
+    {
+        return String((int)round(v*AMBI_ORDER));
+    };
+
+    addParameter (apply_param = new ambix::Parameter (*this, ApplyParam, "apply", 0.5f, applyText, snapApply));
+    addParameter (order_param = new ambix::Parameter (*this, OrderParam, "order", 1.f, orderText));
+
     weights.resize(AMBI_ORDER+1);
 
     // set all weights
@@ -43,7 +71,7 @@ Ambix_maxreAudioProcessor::Ambix_maxreAudioProcessor() :
         weights.set(i, 1.f);
     }
 
-    CalcParams();
+    CalcParams(orderFromParam(order_param->get()), apply_param->get());
 
 }
 
@@ -55,87 +83,6 @@ Ambix_maxreAudioProcessor::~Ambix_maxreAudioProcessor()
 const String Ambix_maxreAudioProcessor::getName() const
 {
     return JucePlugin_Name;
-}
-
-int Ambix_maxreAudioProcessor::getNumParameters()
-{
-    return totalNumParams;
-}
-
-float Ambix_maxreAudioProcessor::getParameter (int index)
-{
-    switch (index)
-	{
-        case ApplyParam:
-            return apply_param;
-        case OrderParam:
-            return order_param;
-
-		default:
-            return 0.f;
-	}
-}
-
-void Ambix_maxreAudioProcessor::setParameter (int index, float newValue)
-{
-    switch (index)
-	{
-        case ApplyParam:
-            if (newValue < 0.33f)
-            {
-                apply_param = 0.f;
-            } else if ((newValue >= 0.33f) && (newValue < 0.66f))
-            {
-                apply_param = 0.5f;
-            } else {
-                apply_param = 1.f;
-            }
-            break;
-        case OrderParam:
-            order_param = newValue;
-            order = (int)round(order_param*AMBI_ORDER); // AMBI_ORDER is maximum
-            break;
-
-		default:
-            break;
-	}
-}
-
-const String Ambix_maxreAudioProcessor::getParameterName (int index)
-{
-    switch (index)
-	{
-        case ApplyParam:
-            return "apply";
-        case OrderParam:
-            return "order";
-
-		default:
-            return String();
-	}
-}
-
-const String Ambix_maxreAudioProcessor::getParameterText (int index)
-{
-    switch (index)
-	{
-        case ApplyParam:
-            if (apply_param < 0.33f)
-            {
-                return "inverse max_re weight";
-            } else if ((apply_param >= 0.33f) && (apply_param < 0.66f))
-            {
-                return "no weighting";
-            } else {
-                return "max_re weight";
-            }
-        case OrderParam:
-            return String(order);
-
-		default:
-            return String();
-	}
-
 }
 
 const String Ambix_maxreAudioProcessor::getInputChannelName (int channelIndex) const
@@ -226,16 +173,26 @@ inline double calccostheta(int N)
     return cos(deg*DEGTORAD);
 }
 
-void Ambix_maxreAudioProcessor::CalcParams()
+void Ambix_maxreAudioProcessor::parameterValueSet (int, float)
 {
-    if (_order != order || _apply_param != apply_param)
+    // nothing to do: processBlock() reads the parameters once per block
+}
+
+int Ambix_maxreAudioProcessor::orderFromParam (float orderParam)
+{
+    return (int)round(orderParam*AMBI_ORDER); // AMBI_ORDER is maximum
+}
+
+void Ambix_maxreAudioProcessor::CalcParams (const int order_, const float apply_param_)
+{
+    if (_order != order_ || _apply_param != apply_param_)
     {
-        costheta = calccostheta(order); // 137.9°/(N+1.51)
+        costheta = calccostheta(order_); // 137.9°/(N+1.51)
 
-        legendre_u.Calc(order, costheta);
-        Pn = legendre_u.Get();
+        legendre_u.Calc(order_, costheta);
+        const auto& Pn = legendre_u.Get(); // Unassociated Legendre
 
-        if (apply_param < 0.33f) // apply reciprokal
+        if (apply_param_ < 0.33f) // apply reciprokal
         {
             for (int i=0; i < Pn.size(); i++) {
                 weights.set(i, (float)(1./Pn(i)));
@@ -260,8 +217,8 @@ void Ambix_maxreAudioProcessor::CalcParams()
         std::cout << std::endl;
         */
 
-        _order = order;
-        _apply_param = apply_param;
+        _order = order_;
+        _apply_param = apply_param_;
     }
 
 }
@@ -282,10 +239,12 @@ void Ambix_maxreAudioProcessor::numChannelsChanged()
 
 void Ambix_maxreAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBuffer& midiMessages)
 {
-    CalcParams();
+    // read the parameters once per block
+    const float apply = apply_param->get();
+    CalcParams(orderFromParam(order_param->get()), apply);
 
     // do scaling only if weighting wanted
-    if (apply_param < 0.33f || apply_param > 0.66f) {
+    if (apply < 0.33f || apply > 0.66f) {
 
         int numSamples = buffer.getNumSamples();
         int l = 0; // 0, 1, 2, 3, 4, ......

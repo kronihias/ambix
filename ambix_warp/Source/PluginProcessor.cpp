@@ -34,25 +34,119 @@ Ambix_warpAudioProcessor::Ambix_warpAudioProcessor() :
         .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
         .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
-    phi_param(0.5f),
     _phi_param(-10.f),
-    phi_curve_param(0.f),
     _phi_curve_param(0.f),
-    theta_param(0.5f),
     _theta_param(-10.f),
-    theta_curve_param(0.f),
     _theta_curve_param(0.f),
-    preemp_param(1.f),
     _preemp_param(1.f),
-    in_order_param(1.f),
-    out_order_param(1.f),
-    in_order(AMBI_ORDER),
     _in_order(-1),
-    out_order(AMBI_ORDER),
     _out_order(-1),
     _initialized(false),
     output_buffer(AMBI_CHANNELS,256)
 {
+    // legacy display texts, as getParameterText() built them
+    auto factorText = [] (float v, int) -> String { return String(v*1.8f-0.9f).substring(0, 5); };
+    auto phiCurve   = [] (float v, int) -> String { return (v <= 0.5f) ? "-90 / 90 deg" : "180 / 0 deg"; };
+    auto thetaCurve = [] (float v, int) -> String { return (v <= 0.5f) ? "northpole" : "equator"; };
+    auto orderText  = [this] (float v, int) -> String { return String (orderForDisplay (v)); };
+    auto onOff      = [] (float v, int) -> String { return (v <= 0.5f) ? "Off" : "On"; };
+
+    addParameter (params[PhiParam]        = new ambix::Parameter (*this, PhiParam,        "Az Warp factor", 0.5f, factorText));
+    addParameter (params[PhiCurveParam]   = new ambix::Parameter (*this, PhiCurveParam,   "Az Warp curve",  0.f,  phiCurve));
+    addParameter (params[ThetaParam]      = new ambix::Parameter (*this, ThetaParam,      "El Warp factor", 0.5f, factorText));
+    addParameter (params[ThetaCurveParam] = new ambix::Parameter (*this, ThetaCurveParam, "El Warp curve",  0.f,  thetaCurve));
+    addParameter (params[InOrderParam]    = new ambix::Parameter (*this, InOrderParam,    "Ambi In order",  1.f,  orderText));
+    addParameter (params[OutOrderParam]   = new ambix::Parameter (*this, OutOrderParam,   "Ambi Out order", 1.f,  orderText));
+    addParameter (params[PreEmpParam]     = new ambix::Parameter (*this, PreEmpParam,     "PreEmphasis",    1.f,  onOff));
+
+    // sampling points (t-design), parsed once
+    {
+        const String t_design_txt (t_design::des_3_240_21_txt);
+
+        String::CharPointerType lineChar = t_design_txt.getCharPointer();
+
+        int n = 0; // how many characters been read
+        int numsamples = 0;
+        int i = 0;
+
+        int curr_n = 0;
+        int max_n = lineChar.length();
+
+        while (curr_n < max_n) { // check how many coordinates we have
+            double value;
+            sscanf(lineChar, "%lf\n%n", &value, &n);
+            lineChar += n;
+            curr_n += n;
+            numsamples++;
+        } // end parse numbers
+
+        numsamples = numsamples/3; // xyz
+
+        Carth_coord.resize(numsamples,3); // positions in cartesian coordinates
+
+        curr_n = 0;
+        lineChar = t_design_txt.getCharPointer();
+
+        // parse line for numbers again and copy to carth coordinate matrix
+        while (i < numsamples) {
+
+            double x,y,z;
+
+            sscanf(lineChar, "%lf%lf%lf%n", &x, &y, &z, &n);
+
+            Carth_coord(i,0) = x;
+            Carth_coord(i,1) = y;
+            Carth_coord(i,2) = z;
+
+            lineChar += n;
+
+            curr_n += n;
+            i++;
+
+        } // end parse numbers
+    }
+
+    const int numsamples = (int) Carth_coord.rows();
+
+    Sph_coord.resize(numsamples,2); // positions in spherical coordinates
+
+    for (int i=0; i < numsamples; i++)
+    {
+        Sph_coord(i,0) = atan2(Carth_coord(i,1),Carth_coord(i,0)); // azimuth
+        Sph_coord(i,1) = atan2(Carth_coord(i,2),sqrt(Carth_coord(i,0)*Carth_coord(i,0) + Carth_coord(i,1)*Carth_coord(i,1))); // elevation
+    }
+
+    // the undistorted SH matrix inverse for every possible input order, and
+    // the output spherical harmonics for every output order
+    Sh_matrix_inv_for_order.resize(AMBI_ORDER+1);
+
+    for (int order = 0; order <= AMBI_ORDER; order++)
+    {
+        SphericalHarmonic sph_h_in;
+        sph_h_in.Init(order);
+
+        Eigen::MatrixXd Sh_matrix;
+        Sh_matrix.setZero(numsamples,AMBI_CHANNELS);
+
+        int in_ambi_channels = (order+1)*(order+1);
+        for (int i=0; i < numsamples; i++)
+        {
+            sph_h_in.Calc(Sph_coord(i,0),Sph_coord(i,1)); // phi theta
+
+            Sh_matrix.block(i,0,1,in_ambi_channels) = sph_h_in.Ymn.transpose();
+        }
+
+        // if input order is different a better solving has to be used for the inverse:
+        Sh_matrix_inv_for_order[(size_t) order] = (Sh_matrix.transpose()*Sh_matrix).colPivHouseholderQr().inverse()*Sh_matrix.transpose();
+
+        sph_h_out_for_order[(size_t) order].Init(order);
+    }
+
+    // sized once here so calcParams() does not allocate
+    Sh_matrix_mod.setZero(numsamples,AMBI_CHANNELS);
+    pre_emphasis.setOnes(numsamples);
+    Sph_coord_mod.resize(numsamples,2);
+
     // set transformation matrix to identity matrix
 	Sh_transf = Eigen::MatrixXd::Identity(AMBI_CHANNELS, AMBI_CHANNELS);
 	_Sh_transf = Eigen::MatrixXd::Identity(AMBI_CHANNELS, AMBI_CHANNELS);
@@ -68,137 +162,25 @@ const String Ambix_warpAudioProcessor::getName() const
     return JucePlugin_Name;
 }
 
-int Ambix_warpAudioProcessor::getNumParameters()
-{
-    return totalNumParams;
-}
-
-float Ambix_warpAudioProcessor::getParameter (int index)
+void Ambix_warpAudioProcessor::parameterValueSet (int index, float newValue)
 {
     switch (index)
 	{
-		case PhiParam:  return phi_param;
-		case PhiCurveParam: return phi_curve_param;
-
-        case ThetaParam:    return theta_param;
-		case ThetaCurveParam:   return theta_curve_param;
-
-        case InOrderParam:  return in_order_param;
-        case OutOrderParam:  return out_order_param;
-
-        case PreEmpParam:  return preemp_param;
-
-		default:            return 0.0f;
-	}
-}
-
-void Ambix_warpAudioProcessor::setParameter (int index, float newValue)
-{
-    switch (index)
-	{
-        case PhiParam:
-            phi_param = newValue;
-            break;
-        case PhiCurveParam:
-            phi_curve_param = newValue;
-            break;
-
-        case ThetaParam:
-            theta_param = newValue;
-            break;
-        case ThetaCurveParam:
-            theta_curve_param = newValue;
-            break;
-
-        case InOrderParam:
-            in_order_param = newValue;
-            in_order = (int)round(in_order_param*AMBI_ORDER); // AMBI_ORDER is maximum
-            _initialized = false; // reinit
-            break;
-        case OutOrderParam:
-            out_order_param = newValue;
-            out_order = (int)round(out_order_param*AMBI_ORDER);
-            break;
-
-        case PreEmpParam:
-            preemp_param = newValue;
 
 		default:
             break;
 	}
-    sendChangeMessage();
 }
 
-const String Ambix_warpAudioProcessor::getParameterName (int index)
+int Ambix_warpAudioProcessor::orderForDisplay (float orderParam)
 {
-    switch (index)
-	{
-        case PhiParam:        return "Az Warp factor";
-        case PhiCurveParam:        return "Az Warp curve";
-        case ThetaParam:        return "El Warp factor";
-        case ThetaCurveParam:        return "El Warp curve";
-
-        case InOrderParam:        return "Ambi In order";
-        case OutOrderParam:        return "Ambi Out order";
-
-        case PreEmpParam:          return "PreEmphasis";
-		default:								break;
-	}
-
-	return String();
-}
-
-const String Ambix_warpAudioProcessor::getParameterText (int index)
-{
-    String text;
-
-    switch (index)
-	{
-        case PhiParam:
-            text = String(phi_param*1.8f-0.9f).substring(0, 5);
-            // text << "";
-            break;
-
-        case PhiCurveParam:
-            if (phi_curve_param <= 0.5f)
-                text = "-90 / 90 deg";
-            else
-                text = "180 / 0 deg";
-            break;
-
-
-        case ThetaParam:
-            text = String(theta_param*1.8f-0.9f).substring(0, 5);
-            // text << "";
-            break;
-
-        case ThetaCurveParam:
-            if (theta_curve_param <= 0.5f)
-                text = "northpole";
-            else
-                text = "equator";
-            break;
-
-        case InOrderParam:
-            text = String(in_order);
-            break;
-
-        case OutOrderParam:
-            text = String(out_order);
-            break;
-
-        case PreEmpParam:
-            if (preemp_param <= 0.5f)
-                text = "Off";
-            else
-                text = "On";
-            break;
-
-		default:
-            break;
-	}
-
-	return text;
+    int order = (int)round(orderParam*AMBI_ORDER);
+#ifdef UNIVERSAL_AMBISONIC
+    int activeOrder = ambiOrderFromChannels (getTotalNumInputChannels());
+    if (activeOrder > 0)
+        order = juce::jmin (order, activeOrder);
+#endif
+    return order;
 }
 
 const String Ambix_warpAudioProcessor::getInputChannelName (int channelIndex) const
@@ -288,137 +270,59 @@ void Ambix_warpAudioProcessor::releaseResources()
 
 void Ambix_warpAudioProcessor::calcParams()
 {
+    // one atomic read per parameter and block
+    const float phi_param         = params[PhiParam]->get();
+    const float phi_curve_param   = params[PhiCurveParam]->get();
+    const float theta_param       = params[ThetaParam]->get();
+    const float theta_curve_param = params[ThetaCurveParam]->get();
+    const float preemp_param      = params[PreEmpParam]->get();
+
+    // orders read afresh each block and capped to the host's channel count;
+    // never written back, so a concurrent set from another thread isn't lost
+    int inOrder  = (int)round(params[InOrderParam]->get()*AMBI_ORDER);
+    int outOrder = (int)round(params[OutOrderParam]->get()*AMBI_ORDER);
+
 #ifdef UNIVERSAL_AMBISONIC
-    // Cap order to active channel count from host
-    int activeOrder = ambiOrderFromChannels (getTotalNumInputChannels());
+    const int activeOrder = ambiOrderFromChannels (getTotalNumInputChannels());
     if (activeOrder > 0) {
-        in_order = juce::jmin (in_order, activeOrder);
-        out_order = juce::jmin (out_order, activeOrder);
+        inOrder = juce::jmin (inOrder, activeOrder);
+        outOrder = juce::jmin (outOrder, activeOrder);
     }
 #endif
 
-    if (!_initialized)
+    if (!_initialized.exchange (true) || inOrder != _in_order)
     {
-
-        sph_h_in.Init(in_order);
-
-        const String t_design_txt (t_design::des_3_240_21_txt);
-
-        // std::cout << t_design_txt << std::endl;
-
-        String::CharPointerType lineChar = t_design_txt.getCharPointer();
-
-        int n = 0; // how many characters been read
-        int numsamples = 0;
-        int i = 0;
-
-        int curr_n = 0;
-        int max_n = lineChar.length();
-
-        while (curr_n < max_n) { // check how many coordinates we have
-            double value;
-            sscanf(lineChar, "%lf\n%n", &value, &n);
-            lineChar += n;
-            curr_n += n;
-            numsamples++;
-        } // end parse numbers
-
-        numsamples = numsamples/3; // xyz
-
-        Carth_coord.resize(numsamples,3); // positions in cartesian coordinates
-
-        curr_n = 0;
-        lineChar = t_design_txt.getCharPointer();
-
-        // parse line for numbers again and copy to carth coordinate matrix
-        while (i < numsamples) {
-
-            double x,y,z;
-
-            sscanf(lineChar, "%lf%lf%lf%n", &x, &y, &z, &n);
-
-            Carth_coord(i,0) = x;
-            Carth_coord(i,1) = y;
-            Carth_coord(i,2) = z;
-
-            lineChar += n;
-
-            curr_n += n;
-            i++;
-
-        } // end parse numbers
-
-        // std::cout << "Coordinate size: " << Carth_coord.rows() << " x " << Carth_coord.cols() << std::endl;
-        // std::cout << Carth_coord << std::endl;
-
-        Sph_coord.resize(numsamples,2); // positions in spherical coordinates
-
-        Eigen::MatrixXd Sh_matrix;
-        Sh_matrix.setZero(numsamples,AMBI_CHANNELS);
-
-        int in_ambi_channels = (in_order+1)*(in_order+1);
-        for (int i=0; i < numsamples; i++)
-        {
-            Eigen::VectorXd Ymn(in_ambi_channels); // Ymn result
-
-            Sph_coord(i,0) = atan2(Carth_coord(i,1),Carth_coord(i,0)); // azimuth
-            Sph_coord(i,1) = atan2(Carth_coord(i,2),sqrt(Carth_coord(i,0)*Carth_coord(i,0) + Carth_coord(i,1)*Carth_coord(i,1))); // elevation
-
-            sph_h_in.Calc(Sph_coord(i,0),Sph_coord(i,1)); // phi theta
-            sph_h_in.Get(Ymn);
-
-            // std::cout << "Ymn Size: " << Ymn.size() << std::endl;
-            // std::cout << "Sh_matrix Size: " << Sh_matrix.size() << std::endl;
-
-            //Sh_matrix.row(i) = Ymn;
-            Sh_matrix.block(i,0,1,in_ambi_channels) = Ymn.transpose();
-            // std::cout << "Size: " << Sh_matrix.block(i,0,1,in_ambi_channels).size() << ": " << Sh_matrix.block(i,0,1,in_ambi_channels) << std::endl;
-        }
-
-        // Sh_matrix_inv.setZero();
-
-        //Sh_matrix_inv = (Sh_matrix.transpose()*Sh_matrix).inverse()*Sh_matrix.transpose(); // not working for dynamic input order
-        // if input order is different a better solving has to be used for the inverse:
-        Sh_matrix_inv = (Sh_matrix.transpose()*Sh_matrix).colPivHouseholderQr().inverse()*Sh_matrix.transpose();
-
-        // std::cout << "Size Sh_matrix: " << Sh_matrix.rows() << " x " << Sh_matrix.cols() << std::endl;
-
-        // std::cout << "Size Inverse: " << Sh_matrix_inv.rows() << " x " << Sh_matrix_inv.cols() << std::endl;
-
-        // std::cout << Sh_matrix_inv << std::endl;
-
-        _initialized = true;
+        // pick the inverse built for this input order (constructor)
+        Sh_matrix_inv = &Sh_matrix_inv_for_order[(size_t) inOrder];
     }
 
     if ( (phi_param != _phi_param) ||
         (floor(phi_curve_param+0.5f) != floor(_phi_curve_param+0.5f)) ||
         (theta_param != _theta_param) ||
         (floor(theta_curve_param+0.5f) != floor(_theta_curve_param+0.5f)) ||
-        (in_order != _in_order) ||
-        (out_order != _out_order) ||
+        (inOrder != _in_order) ||
+        (outOrder != _out_order) ||
         (floor(preemp_param+0.5f) != floor(_preemp_param+0.5f))
         )
     {
 
-        if (_out_order != out_order)
+        if (_out_order != outOrder)
         {
-            // init or reinit spherical harmonics
-            sph_h_out.Init(out_order);
+            // spherical harmonics for this order, initialised in the constructor
+            sph_h_out = &sph_h_out_for_order[(size_t) outOrder];
         }
 
-        Eigen::MatrixXd Sh_matrix_mod;
-        Sh_matrix_mod.setZero(Sph_coord.rows(),AMBI_CHANNELS);
+        Sh_matrix_mod.setZero();
 
-        Eigen::VectorXd pre_emphasis;
-        pre_emphasis.setOnes(Sph_coord.rows());
+        pre_emphasis.setOnes();
 
-        Eigen::MatrixXd Sph_coord_mod = Sph_coord;
+        Sph_coord_mod = Sph_coord; // same size -> no reallocation
 
         // warping parameters - use inverse parameters! (see paper)
         double phi_alpha = -((double)phi_param*1.8f - 0.9f);
         double theta_alpha = -((double)theta_param*1.8f - 0.9f);
 
-        int out_ambi_channels = (out_order+1)*(out_order+1);
+        int out_ambi_channels = (outOrder+1)*(outOrder+1);
 
         for (int i=0; i < Sph_coord_mod.rows(); i++)
         {
@@ -522,24 +426,22 @@ void Ambix_warpAudioProcessor::calcParams()
             // rotate
             // Sph_mod(i,0) = Sph(i,0);
 
-            Eigen::VectorXd Ymn(out_ambi_channels); // Ymn result
-
-            sph_h_out.Calc(Sph_coord_mod(i,0),Sph_coord_mod(i,1)); // phi theta
-            sph_h_out.Get(Ymn);
+            sph_h_out->Calc(Sph_coord_mod(i,0),Sph_coord_mod(i,1)); // phi theta
 
             // Sh_matrix_mod.row(i) = Ymn;
-            Sh_matrix_mod.block(i,0,1,out_ambi_channels) = Ymn.transpose();
+            Sh_matrix_mod.block(i,0,1,out_ambi_channels) = sph_h_out->Ymn.transpose();
         }
 
         // apply preemphasis if wanted
         if (preemp_param > 0.5f)
         {
-            Sh_matrix_mod = pre_emphasis.asDiagonal() * Sh_matrix_mod;
+            // == pre_emphasis.asDiagonal() * Sh_matrix_mod, in place (row i scaled by pre_emphasis(i))
+            Sh_matrix_mod.array().colwise() *= pre_emphasis.array();
         }
 
         // calculate new transformation matrix
 
-        Sh_transf = Sh_matrix_inv * Sh_matrix_mod;
+        Sh_transf.noalias() = *Sh_matrix_inv * Sh_matrix_mod;
 
         // threshold coefficients
         for (int i = 0; i < Sh_transf.size(); i++)
@@ -552,8 +454,8 @@ void Ambix_warpAudioProcessor::calcParams()
         _phi_curve_param = phi_curve_param;
         _theta_param = theta_param;
         _theta_curve_param = theta_curve_param;
-        _in_order = in_order;
-        _out_order = out_order;
+        _in_order = inOrder;
+        _out_order = outOrder;
         _preemp_param = preemp_param;
     }
 
@@ -634,10 +536,10 @@ void Ambix_warpAudioProcessor::getStateInformation (MemoryBlock& destData)
 
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    // add some attributes to it..
-    for (int i=0; i < getNumParameters(); i++)
+    // add some attributes to it.. (legacy layout, so older versions can read projects)
+    for (int i=0; i < totalNumParams; i++)
     {
-        xml.setAttribute (String(i), getParameter(i));
+        xml.setAttribute (String(i), params[i]->get());
     }
 
     // then use this helper function to stuff it into the binary blob and return it..
@@ -656,8 +558,9 @@ void Ambix_warpAudioProcessor::setStateInformation (const void* data, int sizeIn
         // make sure that it's actually our type of XML object..
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
-            for (int i=0; i < getNumParameters(); i++) {
-                setParameter(i, xmlState->getDoubleAttribute(String(i)));
+            // restore() runs the side effects like the legacy setParameter() did
+            for (int i=0; i < totalNumParams; i++) {
+                params[i]->restore ((float) xmlState->getDoubleAttribute(String(i)));
             }
         }
 

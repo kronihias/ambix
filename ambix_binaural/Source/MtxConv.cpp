@@ -61,11 +61,11 @@ void MtxConvMaster::WriteLog(String &text)
 void MtxConvMaster::processBlock(juce::AudioSampleBuffer &inbuf, juce::AudioSampleBuffer &outbuf, int numsamples, bool forcesync)
 {
 
-    if (configuration_)
-    {
+    // never wait for Cleanup() here - it frees memory while holding lock_
+    const ScopedTryLock myScopedLock (lock_);
 
-        // lock configuration
-        const ScopedLock myScopedLock (lock_);
+    if (configuration_ && myScopedLock.isLocked())
+    {
 
         /////////////////////////
         // write to input ring buffer
@@ -1133,8 +1133,9 @@ bool MtxConvSlave::ReadOutput(int numsamples, bool forcesync)
         if (inter_offset >= offset_)
         {
             inter_offset -= partitionsize_;
+            // real-time: don't block the audio thread, a late partition glitches
             if (!threadShouldExit())
-                inter_sync.wait();
+                inter_sync.wait(forcesync ? -1 : 0);
         }
     }
 #endif

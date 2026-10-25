@@ -18,7 +18,6 @@
  */
 
 #include "PanningGraph.h"
-#include "../../common/JuceCompat.h"
 
 
 PanningGraph::PanningGraph (AudioProcessor* processor) :
@@ -80,6 +79,15 @@ PanningGraph::PanningGraph (AudioProcessor* processor) :
 
 PanningGraph::~PanningGraph()
 {
+    // closed mid-drag: don't leave the host's gestures open
+    if (puck_gesture_id >= 0)
+    {
+        param(PARAMS_PER_FILTER*puck_gesture_id+Ambix_vmicAudioProcessor::AzimuthParam).endChangeGesture();
+        param(PARAMS_PER_FILTER*puck_gesture_id+Ambix_vmicAudioProcessor::ElevationParam).endChangeGesture();
+        puck_gesture_id = -1;
+    }
+    endWidthHeightGesture();
+
     btn_drag.clear();
     graphs_.clear();
 }
@@ -408,10 +416,59 @@ void PanningGraph::buttonClicked (Button* buttonThatWasClicked)
     }
 
 
-    setParameterNotifyingHost(myprocessor_, PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::AzimuthParam, Deg360ToParam(az) );
+    auto& az_param = param(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::AzimuthParam);
+    auto& el_param = param(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ElevationParam);
 
-    setParameterNotifyingHost(myprocessor_, PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ElevationParam, Deg360ToParam(el) );
+    // inside the gesture of the held puck (buttonStateChanged), else its own
+    const bool own_gesture = (puck_gesture_id != i);
 
+    if (own_gesture) { az_param.beginChangeGesture(); el_param.beginChangeGesture(); }
+
+    az_param.setValueNotifyingHost( Deg360ToParam(az) );
+
+    el_param.setValueNotifyingHost( Deg360ToParam(el) );
+
+    if (own_gesture) { az_param.endChangeGesture(); el_param.endChangeGesture(); }
+
+}
+
+void PanningGraph::buttonStateChanged (Button* button)
+{
+    const int i = button->getName().getIntValue();
+
+    if (button->getState() == Button::buttonDown)
+    {
+        if (puck_gesture_id < 0)
+        {
+            puck_gesture_id = i;
+            param(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::AzimuthParam).beginChangeGesture();
+            param(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ElevationParam).beginChangeGesture();
+        }
+    }
+    else if (puck_gesture_id == i)
+    {
+        puck_gesture_id = -1;
+        param(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::AzimuthParam).endChangeGesture();
+        param(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ElevationParam).endChangeGesture();
+    }
+}
+
+void PanningGraph::beginWidthHeightGesture (int filter_id)
+{
+    endWidthHeightGesture();
+    wh_gesture_id = filter_id;
+    param(PARAMS_PER_FILTER*filter_id+Ambix_vmicAudioProcessor::WidthParam).beginChangeGesture();
+    param(PARAMS_PER_FILTER*filter_id+Ambix_vmicAudioProcessor::HeightParam).beginChangeGesture();
+}
+
+void PanningGraph::endWidthHeightGesture()
+{
+    if (wh_gesture_id < 0)
+        return;
+
+    param(PARAMS_PER_FILTER*wh_gesture_id+Ambix_vmicAudioProcessor::WidthParam).endChangeGesture();
+    param(PARAMS_PER_FILTER*wh_gesture_id+Ambix_vmicAudioProcessor::HeightParam).endChangeGesture();
+    wh_gesture_id = -1;
 }
 
 void PanningGraph::mouseDown(const MouseEvent &event)
@@ -433,8 +490,10 @@ void PanningGraph::mouseDown(const MouseEvent &event)
             int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::WidthParam;
             int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::HeightParam;
 
-            mouse_down_width = ParamToDeg360(myprocessor_->getParameter(w_idx));
-            mouse_down_height = ParamToDeg180(myprocessor_->getParameter(h_idx));
+            mouse_down_width = ParamToDeg360(param(w_idx).get());
+            mouse_down_height = ParamToDeg180(param(h_idx).get());
+
+            beginWidthHeightGesture(mouse_near_filter_id);
 
             mouse_dir_w = btn_drag.getUnchecked(i)->getX() < event.getMouseDownX() ? 1 : -1;
             mouse_dir_h = btn_drag.getUnchecked(i)->getY() > event.getMouseDownY() ? 1 : -1;
@@ -446,6 +505,7 @@ void PanningGraph::mouseDown(const MouseEvent &event)
 
 void PanningGraph::mouseUp(const MouseEvent &event)
 {
+    endWidthHeightGesture();
     mouse_near_filter_id = -1;
 }
 
@@ -456,14 +516,19 @@ void PanningGraph::mouseDrag(const MouseEvent &event)
 
     if (mouse_near_filter_id > -1)
     {
+        // the filter can differ from the one picked in mouseDown (the wheel
+        // or a puck can select another one meanwhile)
+        if (wh_gesture_id != mouse_near_filter_id)
+            beginWidthHeightGesture(mouse_near_filter_id);
+
         int w_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::WidthParam;
 
 
-        setParameterNotifyingHost(myprocessor_, w_idx, (float)jlimit(0.f, 1.f, Deg360ToParam( mouse_down_width + xpostodeg(mouse_dir_w*event.getDistanceFromDragStartX()+degtoxpos(0))  ) ) );
+        param(w_idx).setValueNotifyingHost((float)jlimit(0.f, 1.f, Deg360ToParam( mouse_down_width + xpostodeg(mouse_dir_w*event.getDistanceFromDragStartX()+degtoxpos(0))  ) ) );
 
         int h_idx = PARAMS_PER_FILTER*mouse_near_filter_id+Ambix_vmicAudioProcessor::HeightParam;
 
-        setParameterNotifyingHost(myprocessor_, h_idx, (float)jlimit(0.f, 1.f, Deg180ToParam( mouse_down_height + ypostodeg(mouse_dir_h*event.getDistanceFromDragStartY()+degtoypos(0))  ) ) );
+        param(h_idx).setValueNotifyingHost((float)jlimit(0.f, 1.f, Deg180ToParam( mouse_down_height + ypostodeg(mouse_dir_h*event.getDistanceFromDragStartY()+degtoypos(0))  ) ) );
     }
 
 }
@@ -484,7 +549,10 @@ void PanningGraph::mouseWheelMove (const MouseEvent &event, const MouseWheelDeta
     {
         int paridx = PARAMS_PER_FILTER*idx+Ambix_vmicAudioProcessor::GainParam;
 
-        setParameterNotifyingHost(myprocessor_, paridx, (float)jlimit(0.f, 1.f, myprocessor_->getParameter(paridx) +wheel.deltaY*0.4f) );
+        auto& gain_param = param(paridx);
+        gain_param.beginChangeGesture();
+        gain_param.setValueNotifyingHost((float)jlimit(0.f, 1.f, gain_param.get() +wheel.deltaY*0.4f) );
+        gain_param.endChangeGesture();
 
         if (idx != mouse_near_filter_id)
         {

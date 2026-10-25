@@ -17,6 +17,9 @@ public:
     std::function<void (float)> onModDepthDragged;
     // Callback: normalized mod T delta from scroll wheel
     std::function<void (float)> onModTScrolled;
+    // Callbacks: a mod depth drag starts / ends (mouse down / up)
+    std::function<void()> onModDepthDragStarted;
+    std::function<void()> onModDepthDragEnded;
 
     WideningVisualizer()
     {
@@ -49,6 +52,15 @@ public:
         dragHalfWidth = plotW * 0.5f;
         dragStartModDepth = lastModDepth;
         dragStartX = (float) e.getPosition().x;
+
+        if (onModDepthDragStarted)
+            onModDepthDragStarted();
+    }
+
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        if (onModDepthDragEnded)
+            onModDepthDragEnded();
     }
 
     void mouseDrag (const juce::MouseEvent& e) override

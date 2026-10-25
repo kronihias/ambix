@@ -18,7 +18,6 @@
  */
 
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 #include "SphericalHarmonic/tools.h"
 
@@ -28,24 +27,35 @@ Ambix_mirrorAudioProcessor::Ambix_mirrorAudioProcessor() :
     AudioProcessor (BusesProperties()
         .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
         .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
-    ),
-    x_even_param(0.75f),
-    x_even_inv_param(0.f),
-    x_odd_param(0.75f),
-    x_odd_inv_param(0.f),
-    y_even_param(0.75f),
-    y_even_inv_param(0.f),
-    y_odd_param(0.75f),
-    y_odd_inv_param(0.f),
-    z_even_param(0.75f),
-    z_even_inv_param(0.f),
-    z_odd_param(0.75f),
-    z_odd_inv_param(0.f),
-    circular_param(0.75f),
-    circular_inv_param(0.f),
-    preset_param(0.f),
-    preset_name("")
+    )
 {
+    // legacy display texts, as getParameterText() built them
+    auto gainText = [] (float v, int) -> String
+    {
+        String text = String(ParamToDB(v)).substring(0, 5);
+        text << " dB";
+        return text;
+    };
+    auto invText    = [] (float v, int) -> String { return (v >= 0.5f) ? "Invert!" : "No"; };
+    auto presetText = [] (float v, int) -> String { return presetName (v); };
+
+    static const char* const names[totalNumParams] = {
+        "X even gain", "X even invert", "X odd gain", "X odd invert",
+        "Y even gain", "Y even invert", "Y odd gain", "Y odd invert",
+        "Z even gain", "Z even invert", "Z odd gain", "Z odd invert",
+        "Circular gain", "Circular invert", "Preset" };
+
+    // even indices below PresetParam are gains (start at 0.75 = 0 dB), odd
+    // ones their invert switches (start at 0)
+    for (int i = 0; i < PresetParam; ++i)
+    {
+        const bool isGain = (i % 2) == 0;
+        addParameter (params[i] = new ambix::Parameter (*this, i, names[i], isGain ? 0.75f : 0.f,
+                                                        isGain ? ambix::Parameter::TextFunction (gainText)
+                                                               : ambix::Parameter::TextFunction (invText)));
+    }
+    addParameter (params[PresetParam] = new ambix::Parameter (*this, PresetParam, names[PresetParam], 0.f, presetText));
+
     _gain_factors.resize(AMBI_CHANNELS);
     gain_factors.resize(AMBI_CHANNELS);
 
@@ -66,276 +76,89 @@ const String Ambix_mirrorAudioProcessor::getName() const
     return JucePlugin_Name;
 }
 
-int Ambix_mirrorAudioProcessor::getNumParameters()
+const char* Ambix_mirrorAudioProcessor::presetName (float presetValue)
 {
-    return totalNumParams;
+    switch ((int)(presetValue * NUM_PRESETS))
+    {
+        case 2: return "no change";
+        case 3: return "flip left <> right";
+        case 4: return "flop front <> back";
+        case 5: return "flap top <> bottom";
+        case 6: return "merge left + right";
+        case 7: return "merge front+back";
+        case 8: return "merge top+bottom";
+        default: return ""; // 1 do nothing...
+    }
 }
 
-float Ambix_mirrorAudioProcessor::getParameter (int index)
+void Ambix_mirrorAudioProcessor::parameterValueSet (int index, float newValue)
 {
-    switch (index)
-	{
-		case XEvenParam:    return x_even_param;
-		case XEvenInvParam:    return x_even_inv_param;
-        case XOddParam:     return x_odd_param;
-		case XOddInvParam:    return x_odd_inv_param;
-		case YEvenParam:    return y_even_param;
-		case YEvenInvParam:    return y_even_inv_param;
-        case YOddParam:     return y_odd_param;
-		case YOddInvParam:    return y_odd_inv_param;
-		case ZEvenParam:    return z_even_param;
-		case ZEvenInvParam:    return z_even_inv_param;
-        case ZOddParam:     return z_odd_param;
-		case ZOddInvParam:    return z_odd_inv_param;
-        case CircularParam: return circular_param;
-		case CircularInvParam:    return circular_inv_param;
-        case PresetParam:          return preset_param;
-		default:            return 0.0f;
-	}
+    // only the preset has a side effect: it rewrites the other parameters,
+    // on every set (also when it selects the preset it already had)
+    if (index == PresetParam)
+        SwitchPreset (newValue);
 }
 
-void Ambix_mirrorAudioProcessor::setParameter (int index, float newValue)
+void Ambix_mirrorAudioProcessor::SwitchPreset (float presetValue)
 {
 
-    switch (index)
-	{
-        case XEvenParam:
-            x_even_param = newValue;
-            break;
-        case XEvenInvParam:
-            x_even_inv_param = newValue;
-            break;
-		case XOddParam:
-            x_odd_param = newValue;
-            break;
-        case XOddInvParam:
-            x_odd_inv_param = newValue;
-            break;
-        case YEvenParam:
-            y_even_param = newValue;
-            break;
-        case YEvenInvParam:
-            y_even_inv_param = newValue;
-            break;
-		case YOddParam:
-            y_odd_param = newValue;
-            break;
-        case YOddInvParam:
-            y_odd_inv_param = newValue;
-            break;
-        case ZEvenParam:
-            z_even_param = newValue;
-            break;
-        case ZEvenInvParam:
-            z_even_inv_param = newValue;
-            break;
-		case ZOddParam:
-            z_odd_param = newValue;
-            break;
-        case ZOddInvParam:
-            z_odd_inv_param = newValue;
-            break;
-		case CircularParam:
-            circular_param = newValue;
-            break;
-        case CircularInvParam:
-            circular_inv_param = newValue;
-            break;
-        case PresetParam:
-            preset_param = newValue;
-            SwitchPreset();
-            break;
-		default:
-            break;
-	}
-
-    // notify gui
-    sendChangeMessage();
-}
-
-const String Ambix_mirrorAudioProcessor::getParameterName (int index)
-{
-    switch (index)
-	{
-        case XEvenParam:        return "X even gain";
-        case XEvenInvParam:        return "X even invert";
-        case XOddParam:        return "X odd gain";
-        case XOddInvParam:        return "X odd invert";
-        case YEvenParam:        return "Y even gain";
-        case YEvenInvParam:        return "Y even invert";
-        case YOddParam:        return "Y odd gain";
-        case YOddInvParam:        return "Y odd invert";
-        case ZEvenParam:        return "Z even gain";
-        case ZEvenInvParam:        return "Z even invert";
-        case ZOddParam:        return "Z odd gain";
-        case ZOddInvParam:        return "Z odd invert";
-        case CircularParam:        return "Circular gain";
-        case CircularInvParam:        return "Circular invert";
-        case PresetParam:           return "Preset";
-		default:								break;
-	}
-
-	return String();
-}
-
-const String Ambix_mirrorAudioProcessor::getParameterText (int index)
-{
-
-    String text;
-
-    switch (index)
-	{
-        case XEvenParam:
-            text = String(ParamToDB(x_even_param)).substring(0, 5);
-            text << " dB";
-            break;
-        case XEvenInvParam:
-            if (x_even_inv_param >= 0.5f)
-                text = "Invert!";
-            else
-                text = "No";
-            break;
-		case XOddParam:
-            text = String(ParamToDB(x_odd_param)).substring(0, 5);
-            text << " dB";
-            break;
-        case XOddInvParam:
-            if (x_odd_inv_param >= 0.5f)
-                text = "Invert!";
-            else
-                text = "No";
-            break;
-        case YEvenParam:
-            text = String(ParamToDB(y_even_param)).substring(0, 5);
-            text << " dB";
-            break;
-        case YEvenInvParam:
-            if (y_even_inv_param >= 0.5f)
-                text = "Invert!";
-            else
-                text = "No";
-            break;
-		case YOddParam:
-            text = String(ParamToDB(y_odd_param)).substring(0, 5);
-            text << " dB";
-            break;
-        case YOddInvParam:
-            if (y_odd_inv_param >= 0.5f)
-                text = "Invert!";
-            else
-                text = "No";
-            break;
-        case ZEvenParam:
-            text = String(ParamToDB(z_even_param)).substring(0, 5);
-            text << " dB";
-            break;
-        case ZEvenInvParam:
-            if (z_even_inv_param >= 0.5f)
-                text = "Invert!";
-            else
-                text = "No";
-            break;
-		case ZOddParam:
-            text = String(ParamToDB(z_odd_param)).substring(0, 5);
-            text << " dB";
-            break;
-        case ZOddInvParam:
-            if (z_odd_inv_param >= 0.5f)
-                text = "Invert!";
-            else
-                text = "No";
-            break;
-		case CircularParam:
-            text = String(ParamToDB(circular_param)).substring(0, 5);
-            text << " dB";
-            break;
-        case CircularInvParam:
-            if (circular_inv_param >= 0.5f)
-                text = "Invert!";
-            else
-                text = "No";
-            break;
-
-        case PresetParam:
-            text = preset_name;
-            break;
-		default:
-            break;
-	}
-
-	return text;
-}
-
-void Ambix_mirrorAudioProcessor::SwitchPreset()
-{
-
-    int active_preset = (int)(preset_param * NUM_PRESETS);
-
-    // 1 do nothing...
-    preset_name = "";
+    int active_preset = (int)(presetValue * NUM_PRESETS);
 
     // first set all zero
     if (active_preset > 1)
     {
-        setParameterNotifyingHost(this, XEvenParam, 0.75f);
-        setParameterNotifyingHost(this, XEvenInvParam, 0.f);
-        setParameterNotifyingHost(this, XOddParam, 0.75f);
-        setParameterNotifyingHost(this, XOddInvParam, 0.f);
+        params[XEvenParam]->setValueNotifyingHost (0.75f);
+        params[XEvenInvParam]->setValueNotifyingHost (0.f);
+        params[XOddParam]->setValueNotifyingHost (0.75f);
+        params[XOddInvParam]->setValueNotifyingHost (0.f);
 
-        setParameterNotifyingHost(this, YEvenParam, 0.75f);
-        setParameterNotifyingHost(this, YEvenInvParam, 0.f);
-        setParameterNotifyingHost(this, YOddParam, 0.75f);
-        setParameterNotifyingHost(this, YOddInvParam, 0.f);
+        params[YEvenParam]->setValueNotifyingHost (0.75f);
+        params[YEvenInvParam]->setValueNotifyingHost (0.f);
+        params[YOddParam]->setValueNotifyingHost (0.75f);
+        params[YOddInvParam]->setValueNotifyingHost (0.f);
 
-        setParameterNotifyingHost(this, ZEvenParam, 0.75f);
-        setParameterNotifyingHost(this, ZEvenInvParam, 0.f);
-        setParameterNotifyingHost(this, ZOddParam, 0.75f);
-        setParameterNotifyingHost(this, ZOddInvParam, 0.f);
+        params[ZEvenParam]->setValueNotifyingHost (0.75f);
+        params[ZEvenInvParam]->setValueNotifyingHost (0.f);
+        params[ZOddParam]->setValueNotifyingHost (0.75f);
+        params[ZOddInvParam]->setValueNotifyingHost (0.f);
 
-        setParameterNotifyingHost(this, CircularParam, 0.75f);
-        setParameterNotifyingHost(this, CircularInvParam, 0.f);
+        params[CircularParam]->setValueNotifyingHost (0.75f);
+        params[CircularInvParam]->setValueNotifyingHost (0.f);
     }
 
     switch (active_preset) {
         case 2:
             // all zero done...
-            preset_name = "no change";
             break;
 
         case 3: // flip left right -> invert Y Odd
-            setParameterNotifyingHost(this, YOddInvParam, 1.f);
-            preset_name = "flip left <> right";
+            params[YOddInvParam]->setValueNotifyingHost (1.f);
             break;
 
         case 4: // flop front back -> invert X Odd
-            setParameterNotifyingHost(this, XOddInvParam, 1.f);
-            preset_name = "flop front <> back";
+            params[XOddInvParam]->setValueNotifyingHost (1.f);
             break;
 
         case 5: // flap top bottom -> invert Z Odd
-            setParameterNotifyingHost(this, ZOddInvParam, 1.f);
-            preset_name = "flap top <> bottom";
+            params[ZOddInvParam]->setValueNotifyingHost (1.f);
             break;
 
         case 6: // merge left+right
-            setParameterNotifyingHost(this, YOddParam, 0.f); // zero
-            setParameterNotifyingHost(this, YEvenParam, 1.f); // +6 dB
-            setParameterNotifyingHost(this, CircularParam, 0.530959f); // -6 dB
-            preset_name = "merge left + right";
+            params[YOddParam]->setValueNotifyingHost (0.f); // zero
+            params[YEvenParam]->setValueNotifyingHost (1.f); // +6 dB
+            params[CircularParam]->setValueNotifyingHost (0.530959f); // -6 dB
             break;
 
         case 7: // merge front+back
-            setParameterNotifyingHost(this, XOddParam, 0.f); // zero
-            setParameterNotifyingHost(this, XEvenParam, 1.f); // +6 dB
-            setParameterNotifyingHost(this, CircularParam, 0.530959f); // -6 dB
-            preset_name = "merge front+back";
+            params[XOddParam]->setValueNotifyingHost (0.f); // zero
+            params[XEvenParam]->setValueNotifyingHost (1.f); // +6 dB
+            params[CircularParam]->setValueNotifyingHost (0.530959f); // -6 dB
             break;
 
         case 8: // merge top+bottom
-            setParameterNotifyingHost(this, ZOddParam, 0.f); // zero
-            setParameterNotifyingHost(this, ZEvenParam, 1.f); // +6 dB
-            setParameterNotifyingHost(this, CircularParam, 0.530959f); // -6 dB
-            preset_name = "merge top+bottom";
+            params[ZOddParam]->setValueNotifyingHost (0.f); // zero
+            params[ZEvenParam]->setValueNotifyingHost (1.f); // +6 dB
+            params[CircularParam]->setValueNotifyingHost (0.530959f); // -6 dB
             break;
 
         default:
@@ -435,6 +258,22 @@ void Ambix_mirrorAudioProcessor::releaseResources()
 
 void Ambix_mirrorAudioProcessor::calcParams()
 {
+    // one atomic read per parameter and block
+    const float x_even_param       = params[XEvenParam]->get();
+    const float x_even_inv_param   = params[XEvenInvParam]->get();
+    const float x_odd_param        = params[XOddParam]->get();
+    const float x_odd_inv_param    = params[XOddInvParam]->get();
+    const float y_even_param       = params[YEvenParam]->get();
+    const float y_even_inv_param   = params[YEvenInvParam]->get();
+    const float y_odd_param        = params[YOddParam]->get();
+    const float y_odd_inv_param    = params[YOddInvParam]->get();
+    const float z_even_param       = params[ZEvenParam]->get();
+    const float z_even_inv_param   = params[ZEvenInvParam]->get();
+    const float z_odd_param        = params[ZOddParam]->get();
+    const float z_odd_inv_param    = params[ZOddInvParam]->get();
+    const float circular_param     = params[CircularParam]->get();
+    const float circular_inv_param = params[CircularInvParam]->get();
+
     for (int i=0; i < gain_factors.size(); i++) {
         gain_factors.set(i, 1.f);
     }
@@ -565,12 +404,16 @@ void Ambix_mirrorAudioProcessor::processBlock (AudioSampleBuffer& buffer, MidiBu
 
 
     // save old parameters for interpolation (start ramp)
-    _gain_factors = gain_factors;
+    // copy in place (Array::operator= reallocates)
+    jassert (_gain_factors.size() == gain_factors.size());
+    FloatVectorOperations::copy (_gain_factors.getRawDataPointer(), gain_factors.getRawDataPointer(), jmin (_gain_factors.size(), gain_factors.size()));
 
     calcParams();
 
 
-    for (int acn = 0; acn < getTotalNumInputChannels(); acn++)
+    const int numCh = jmin ((int) AMBI_CHANNELS, getTotalNumInputChannels());
+
+    for (int acn = 0; acn < numCh; acn++)
     {
         buffer.applyGainRamp(acn, 0, NumSamples, _gain_factors.getUnchecked(acn), gain_factors.getUnchecked(acn));
 
@@ -599,10 +442,10 @@ void Ambix_mirrorAudioProcessor::getStateInformation (MemoryBlock& destData)
 
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    // add some attributes to it..
-    for (int i=0; i < getNumParameters(); i++)
+    // add some attributes to it.. (legacy names and order, readable by older versions)
+    for (int i=0; i < totalNumParams; i++)
     {
-        xml.setAttribute (String(i), getParameter(i));
+        xml.setAttribute (String(i), params[i]->get());
     }
 
     // then use this helper function to stuff it into the binary blob and return it..
@@ -621,8 +464,10 @@ void Ambix_mirrorAudioProcessor::setStateInformation (const void* data, int size
         // make sure that it's actually our type of XML object..
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
-            for (int i=0; i < getNumParameters(); i++) {
-                setParameter(i, (float)xmlState->getDoubleAttribute(String(i)));
+            // restore() runs the side effects; the preset comes last and so
+            // overrides the others
+            for (int i=0; i < totalNumParams; i++) {
+                params[i]->restore ((float)xmlState->getDoubleAttribute(String(i)));
             }
         }
 

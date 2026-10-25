@@ -33,6 +33,7 @@ add_executable (ambix_bustest
     "${VST3_SDK_DIR}/pluginterfaces/base/conststringtable.cpp"
     "${VST3_SDK_DIR}/pluginterfaces/base/ustring.cpp"
     "${VST3_SDK_DIR}/public.sdk/source/vst/vstinitiids.cpp"
+    "${VST3_SDK_DIR}/public.sdk/source/common/memorystream.cpp"
 )
 
 target_include_directories (ambix_bustest PRIVATE "${VST3_SDK_DIR}")

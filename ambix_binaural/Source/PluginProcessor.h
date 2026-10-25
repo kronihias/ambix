@@ -25,6 +25,7 @@
 #include "AmbiSpeaker.h"
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 
 #if BINAURAL_DECODER
     #if WITH_ZITA_CONVOLVER
@@ -107,7 +108,8 @@ inline float DbToParam(float db)
 */
 class Ambix_binauralAudioProcessor  : public AudioProcessor,
                                       public ChangeBroadcaster,
-                                      public Thread
+                                      public Thread,
+                                      public ambix::ParameterOwner
 {
 public:
     //==============================================================================
@@ -134,14 +136,6 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
-
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
     bool isInputChannelStereoPair (int index) const override;
@@ -163,6 +157,8 @@ public:
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    ambix::Parameter* gain_param; // output gain, applied to the speakers in processBlock
+
     // use a thread to load a configuration
     void run() override;
 
@@ -179,6 +175,10 @@ public:
     Atomic<int> _readyToSaveConfiguration;
 
     unsigned int getBufferSize();
+    String getDebugText();
+    String getActivePreset();
+    String getPresetText();
+    File getConfigFile();
     unsigned int getConvBufferSize();
     void setConvBufferSize(unsigned int bufsize);
 
@@ -190,7 +190,7 @@ public:
 
     int _AmbiChannels;
 
-    bool configLoaded; // is a configuration successfully loaded?
+    std::atomic<bool> configLoaded; // is a configuration successfully loaded?
 
     void DebugPrint(String debugText);
 
@@ -222,8 +222,15 @@ public:
 private:
 
     void DeleteTemporaryFiles();
+    File getTempConfigZipFile();
 
-    File _desConfigFile;
+    // Load requests (message and loader thread only). One arriving mid-load is
+    // queued, not dropped: a host restoring a project asks for a reload at the
+    // real sample rate while the first load is still running.
+    CriticalSection loadRequestLock;
+    File pendingConfigFile;   // next file to load, if loadPending
+    File requestedConfigFile; // last file asked for - what a reload reloads
+    bool loadPending = false;
 
     File _tempConfigZipFile;
     Array<File> _cleanUpFilesOnExit;
@@ -246,14 +253,20 @@ private:
     bool safemode_; // this will add some latency for hosts that might send partial blocks, done automatically based on host type
 #endif
 
-    double SampleRate;
-    int BufferSize;
+    std::atomic<double> SampleRate;
+    std::atomic<int> BufferSize;
 
-    int ConvBufferSize;
+    std::atomic<int> ConvBufferSize;
 
-    bool isProcessing;
+    // activePreset, box_preset_str, _DebugText, _configFile, _tempConfigZipFile
+    // and _cleanUpFilesOnExit: the loader thread writes them too
+    CriticalSection sharedLock;
 
-    float _gain; // output gain
+    std::atomic<bool> isProcessing; // handshake with the loader thread, see LoadConfiguration
+
+    void parameterValueSet (int, float) override {} // gain is only stored
+
+    float _appliedGain; // audio thread only
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_binauralAudioProcessor)

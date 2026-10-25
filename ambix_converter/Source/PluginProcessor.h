@@ -24,12 +24,14 @@
 #include "ambix_buses.h"
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 
 //==============================================================================
 /**
 */
 class Ambix_converterAudioProcessor  : public AudioProcessor,
-                                       public ChangeBroadcaster
+                                       public ambix::ParameterOwner,
+                                       public ChangeBroadcaster // numChannelsChanged() only
 {
 public:
     //==============================================================================
@@ -56,13 +58,7 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
+    ambix::Parameter& getParam (int index) const { return *params[index]; }
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -113,37 +109,13 @@ public:
     String box_presets_text; // for save state...
 
 private:
-    void setNormalizationScheme();
+    void parameterValueSet (int index, float newValue) override;
 
-
-    void setChannelSequence();
+    // owned by AudioProcessor; seq/norm hold 0, 0.5 or 1, switches 0 or 1
+    // (the values the legacy members held)
+    ambix::Parameter* params[totalNumParams] {};
 
     AudioSampleBuffer output_buffer;
-    const unsigned int* in_ch_seq;
-    const unsigned int* out_ch_seq;
-
-    const unsigned int* in_2d_ch_seq;
-    const unsigned int* out_2d_ch_seq;
-
-    const float* in_ch_norm; // holds normalization conversion array
-
-    const int* acn_cs; // holds condon-shortley conversion map
-
-    float in_seq_param; // channel sequence acn, fuma, sid
-    float out_seq_param;
-    float in_norm_param;
-    float out_norm_param;
-
-    bool flip_cs_phase; // flip condon-shortley phase -> apply (-1)^m to output channels
-
-    bool flip_param; // mirror left-right
-    bool flop_param; // mirror front-back
-    bool flap_param; // mirror ceiling-floor
-
-    bool in_2d; // input is 2d ambisonics (fill with empty channels)
-    bool out_2d; // output is 2d ambisonics (channels will be thrown away)
-
-    bool ch_norm_flat;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_converterAudioProcessor)

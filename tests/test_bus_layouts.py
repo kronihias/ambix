@@ -35,10 +35,10 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from conftest import ALL_PLUGINS, REPO_ROOT, vst3
+from conftest import ALL_PLUGINS, BUILD_DIR, vst3
 
 _BUSTEST_EXE = "ambix_bustest.exe" if os.name == "nt" else "ambix_bustest"
-BUSTEST_BIN = os.path.join(REPO_ROOT, "_build", "testhost", _BUSTEST_EXE)
+BUSTEST_BIN = os.path.join(BUILD_DIR, "testhost", _BUSTEST_EXE)
 
 # Ambisonic widths, orders 1-7.
 AMBISONIC_WIDTHS = [4, 9, 16, 25, 36, 49, 64]

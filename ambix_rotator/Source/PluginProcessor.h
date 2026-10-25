@@ -29,6 +29,7 @@
 #include <Eigen/Eigen>
 
 #include "AmbisonicConfig.h"
+#include "../../common/AmbixParameters.h"
 
 //==============================================================================
 /**
@@ -38,7 +39,8 @@ class Ambix_rotatorAudioProcessor  : public AudioProcessor,
                                     private OSCReceiver,
                                     private OSCReceiver::Listener<OSCReceiver::RealtimeCallback>,
 #endif
-                                    public ChangeBroadcaster
+                                    public ChangeBroadcaster,
+                                    public ambix::ParameterOwner
 {
 public:
     //==============================================================================
@@ -64,14 +66,6 @@ public:
 
     //==============================================================================
     const String getName() const override;
-
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -120,29 +114,31 @@ public:
 private:
     
     void calcParams();
+
+    void parameterValueSet (int index, float newValue) override;
     
     // yaw (z)
-    float yaw_param;
+    ambix::Parameter* yaw_param;
     
     // pitch (y)
-    float pitch_param;
+    ambix::Parameter* pitch_param;
     
     // roll (x)
-    float roll_param;
+    ambix::Parameter* roll_param;
     
     // rotation order :  < 0.5: ypr; >=0.5 rpy
-    float rot_order_param;
+    ambix::Parameter* rot_order_param;
     
-    float q0_param;
-    float q1_param;
-    float q2_param;
-    float q3_param;
-    float qinvert_param;
+    ambix::Parameter* q0_param;
+    ambix::Parameter* q1_param;
+    ambix::Parameter* q2_param;
+    ambix::Parameter* q3_param;
+    ambix::Parameter* qinvert_param;
 
-    bool _q_changed; // flag for telling calcParams which parameters to use for calculating rotationmatrix
+    std::atomic<bool> _q_changed; // flag for telling calcParams which parameters to use for calculating rotationmatrix
 
     bool _initialized;
-    bool _new_params;
+    std::atomic<bool> _new_params;
     
     AudioSampleBuffer output_buffer;
     

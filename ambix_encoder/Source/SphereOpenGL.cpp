@@ -14,7 +14,6 @@
  */
 
 #include "SphereOpenGL.h"
-#include "../../common/JuceCompat.h"
 
 using namespace ::juce::gl;
 
@@ -45,6 +44,8 @@ SphereOpenGL::SphereOpenGL() :
 
 SphereOpenGL::~SphereOpenGL()
 {
+    if (processor)
+        gestures.releaseAll (*processor);
     openGLContext.detach();
 }
 
@@ -118,8 +119,8 @@ void SphereOpenGL::renderOpenGL()
         // anchor.
         if (active > 1 && processor->isLinked())
         {
-            const float azC = (processor->getParameter (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * 360.f * (float) DEG2RAD;
-            const float elC = (processor->getParameter (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f * (float) DEG2RAD;
+            const float azC = (processor->getParamValue (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * 360.f * (float) DEG2RAD;
+            const float elC = (processor->getParamValue (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f * (float) DEG2RAD;
             const float x = 0.9f * sinf(azC) * cosf(elC);
             const float y = 0.9f * cosf(azC) * cosf(elC);
             const float z = 0.9f * sinf(elC);
@@ -242,9 +243,9 @@ void SphereOpenGL::mouseDown(const juce::MouseEvent &e)
     if (! processor) return;
 
     // Snapshot current global params for relative-mode drag fallback.
-    _mPhi   = (processor->getParameter (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * (float)(2.f * M_PI);
-    _mTheta = (processor->getParameter (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * (float)(2.f * M_PI);
-    _mWidth = processor->getParameter (Ambix_encoderAudioProcessor::WidthParam)              * (float)(2.f * M_PI);
+    _mPhi   = (processor->getParamValue (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * (float)(2.f * M_PI);
+    _mTheta = (processor->getParamValue (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * (float)(2.f * M_PI);
+    _mWidth = processor->getParamValue (Ambix_encoderAudioProcessor::WidthParam)              * (float)(2.f * M_PI);
 
     const float sphereR = sphereRadiusPx (*this);
 
@@ -312,8 +313,8 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
         const float deltaDist = currentDist - _dragStartDistToCenter;
         const float newWidth = jlimit (0.f, (float)(2 * M_PI),
                                         _mWidth + deltaDist / sphereR * (float)M_PI);
-        setParameterNotifyingHost (processor, Ambix_encoderAudioProcessor::WidthParam,
-                                   newWidth / (2.f * (float)M_PI));
+        gestures.set (*processor, e.source.getIndex(), Ambix_encoderAudioProcessor::WidthParam,
+                      newWidth / (2.f * (float)M_PI));
         return;
     }
 
@@ -351,10 +352,10 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
 
     if (processor->isLinked())
     {
-        setParameterNotifyingHost (processor, Ambix_encoderAudioProcessor::AzimuthParam,
-                                   mPhi   / (2.f * (float)M_PI) + 0.5f);
-        setParameterNotifyingHost (processor, Ambix_encoderAudioProcessor::ElevationParam,
-                                   mTheta / (2.f * (float)M_PI) + 0.5f);
+        gestures.set (*processor, e.source.getIndex(), Ambix_encoderAudioProcessor::AzimuthParam,
+                      mPhi   / (2.f * (float)M_PI) + 0.5f);
+        gestures.set (*processor, e.source.getIndex(), Ambix_encoderAudioProcessor::ElevationParam,
+                      mTheta / (2.f * (float)M_PI) + 0.5f);
     }
     else
     {
@@ -362,16 +363,18 @@ void SphereOpenGL::mouseDrag(const juce::MouseEvent &e)
         auto it = draggingByTouchIndex.find (e.source.getIndex());
         if (it == draggingByTouchIndex.end()) return;
         const int draggingSource = it->second;
-        setParameterNotifyingHost (processor,
-                                   Ambix_encoderAudioProcessor::sourceParamIndex (draggingSource, Ambix_encoderAudioProcessor::SrcAz),
-                                   jlimit (0.f, 1.f, mPhi   / (2.f * (float)M_PI) + 0.5f));
-        setParameterNotifyingHost (processor,
-                                   Ambix_encoderAudioProcessor::sourceParamIndex (draggingSource, Ambix_encoderAudioProcessor::SrcEl),
-                                   jlimit (0.f, 1.f, mTheta / (2.f * (float)M_PI) + 0.5f));
+        gestures.set (*processor, e.source.getIndex(),
+                      Ambix_encoderAudioProcessor::sourceParamIndex (draggingSource, Ambix_encoderAudioProcessor::SrcAz),
+                      jlimit (0.f, 1.f, mPhi   / (2.f * (float)M_PI) + 0.5f));
+        gestures.set (*processor, e.source.getIndex(),
+                      Ambix_encoderAudioProcessor::sourceParamIndex (draggingSource, Ambix_encoderAudioProcessor::SrcEl),
+                      jlimit (0.f, 1.f, mTheta / (2.f * (float)M_PI) + 0.5f));
     }
 }
 
 void SphereOpenGL::mouseUp(const juce::MouseEvent& e)
 {
+    if (processor)
+        gestures.release (*processor, e.source.getIndex());
     draggingByTouchIndex.erase (e.source.getIndex());
 }

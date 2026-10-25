@@ -25,8 +25,13 @@
 
 #include "JuceHeader.h"
 #include "ambix_buses.h"
+#include "../../common/AmbixParameters.h"
 #include "SphericalHarmonic/SphericalHarmonic.h"
 #include <Eigen/Eigen>
+
+#include <array>
+#include <atomic>
+#include <vector>
 
 #include "AmbisonicConfig.h"
 
@@ -62,6 +67,7 @@
  c = 343 m/s is documented in the source as a constant for future use.
 */
 class Ambix_moveAudioProcessor  : public AudioProcessor,
+                                   public ambix::ParameterOwner,
 #ifdef WITH_OSC
                                    private OSCReceiver,
                                    private OSCReceiver::Listener<OSCReceiver::RealtimeCallback>,
@@ -92,14 +98,6 @@ public:
 
     //==============================================================================
     const String getName() const override;
-
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -148,6 +146,9 @@ public:
     static float degFromParam   (float p) { return p * 360.f - 180.f; }
     static float paramFromDeg   (float d) { return juce::jlimit (0.f, 1.f, (d + 180.f) / 360.f); }
 
+    // the parameter at `index` (one of Parameters)
+    ambix::Parameter& param (int index) const { return *params[index]; }
+
 #ifdef WITH_OSC
     String osc_in_port;
     bool   osc_enabled;
@@ -182,52 +183,61 @@ public:
 
 private:
 
+    // side effects of a set; runs on the thread that set the parameter
+    void parameterValueSet (int index, float newValue) override;
+
     void calcParams();
 
-    // Translation parameters (normalized 0..1, default 0.5 = 0 m)
-    float x_param,      _x_param;
-    float y_param,      _y_param;
-    float z_param,      _z_param;
+    // the selected order, capped to the input bus as calcParams() does
+    int orderForDisplay (float orderParam);
 
-    // Reference radius (normalized 0..1, default 0 = 1 m)
-    float radius_param, _radius_param;
+    // defaults: translation 0.5 = 0 m, reference radius 0 = 1 m,
+    // rotation 0.5 = 0 deg / 0 quat
+    ambix::Parameter* params[totalNumParams] {};
 
-    // Rotation parameters (normalized 0..1, default 0.5 = 0 deg / 0 quat)
-    float yaw_param,   _yaw_param;
-    float pitch_param, _pitch_param;
-    float roll_param,  _roll_param;
-    float rot_order_param, _rot_order_param;
-    float q0_param, _q0_param;
-    float q1_param, _q1_param;
-    float q2_param, _q2_param;
-    float q3_param, _q3_param;
-    float qinvert_param, _qinvert_param;
+    // values the current transformation matrix was computed for
+    float _x_param;
+    float _y_param;
+    float _z_param;
+    float _radius_param;
+    float _yaw_param;
+    float _pitch_param;
+    float _roll_param;
+    float _rot_order_param;
+    float _q0_param;
+    float _q1_param;
+    float _q2_param;
+    float _q3_param;
+    float _qinvert_param;
 
-    bool _q_changed;
+    std::atomic<bool> _q_changed; // true when quaternions were touched last (-> use them)
 
-    float transl_enabled_param, _transl_enabled_param;
-    float rot_enabled_param,    _rot_enabled_param; // true when quaternions were touched last (→ use them)
+    float _transl_enabled_param;
+    float _rot_enabled_param;
 
-    // Ambisonic order parameters
-    float in_order_param;
-    float out_order_param;
+    // set from the parameters' side effects (any thread) and capped by
+    // calcParams() (audio thread)
+    int _in_order;  // orders the current matrices were built for (audio thread);
+    int _out_order; // calcParams derives the wanted ones from the parameters
 
-    int in_order, _in_order;
-    int out_order, _out_order;
-
-    bool _initialized;
+    std::atomic<bool> _initialized;
 
     // Speed of sound — kept for documentation / future delay compensation
     static constexpr float speedOfSound = 343.0f; // m/s
 
     AudioSampleBuffer output_buffer;
 
-    SphericalHarmonic sph_h_in;
-    SphericalHarmonic sph_h_out;
+    // built once in the constructor for every order 0..AMBI_ORDER, so an
+    // order change on the audio thread only picks one
+    std::vector<Eigen::MatrixXd> Sh_matrix_inv_for_order; // pseudo-inverse of undistorted SH basis, per input order
+    std::array<SphericalHarmonic, AMBI_ORDER + 1> sph_h_out_for_order;
+
+    const Eigen::MatrixXd* Sh_matrix_inv = nullptr; // the one for the current input order
+    SphericalHarmonic*     sph_h_out     = nullptr; // the one for the current output order
 
     // Eigen members (mirror ambix_warp layout)
     Eigen::MatrixXd Carth_coord;     // unit-sphere sampling points (numsamples x 3)
-    Eigen::MatrixXd Sh_matrix_inv;   // pseudo-inverse of undistorted SH basis
+    Eigen::MatrixXd Sh_matrix_mod;   // moved/rotated SH basis (numsamples x AMBI_CHANNELS), sized in init
     Eigen::MatrixXd Sh_transf;       // current transformation matrix
     Eigen::MatrixXd _Sh_transf;      // previous transformation matrix (for ramping)
 

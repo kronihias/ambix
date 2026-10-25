@@ -62,14 +62,6 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
-
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
     bool isInputChannelStereoPair (int index) const override;
@@ -80,11 +72,6 @@ public:
     bool silenceInProducesSilenceOut() const override;
     double getTailLengthSeconds() const override;
 
-    enum Parameters
-	{
-		RotZParam,
-		totalNumParams
-	};
     //==============================================================================
     int getNumPrograms() override;
     int getCurrentProgram() override;
@@ -106,7 +93,9 @@ public:
 
 private:
 
-    float rot_z_param;
+    // 0..1 -> -180..+180 deg. ID "0" is what the legacy API exported, so
+    // automation in existing sessions still finds it.
+    AudioParameterFloat* rot_z_param;
 
     // actual values
     Array<float> sin_z;
@@ -118,7 +107,7 @@ private:
 
     AudioSampleBuffer output_buffer;
 
-    void calcParams();
+    void calcParams (float rotZ);
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_rotator_zAudioProcessor)

@@ -38,8 +38,9 @@ void ShChebyshev::Calc(int n_max, double phi)
 {
     if (_n != n_max || _phi != phi)
     {
-        Eigen::VectorXd sinus(n_max+1); // temporary storage
-        Eigen::VectorXd cosinus(n_max+1);
+        // same-size resize is a no-op, so this only allocates on an order change
+        sinus.resize(n_max+1);
+        cosinus.resize(n_max+1);
         
         sinus.setZero();
         cosinus.setZero();

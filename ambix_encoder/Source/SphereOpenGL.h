@@ -108,7 +108,7 @@ public:
     void mouseUp (const MouseEvent& e);
     void mouseDrag (const MouseEvent& e);
 
-    Ambix_encoderAudioProcessor* processor;
+    Ambix_encoderAudioProcessor* processor = nullptr;
 
 private:
 
@@ -129,6 +129,7 @@ private:
     // displays. The single _mPhi/_mTheta snapshot above is still used for
     // relative-mode and Alt-drag-width (modifier-driven, mouse-only).
     std::map<int, int> draggingByTouchIndex;
+    PannerGestures gestures;
 
     // Pre-rendered "1", "2", ... textures used by renderOpenGL to label
     // sources directly in OpenGL — avoids JUCE's component-painting cache

@@ -4,7 +4,6 @@
  */
 
 #include "HammerAitoffView.h"
-#include "../../common/JuceCompat.h"
 #include <cmath>
 
 namespace
@@ -407,8 +406,8 @@ void HammerAitoffView::paint (juce::Graphics& g)
     const int active = processor->getActiveSources();
     if (active > 1 && processor->isLinked())
     {
-        const float masterAzDeg = (processor->getParameter (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * 360.f;
-        const float masterElDeg = (processor->getParameter (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f;
+        const float masterAzDeg = (processor->getParamValue (Ambix_encoderAudioProcessor::AzimuthParam)   - 0.5f) * 360.f;
+        const float masterElDeg = (processor->getParamValue (Ambix_encoderAudioProcessor::ElevationParam) - 0.5f) * 360.f;
         const float azRad = masterAzDeg * juce::MathConstants<float>::pi / 180.f;
         const float elRad = masterElDeg * juce::MathConstants<float>::pi / 180.f;
         const auto p = project (azRad, elRad);
@@ -491,8 +490,16 @@ void HammerAitoffView::mouseDown (const juce::MouseEvent& e)
     mouseDrag (e);
 }
 
+HammerAitoffView::~HammerAitoffView()
+{
+    if (processor)
+        gestures.releaseAll (*processor);
+}
+
 void HammerAitoffView::mouseUp (const juce::MouseEvent& e)
 {
+    if (processor)
+        gestures.release (*processor, e.source.getIndex());
     draggingByTouchIndex.erase (e.source.getIndex());
     if (draggingByTouchIndex.empty())
         lastGrabbed = -1;
@@ -554,21 +561,21 @@ void HammerAitoffView::mouseDrag (const juce::MouseEvent& e)
     if (processor->isLinked())
     {
         // In linked mode the dot drives the global azimuth/elevation.
-        setParameterNotifyingHost (processor,
-                                   Ambix_encoderAudioProcessor::AzimuthParam,
-                                   juce::jlimit (0.f, 1.f, azNorm));
-        setParameterNotifyingHost (processor,
-                                   Ambix_encoderAudioProcessor::ElevationParam,
-                                   juce::jlimit (0.f, 1.f, elNorm));
+        gestures.set (*processor, e.source.getIndex(),
+                      Ambix_encoderAudioProcessor::AzimuthParam,
+                      juce::jlimit (0.f, 1.f, azNorm));
+        gestures.set (*processor, e.source.getIndex(),
+                      Ambix_encoderAudioProcessor::ElevationParam,
+                      juce::jlimit (0.f, 1.f, elNorm));
     }
     else
     {
         const int idx = draggingSource;
-        setParameterNotifyingHost (processor,
-                                   Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz),
-                                   juce::jlimit (0.f, 1.f, azNorm));
-        setParameterNotifyingHost (processor,
-                                   Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl),
-                                   juce::jlimit (0.f, 1.f, elNorm));
+        gestures.set (*processor, e.source.getIndex(),
+                      Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcAz),
+                      juce::jlimit (0.f, 1.f, azNorm));
+        gestures.set (*processor, e.source.getIndex(),
+                      Ambix_encoderAudioProcessor::sourceParamIndex (idx, Ambix_encoderAudioProcessor::SrcEl),
+                      juce::jlimit (0.f, 1.f, elNorm));
     }
 }

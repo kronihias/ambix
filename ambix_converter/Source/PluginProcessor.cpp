@@ -18,12 +18,137 @@
 */
 
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 #include "SphericalHarmonic/ch_sequence.h" // defines channel mappings
 #include "SphericalHarmonic/normalization.h" // defines conversion between normalization schemes
 #include "SphericalHarmonic/ch_cs.h" // defines condon shortley scheme in acn channel sequence
 #include "SphericalHarmonic/tools.h"
+
+//==============================================================================
+namespace
+{
+    // the legacy tri-state switch; exactly 0.66f matched no branch and kept
+    // the previous value, so it snaps to the stored one
+    float snapTriState (float v, const ambix::Parameter* const* self)
+    {
+        if (v < 0.33f)
+            return 0.f;
+        else if (v >= 0.33f && v < 0.66f)
+            return 0.5f;
+        else if (v > 0.66f)
+            return 1.f;
+
+        return *self != nullptr ? (*self)->get() : 0.f;
+    }
+
+    float snapSwitch (float v) { return v <= 0.5f ? 0.f : 1.f; }
+
+    // legacy getParameterText(), for the stored (snapped) value
+    String seqText (float v, int)
+    {
+        if (v < 0.33f) {
+            return "ACN";
+        } else if (v >= 0.33f && v < 0.66f) {
+            return "FuMa";
+        } else if (v > 0.66f) {
+            return "SID";
+        }
+        return String();
+    }
+
+    String normText (float v, int)
+    {
+        if (v < 0.33f) {
+            return "SN3D";
+        } else if (v >= 0.33f && v < 0.66f) {
+            return "FuMa";
+        } else if (v > 0.66f) {
+            return "N3D";
+        }
+        return String();
+    }
+
+    String onOffText (float v, int)  { return v > 0.5f ? "On" : "Off"; }
+    String yesNoText (float v, int)  { return v > 0.5f ? "Yes" : "No"; }
+
+    // legacy setChannelSequence(), as a pure function of the stored values
+    void channelSequence (float seq_param, const unsigned int*& ch_seq, const unsigned int*& ch_2d_seq)
+    {
+        if (seq_param < 0.33f) {
+            ch_seq = acn_ch_map;
+            ch_2d_seq = acn_2d_ch_map;
+
+        } else if (seq_param >= 0.33f && seq_param < 0.66f) {
+            ch_seq = fuma_ch_map;
+            ch_2d_seq = fuma_2d_ch_map;
+
+        } else if (seq_param > 0.66f) {
+            ch_seq = sid_ch_map;
+            ch_2d_seq = sid_2d_ch_map;
+
+        }
+    }
+
+    // legacy setNormalizationScheme(), as a pure function of the stored values
+    void normalizationScheme (float in_norm_param, float out_norm_param, const float*& in_ch_norm, bool& ch_norm_flat)
+    {
+        if (in_norm_param < 0.33f) { // in SN3D
+
+            if (out_norm_param < 0.33f) // out SN3D
+            {
+                in_ch_norm = conv_norm_ones;
+                ch_norm_flat = true;
+            }
+            else if (out_norm_param >= 0.33f && out_norm_param < 0.66f) // out FuMa
+            {
+                in_ch_norm = conv_norm_sn3d_fuma;
+                ch_norm_flat = false;
+            }
+            else if (out_norm_param >= 0.66f)// out N3D
+            {
+                in_ch_norm = conv_norm_sn3d_n3d;
+                ch_norm_flat = false;
+            }
+
+        } else if (in_norm_param >= 0.33f && in_norm_param < 0.66f) { // in FuMa
+
+            if (out_norm_param < 0.33f) // out SN3D
+            {
+                in_ch_norm = conv_norm_fuma_sn3d;
+                ch_norm_flat = false;
+            }
+            else if (out_norm_param >= 0.33f && out_norm_param < 0.66f) // out FuMa
+            {
+                in_ch_norm = conv_norm_ones;
+                ch_norm_flat = true;
+            }
+            else if (out_norm_param >= 0.66f)// out N3D
+            {
+                in_ch_norm = conv_norm_fuma_n3d;
+                ch_norm_flat = false;
+            }
+
+        } else if (in_norm_param > 0.66f) { // in N3D
+
+            if (out_norm_param < 0.33f) // out SN3D
+            {
+                in_ch_norm = conv_norm_n3d_sn3d;
+                ch_norm_flat = false;
+            }
+            else if (out_norm_param >= 0.33f && out_norm_param < 0.66f) // out FuMa
+            {
+                in_ch_norm = conv_norm_n3d_fuma;
+                ch_norm_flat = false;
+            }
+            else if (out_norm_param >= 0.66f)// out N3D
+            {
+                in_ch_norm = conv_norm_ones;
+                ch_norm_flat = true;
+            }
+
+        }
+    }
+}
 
 //==============================================================================
 Ambix_converterAudioProcessor::Ambix_converterAudioProcessor() :
@@ -32,31 +157,32 @@ Ambix_converterAudioProcessor::Ambix_converterAudioProcessor() :
         .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
     ),
     active_preset(0),
-    output_buffer(16, 256),
-    in_seq_param(0.f),
-    out_seq_param(0.f),
-    in_norm_param(0.f),
-    out_norm_param(0.f),
-    flip_cs_phase(false),
-    flip_param(false),
-    flop_param(false),
-    flap_param(false),
-    in_2d(false),
-    out_2d(false),
-    ch_norm_flat(true)
+    output_buffer(16, 256)
 {
     // constructor
 
-    in_ch_seq = acn_ch_map;
-    out_ch_seq = acn_ch_map;
+    // order, names and texts as the legacy index-based API had them
+    auto addTriState = [this] (int index, const char* name, ambix::Parameter::TextFunction text)
+    {
+        const ambix::Parameter* const* self = &params[index];
+        addParameter (params[index] = new ambix::Parameter (*this, index, name, 0.f, std::move (text),
+                                                            [self] (float v) { return snapTriState (v, self); }));
+    };
+    auto addSwitch = [this] (int index, const char* name, ambix::Parameter::TextFunction text)
+    {
+        addParameter (params[index] = new ambix::Parameter (*this, index, name, 0.f, std::move (text), snapSwitch));
+    };
 
-    in_2d_ch_seq = acn_2d_ch_map;
-    out_2d_ch_seq = acn_2d_ch_map;
-
-    in_ch_norm = conv_norm_ones;
-
-    acn_cs = acn_cs_phase;
-
+    addTriState (InSeqParam,   "InChannelSeq",     seqText);
+    addTriState (OutSeqParam,  "OutChannelSeq",    seqText);
+    addTriState (InNormParam,  "InNormalization",  normText);
+    addTriState (OutNormParam, "OutNormalization", normText);
+    addSwitch (FlipCsParam, "FlipCondonShortleyPhase", onOffText);
+    addSwitch (FlipParam,   "MirrorLeftRight",         onOffText);
+    addSwitch (FlopParam,   "MirrorFrontBack",         onOffText);
+    addSwitch (FlapParam,   "MirrorTopBottom",         onOffText);
+    addSwitch (In2DParam,   "InputIs2D",               yesNoText);
+    addSwitch (Out2DParam,  "OutputIs2D",              yesNoText);
 }
 
 Ambix_converterAudioProcessor::~Ambix_converterAudioProcessor()
@@ -69,343 +195,9 @@ const String Ambix_converterAudioProcessor::getName() const
     return JucePlugin_Name;
 }
 
-int Ambix_converterAudioProcessor::getNumParameters()
+void Ambix_converterAudioProcessor::parameterValueSet (int, float)
 {
-    return totalNumParams;
-}
-
-float Ambix_converterAudioProcessor::getParameter (int index)
-{
-    switch (index)
-	{
-		case InSeqParam:    return in_seq_param;
-        case OutSeqParam:    return out_seq_param;
-        case InNormParam:    return in_norm_param;
-        case OutNormParam:    return out_norm_param;
-        case FlipCsParam:    return (float)flip_cs_phase;
-        case FlipParam:      return (float)flip_param;
-        case FlopParam:      return (float)flop_param;
-        case FlapParam:      return (float)flap_param;
-        case In2DParam:      return (float)in_2d;
-        case Out2DParam:      return (float)out_2d;
-
-		default:            return 0.0f;
-	}
-}
-
-void Ambix_converterAudioProcessor::setParameter (int index, float newValue)
-{
-    switch (index)
-	{
-		case InSeqParam:
-            if (newValue < 0.33f) {
-                in_seq_param=0.f;
-            } else if (newValue >= 0.33f && newValue < 0.66f) {
-                in_seq_param=0.5f;
-            } else if (newValue > 0.66f) {
-                in_seq_param=1.f;
-            }
-            setChannelSequence();
-            break;
-
-        case OutSeqParam:
-            if (newValue < 0.33f) {
-                out_seq_param=0.0f;
-            } else if (newValue >= 0.33f && newValue < 0.66f) {
-                out_seq_param=0.5f;
-            } else if (newValue > 0.66f) {
-                out_seq_param=1.f;
-            }
-            setChannelSequence();
-            break;
-
-        case InNormParam:
-            if (newValue < 0.33f) {
-                in_norm_param=0.f;
-            } else if (newValue >= 0.33f && newValue < 0.66f) {
-                in_norm_param=0.5f;
-            } else if (newValue > 0.66f) {
-                in_norm_param=1.f;
-            }
-            setNormalizationScheme();
-            break;
-
-        case OutNormParam:
-            if (newValue < 0.33f) {
-                out_norm_param=0.f;
-            } else if (newValue >= 0.33f && newValue < 0.66f) {
-                out_norm_param=0.5f;
-            } else if (newValue > 0.66f) {
-                out_norm_param=1.f;
-            }
-            setNormalizationScheme();
-            break;
-
-        case FlipCsParam:
-            if (newValue <= 0.5f)
-            {
-                flip_cs_phase = false;
-            } else {
-                flip_cs_phase = true;
-            }
-            break;
-
-        case FlipParam:
-            if (newValue <= 0.5f)
-            {
-                flip_param = false;
-            } else {
-                flip_param = true;
-            }
-            break;
-
-        case FlopParam:
-            if (newValue <= 0.5f)
-            {
-                flop_param = false;
-            } else {
-                flop_param = true;
-            }
-            break;
-
-        case FlapParam:
-            if (newValue <= 0.5f)
-            {
-                flap_param = false;
-            } else {
-                flap_param = true;
-            }
-            break;
-
-        case In2DParam:
-            if (newValue <= 0.5f)
-            {
-                in_2d = false;
-            } else {
-                in_2d = true;
-            }
-            break;
-
-        case Out2DParam:
-            if (newValue <= 0.5f)
-            {
-                out_2d = false;
-            } else {
-                out_2d = true;
-            }
-            break;
-
-		default:
-            break;
-	}
-    // notfiy editor
-    sendChangeMessage();
-}
-
-void Ambix_converterAudioProcessor::setChannelSequence()
-{
-    // in ch sequence
-
-    if (in_seq_param < 0.33f) {
-        in_ch_seq = acn_ch_map;
-        in_2d_ch_seq = acn_2d_ch_map;
-
-    } else if (in_seq_param >= 0.33f && in_seq_param < 0.66f) {
-        in_ch_seq = fuma_ch_map;
-        in_2d_ch_seq = fuma_2d_ch_map;
-
-    } else if (in_seq_param > 0.66f) {
-        in_ch_seq = sid_ch_map;
-        in_2d_ch_seq = sid_2d_ch_map;
-
-    }
-
-    // out ch sequence
-
-    if (out_seq_param < 0.33f) {
-        out_ch_seq = acn_ch_map;
-        out_2d_ch_seq = acn_2d_ch_map;
-
-    } else if (out_seq_param >= 0.33f && out_seq_param < 0.66f) {
-        out_ch_seq = fuma_ch_map;
-        out_2d_ch_seq = fuma_2d_ch_map;
-
-    } else if (out_seq_param > 0.66f) {
-        out_ch_seq = sid_ch_map;
-        out_2d_ch_seq = sid_2d_ch_map;
-
-    }
-}
-
-void Ambix_converterAudioProcessor::setNormalizationScheme()
-{
-    if (in_norm_param < 0.33f) { // in SN3D
-
-        if (out_norm_param < 0.33f) // out SN3D
-        {
-            in_ch_norm = conv_norm_ones;
-            ch_norm_flat = true;
-        }
-        else if (out_norm_param >= 0.33f && out_norm_param < 0.66f) // out FuMa
-        {
-            in_ch_norm = conv_norm_sn3d_fuma;
-            ch_norm_flat = false;
-        }
-        else if (out_norm_param >= 0.66f)// out N3D
-        {
-            in_ch_norm = conv_norm_sn3d_n3d;
-            ch_norm_flat = false;
-        }
-
-    } else if (in_norm_param >= 0.33f && in_norm_param < 0.66f) { // in FuMa
-
-        if (out_norm_param < 0.33f) // out SN3D
-        {
-            in_ch_norm = conv_norm_fuma_sn3d;
-            ch_norm_flat = false;
-        }
-        else if (out_norm_param >= 0.33f && out_norm_param < 0.66f) // out FuMa
-        {
-            in_ch_norm = conv_norm_ones;
-            ch_norm_flat = true;
-        }
-        else if (out_norm_param >= 0.66f)// out N3D
-        {
-            in_ch_norm = conv_norm_fuma_n3d;
-            ch_norm_flat = false;
-        }
-
-    } else if (in_norm_param > 0.66f) { // in N3D
-
-        if (out_norm_param < 0.33f) // out SN3D
-        {
-            in_ch_norm = conv_norm_n3d_sn3d;
-            ch_norm_flat = false;
-        }
-        else if (out_norm_param >= 0.33f && out_norm_param < 0.66f) // out FuMa
-        {
-            in_ch_norm = conv_norm_n3d_fuma;
-            ch_norm_flat = false;
-        }
-        else if (out_norm_param >= 0.66f)// out N3D
-        {
-            in_ch_norm = conv_norm_ones;
-            ch_norm_flat = true;
-        }
-
-    }
-}
-
-const String Ambix_converterAudioProcessor::getParameterName (int index)
-{
-    switch (index)
-	{
-		case InSeqParam:			return "InChannelSeq";
-        case OutSeqParam:			return "OutChannelSeq";
-		case InNormParam:			return "InNormalization";
-        case OutNormParam:			return "OutNormalization";
-        case FlipCsParam:           return "FlipCondonShortleyPhase";
-        case FlipParam:           return "MirrorLeftRight";
-        case FlopParam:           return "MirrorFrontBack";
-        case FlapParam:           return "MirrorTopBottom";
-        case In2DParam:           return "InputIs2D";
-        case Out2DParam:           return "OutputIs2D";
-		default:								break;
-	}
-
-	return String();
-}
-
-const String Ambix_converterAudioProcessor::getParameterText (int index)
-{
-    switch (index)
-	{
-		case InSeqParam:
-            if (in_seq_param < 0.33f) {
-                return "ACN";
-            } else if (in_seq_param >= 0.33f && in_seq_param < 0.66f) {
-                return "FuMa";
-            } else if (in_seq_param > 0.66f) {
-                return "SID";
-            }
-            break;
-
-        case OutSeqParam:
-            if (out_seq_param < 0.33f) {
-                return "ACN";
-            } else if (out_seq_param >= 0.33f && out_seq_param < 0.66f) {
-                return "FuMa";
-            } else if (out_seq_param > 0.66f) {
-                return "SID";
-            }
-            break;
-
-        case InNormParam:
-            if (in_norm_param < 0.33f) {
-                return "SN3D";
-            } else if (in_norm_param >= 0.33f && in_norm_param < 0.66f) {
-                return "FuMa";
-            } else if (in_norm_param > 0.66f) {
-                return "N3D";
-            }
-            break;
-
-        case OutNormParam:
-            if (out_norm_param < 0.33f) {
-                return "SN3D";
-            } else if (out_norm_param >= 0.33f && out_norm_param < 0.66f) {
-                return "FuMa";
-            } else if (out_norm_param > 0.66f) {
-                return "N3D";
-            }
-            break;
-
-        case FlipCsParam:
-            if (flip_cs_phase)
-                return "On";
-            else
-                return "Off";
-            break;
-
-        case FlipParam:
-            if (flip_param)
-                return "On";
-            else
-                return "Off";
-            break;
-
-        case FlopParam:
-            if (flop_param)
-                return "On";
-            else
-                return "Off";
-            break;
-
-        case FlapParam:
-            if (flap_param)
-                return "On";
-            else
-                return "Off";
-            break;
-
-        case In2DParam:
-            if (in_2d)
-                return "Yes";
-            else
-                return "No";
-            break;
-
-        case Out2DParam:
-            if (out_2d)
-                return "Yes";
-            else
-                return "No";
-            break;
-
-		default:								break;
-	}
-
-	return String();
+    // nothing to do: processBlock() derives the tables from the parameters
 }
 
 const String Ambix_converterAudioProcessor::getInputChannelName (int channelIndex) const
@@ -518,9 +310,29 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     // resize output buffer if necessare
     int NumSamples = buffer.getNumSamples();
 
-    output_buffer.setSize(std::max(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples);
+    output_buffer.setSize(std::max(getTotalNumOutputChannels(), getTotalNumInputChannels()), NumSamples, false, false, true);
 
     output_buffer.clear(); // in case of 2d where we might throw away some channels
+
+    // one read per parameter and block
+    const unsigned int* in_ch_seq = acn_ch_map;
+    const unsigned int* out_ch_seq = acn_ch_map;
+    const unsigned int* in_2d_ch_seq = acn_2d_ch_map;
+    const unsigned int* out_2d_ch_seq = acn_2d_ch_map;
+    const float* in_ch_norm = conv_norm_ones; // holds normalization conversion array
+    bool ch_norm_flat = true;
+    const int* acn_cs = acn_cs_phase; // holds condon-shortley conversion map
+
+    channelSequence (params[InSeqParam]->get(), in_ch_seq, in_2d_ch_seq);
+    channelSequence (params[OutSeqParam]->get(), out_ch_seq, out_2d_ch_seq);
+    normalizationScheme (params[InNormParam]->get(), params[OutNormParam]->get(), in_ch_norm, ch_norm_flat);
+
+    const bool flip_cs_phase = params[FlipCsParam]->get() > 0.5f;
+    const bool flip_param    = params[FlipParam]->get() > 0.5f;
+    const bool flop_param    = params[FlopParam]->get() > 0.5f;
+    const bool flap_param    = params[FlapParam]->get() > 0.5f;
+    const bool in_2d         = params[In2DParam]->get() > 0.5f;
+    const bool out_2d        = params[Out2DParam]->get() > 0.5f;
 
     // std::cout << "NumInputChannels: " << getTotalNumInputChannels() << " Buffersize: " << buffer.getNumChannels() << std::endl;
 
@@ -599,7 +411,8 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
     }
     */
 
-    buffer = output_buffer;
+    for (int ch = 0; ch < getTotalNumOutputChannels(); ++ch)
+        buffer.copyFrom(ch, 0, output_buffer, ch, 0, NumSamples);
 }
 
 //==============================================================================
@@ -626,16 +439,17 @@ void Ambix_converterAudioProcessor::getStateInformation (MemoryBlock& destData)
     // add some attributes to it..
     xml.setAttribute ("box_presets", box_presets_text);
 
-    xml.setAttribute("in_seq_param", in_seq_param);
-    xml.setAttribute("out_seq_param", out_seq_param);
-    xml.setAttribute("in_norm_param", in_norm_param);
-    xml.setAttribute("out_norm_param", out_norm_param);
-    xml.setAttribute("flip_cs_phase", flip_cs_phase);
-    xml.setAttribute("flip_param", flip_param);
-    xml.setAttribute("flop_param", flop_param);
-    xml.setAttribute("flap_param", flap_param);
-    xml.setAttribute("in_2d_param", in_2d);
-    xml.setAttribute("out_2d_param", out_2d);
+    // legacy format: seq/norm as double, switches as bool ("0" / "1")
+    xml.setAttribute("in_seq_param", (double) params[InSeqParam]->get());
+    xml.setAttribute("out_seq_param", (double) params[OutSeqParam]->get());
+    xml.setAttribute("in_norm_param", (double) params[InNormParam]->get());
+    xml.setAttribute("out_norm_param", (double) params[OutNormParam]->get());
+    xml.setAttribute("flip_cs_phase", params[FlipCsParam]->get() > 0.5f);
+    xml.setAttribute("flip_param", params[FlipParam]->get() > 0.5f);
+    xml.setAttribute("flop_param", params[FlopParam]->get() > 0.5f);
+    xml.setAttribute("flap_param", params[FlapParam]->get() > 0.5f);
+    xml.setAttribute("in_2d_param", params[In2DParam]->get() > 0.5f);
+    xml.setAttribute("out_2d_param", params[Out2DParam]->get() > 0.5f);
 
 
     // then use this helper function to stuff it into the binary blob and return it..
@@ -658,16 +472,18 @@ void Ambix_converterAudioProcessor::setStateInformation (const void* data, int s
             // ok, now pull out our parameters..
 
             box_presets_text = xmlState->getStringAttribute("box_presets", "");
-            setParameterNotifyingHost(this, FlipCsParam, (float) xmlState->getDoubleAttribute("flip_cs_phase"));
-            setParameterNotifyingHost(this, FlipParam, (float) xmlState->getDoubleAttribute("flip_param"));
-            setParameterNotifyingHost(this, FlopParam, (float) xmlState->getDoubleAttribute("flop_param"));
-            setParameterNotifyingHost(this, FlapParam, (float) xmlState->getDoubleAttribute("flap_param"));
-            setParameterNotifyingHost(this, InSeqParam, (float) xmlState->getDoubleAttribute("in_seq_param"));
-            setParameterNotifyingHost(this, OutSeqParam, (float) xmlState->getDoubleAttribute("out_seq_param"));
-            setParameterNotifyingHost(this, InNormParam, (float) xmlState->getDoubleAttribute("in_norm_param"));
-            setParameterNotifyingHost(this, OutNormParam, (float) xmlState->getDoubleAttribute("out_norm_param"));
-            setParameterNotifyingHost(this, In2DParam, (float) xmlState->getDoubleAttribute("in_2d_param"));
-            setParameterNotifyingHost(this, Out2DParam, (float) xmlState->getDoubleAttribute("out_2d_param"));
+
+            // legacy restore notified the host too - keep that
+            params[FlipCsParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("flip_cs_phase"));
+            params[FlipParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("flip_param"));
+            params[FlopParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("flop_param"));
+            params[FlapParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("flap_param"));
+            params[InSeqParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("in_seq_param"));
+            params[OutSeqParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("out_seq_param"));
+            params[InNormParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("in_norm_param"));
+            params[OutNormParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("out_norm_param"));
+            params[In2DParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("in_2d_param"));
+            params[Out2DParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("out_2d_param"));
         }
 
 

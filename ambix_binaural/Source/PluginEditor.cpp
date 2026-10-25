@@ -18,7 +18,6 @@
 */
 
 #include "PluginEditor.h"
-#include "../../common/JuceCompat.h"
 
 
 #define Q(x) #x
@@ -27,7 +26,8 @@
 //==============================================================================
 Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_binauralAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-    _width(0)
+    _width(0),
+    paramWatcher(*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
     tooltipWindow.setMillisecondsBeforeTipAppears (700); // tooltip delay
@@ -178,11 +178,11 @@ Ambix_binauralAudioProcessorEditor::Ambix_binauralAudioProcessorEditor (Ambix_bi
 
     UpdatePresets();
 
-    txt_preset.setText(ownerFilter->box_preset_str);
+    txt_preset.setText(ownerFilter->getPresetText());
     txt_preset.setCaretPosition(txt_preset.getTotalNumChars()-1);
     txt_preset.setTooltip(txt_preset.getText());
 
-    sld_gain.setValue(ParamToDB(ownerFilter->getParameter(0)), dontSendNotification);
+    sld_gain.setValue(ParamToDB(ownerFilter->gain_param->get()), dontSendNotification);
 
     startTimer (100);
 
@@ -194,6 +194,10 @@ Ambix_binauralAudioProcessorEditor::~Ambix_binauralAudioProcessorEditor()
     //[Destructor_pre]. You can add your own custom destruction code here..
     //[/Destructor_pre]
     stopTimer();
+
+    // closed mid-drag: don't leave the host's gesture open
+    if (gainGesture)
+        getProcessor()->gain_param->endChangeGesture();
 
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
 
@@ -296,7 +300,27 @@ void Ambix_binauralAudioProcessorEditor::resized()
 
 void Ambix_binauralAudioProcessorEditor::timerCallback()
 {
+    // the gain is polled, so host automation shows up as well
+    if (paramWatcher.changed() || gainRefreshPending)
+        refreshGainSlider();
+
     UpdateMeters();
+}
+
+// not while it's dragged or typed into; it's refreshed once it's free
+void Ambix_binauralAudioProcessorEditor::refreshGainSlider()
+{
+    bool busy = gainGesture;
+
+    for (auto* child : sld_gain.getChildren())
+        if (auto* label = dynamic_cast<Label*> (child))
+            if (label->isBeingEdited())
+                busy = true;
+
+    gainRefreshPending = busy;
+
+    if (! busy)
+        sld_gain.setValue(ParamToDB(getProcessor()->gain_param->get()), dontSendNotification);
 }
 
 bool Ambix_binauralAudioProcessorEditor::isInterestedInFileDrag(StringArray const& files)
@@ -315,7 +339,7 @@ void Ambix_binauralAudioProcessorEditor::filesDropped(StringArray const& files, 
 
     if (droppedFile.getFileExtension() == ".config") {
         Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-        ourProcessor->LoadConfiguration(droppedFile);
+        ourProcessor->LoadConfigurationAsync(droppedFile);
         ourProcessor->lastDir = droppedFile.getParentDirectory();
     }
 }
@@ -330,9 +354,9 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
 #endif
     num_ch.setText(String(ourProcessor->_AmbiChannels), dontSendNotification);
 
-    txt_debug.setText(ourProcessor->_DebugText, true);
+    txt_debug.setText(ourProcessor->getDebugText(), true);
 
-    txt_preset.setText(ourProcessor->box_preset_str);
+    txt_preset.setText(ourProcessor->getPresetText());
     txt_preset.setCaretPosition(txt_preset.getTotalNumChars()-1);
     txt_preset.setTooltip(txt_preset.getText());
 
@@ -367,6 +391,7 @@ void Ambix_binauralAudioProcessorEditor::UpdateText()
 void Ambix_binauralAudioProcessorEditor::UpdatePresets()
 {
     Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
+    const File configFile = ourProcessor->getConfigFile();
 
     popup_submenu.clear(); // contains submenus
 
@@ -394,7 +419,7 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
         // add item to submenu
         // check if this preset is loaded
 
-        if (ourProcessor->_configFile == ourProcessor->_presetFiles.getUnchecked(i))
+        if (configFile == ourProcessor->_presetFiles.getUnchecked(i))
         {
             popup_submenu.getLast()->addItem(i+1, ourProcessor->_presetFiles.getUnchecked(i).getFileNameWithoutExtension(), true, true);
         } else {
@@ -406,7 +431,7 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
 
     // add all subdirs to main menu
     for (int i=0; i < popup_submenu.size(); i++) {
-        if (Subdirs.getReference(i) == ourProcessor->_configFile.getParentDirectory().getFileName())
+        if (Subdirs.getReference(i) == configFile.getParentDirectory().getFileName())
         {
             popup_presets.addSubMenu(Subdirs.getReference(i), *popup_submenu.getUnchecked(i), true, nullptr, true);
         } else {
@@ -415,7 +440,7 @@ void Ambix_binauralAudioProcessorEditor::UpdatePresets()
 
     }
 
-    if (ourProcessor->activePreset.isNotEmpty())
+    if (ourProcessor->getActivePreset().isNotEmpty())
     {
         popup_presets.addSeparator();
         popup_presets.addItem(-2, String("save preset to .zip file..."), ourProcessor->_readyToSaveConfiguration.get());
@@ -449,7 +474,7 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
 
             File mooseFile (myChooser.getResult());
             //ourProcessor->ScheduleConfiguration(mooseFile);
-            ourProcessor->LoadConfiguration(mooseFile);
+            ourProcessor->LoadConfigurationAsync(mooseFile);
 
             ourProcessor->lastDir = mooseFile.getParentDirectory();
         }
@@ -457,7 +482,7 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
     else if (result == -2)
     {
         FileChooser myChooser("Save the loaded preset as .zip file...",
-            ourProcessor->lastDir.getChildFile(ourProcessor->activePreset),
+            ourProcessor->lastDir.getChildFile(ourProcessor->getActivePreset()),
             "*.zip");
         if (myChooser.browseForFileToSave(true))
         {
@@ -496,7 +521,35 @@ void Ambix_binauralAudioProcessorEditor::sliderValueChanged (Slider* sliderThatW
 
     if (sliderThatWasMoved == &sld_gain)
     {
-        setParameterNotifyingHost(ourProcessor, 0, DbToParam(sld_gain.getValue()));
+        auto* param = ourProcessor->gain_param;
+
+        // drags, wheel, text entry and double-click come within the slider's
+        // drag notifications; anything else (keys) gets a gesture of its own
+        if (! gainGesture)
+            param->beginChangeGesture();
+
+        param->setValueNotifyingHost(DbToParam(sld_gain.getValue()));
+
+        if (! gainGesture)
+            param->endChangeGesture();
+    }
+}
+
+void Ambix_binauralAudioProcessorEditor::sliderDragStarted (Slider* slider)
+{
+    if (slider == &sld_gain)
+    {
+        gainGesture = true;
+        getProcessor()->gain_param->beginChangeGesture();
+    }
+}
+
+void Ambix_binauralAudioProcessorEditor::sliderDragEnded (Slider* slider)
+{
+    if (slider == &sld_gain)
+    {
+        getProcessor()->gain_param->endChangeGesture();
+        gainGesture = false;
     }
 }
 
@@ -515,7 +568,7 @@ void Ambix_binauralAudioProcessorEditor::buttonClicked (Button* buttonThatWasCli
         {
 
             File mooseFile (myChooser.getResult());
-            ourProcessor->LoadConfiguration(mooseFile);
+            ourProcessor->LoadConfigurationAsync(mooseFile);
 
             UpdateText();
 
@@ -622,9 +675,7 @@ void Ambix_binauralAudioProcessorEditor::UpdateMeters()
 
 void Ambix_binauralAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
-    Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-
-    sld_gain.setValue(ParamToDB(ourProcessor->getParameter(0)), dontSendNotification);
+    refreshGainSlider();
 
     UpdateText();
     DrawMeters();

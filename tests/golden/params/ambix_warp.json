@@ -1,0 +1,301 @@
+{
+ "displayed": {
+  "0": {
+   "48": {
+    "text": "-0.9",
+    "value": 0
+   },
+   "49": {
+    "text": "-90 / 90 deg",
+    "value": 0
+   },
+   "50": {
+    "text": "-0.9",
+    "value": 0
+   },
+   "51": {
+    "text": "northpole",
+    "value": 0
+   },
+   "52": {
+    "text": "0",
+    "value": 0
+   },
+   "53": {
+    "text": "0",
+    "value": 0
+   },
+   "54": {
+    "text": "Off",
+    "value": 0
+   }
+  },
+  "0.25": {
+   "48": {
+    "text": "-0.45",
+    "value": 0.25
+   },
+   "49": {
+    "text": "-90 / 90 deg",
+    "value": 0.25
+   },
+   "50": {
+    "text": "-0.45",
+    "value": 0.25
+   },
+   "51": {
+    "text": "northpole",
+    "value": 0.25
+   },
+   "52": {
+    "text": "1",
+    "value": 0.25
+   },
+   "53": {
+    "text": "1",
+    "value": 0.25
+   },
+   "54": {
+    "text": "Off",
+    "value": 0.25
+   }
+  },
+  "0.5": {
+   "48": {
+    "text": "0",
+    "value": 0.5
+   },
+   "49": {
+    "text": "-90 / 90 deg",
+    "value": 0.5
+   },
+   "50": {
+    "text": "0",
+    "value": 0.5
+   },
+   "51": {
+    "text": "northpole",
+    "value": 0.5
+   },
+   "52": {
+    "text": "1",
+    "value": 0.5
+   },
+   "53": {
+    "text": "1",
+    "value": 0.5
+   },
+   "54": {
+    "text": "Off",
+    "value": 0.5
+   }
+  },
+  "0.55": {
+   "48": {
+    "text": "0.09",
+    "value": 0.550000012
+   },
+   "49": {
+    "text": "180 / 0 deg",
+    "value": 0.550000012
+   },
+   "50": {
+    "text": "0.09",
+    "value": 0.550000012
+   },
+   "51": {
+    "text": "equator",
+    "value": 0.550000012
+   },
+   "52": {
+    "text": "1",
+    "value": 0.550000012
+   },
+   "53": {
+    "text": "1",
+    "value": 0.550000012
+   },
+   "54": {
+    "text": "On",
+    "value": 0.550000012
+   }
+  },
+  "0.75": {
+   "48": {
+    "text": "0.45",
+    "value": 0.75
+   },
+   "49": {
+    "text": "180 / 0 deg",
+    "value": 0.75
+   },
+   "50": {
+    "text": "0.45",
+    "value": 0.75
+   },
+   "51": {
+    "text": "equator",
+    "value": 0.75
+   },
+   "52": {
+    "text": "1",
+    "value": 0.75
+   },
+   "53": {
+    "text": "1",
+    "value": 0.75
+   },
+   "54": {
+    "text": "On",
+    "value": 0.75
+   }
+  },
+  "1": {
+   "48": {
+    "text": "0.9",
+    "value": 1
+   },
+   "49": {
+    "text": "180 / 0 deg",
+    "value": 1
+   },
+   "50": {
+    "text": "0.9",
+    "value": 1
+   },
+   "51": {
+    "text": "equator",
+    "value": 1
+   },
+   "52": {
+    "text": "1",
+    "value": 1
+   },
+   "53": {
+    "text": "1",
+    "value": 1
+   },
+   "54": {
+    "text": "On",
+    "value": 1
+   }
+  }
+ },
+ "fresh_values": {
+  "48": 0.5,
+  "49": 0,
+  "50": 0.5,
+  "51": 0,
+  "52": 1,
+  "53": 1,
+  "54": 1,
+  "7": 0
+ },
+ "parameters": [
+  {
+   "can_automate": true,
+   "id": 48,
+   "index": 0,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Az Warp ",
+   "step_count": 0,
+   "title": "Az Warp factor",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 49,
+   "index": 1,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Az Warp ",
+   "step_count": 0,
+   "title": "Az Warp curve",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 50,
+   "index": 2,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "El Warp ",
+   "step_count": 0,
+   "title": "El Warp factor",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 51,
+   "index": 3,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "El Warp ",
+   "step_count": 0,
+   "title": "El Warp curve",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 52,
+   "index": 4,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Ambi In ",
+   "step_count": 0,
+   "title": "Ambi In order",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 53,
+   "index": 5,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Ambi Out",
+   "step_count": 0,
+   "title": "Ambi Out order",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 54,
+   "index": 6,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "PreEmpha",
+   "step_count": 0,
+   "title": "PreEmphasis",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 7,
+   "index": 7,
+   "is_bypass": true,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Bypass",
+   "step_count": 1,
+   "title": "Bypass",
+   "units": ""
+  }
+ ],
+ "restored": {
+  "48": 0.550000012,
+  "49": 0.550000012,
+  "50": 0.550000012,
+  "51": 0.550000012,
+  "52": 0.550000012,
+  "53": 0.550000012,
+  "54": 0.550000012
+ }
+}

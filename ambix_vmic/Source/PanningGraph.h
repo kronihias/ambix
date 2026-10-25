@@ -100,6 +100,7 @@ public:
     void setFilter(int idx, float az, float el, bool shape, float width, float height, float gain);
 
     void buttonClicked (Button* buttonThatWasClicked) override;
+    void buttonStateChanged (Button* button) override; // puck gestures
 
     void mouseDown (const MouseEvent &event) override;
     void mouseUp (const MouseEvent &event) override;
@@ -142,6 +143,15 @@ private:
     Path path_grid, path_w_grid;
 
     AudioProcessor* myprocessor_; // this is used for changing parameters
+
+    ambix::Parameter& param (int index) const { return *ambix::Parameter::at (*myprocessor_, index); }
+
+    // host gestures: a puck held down (azimuth + elevation), a width/height
+    // drag on the graph
+    int puck_gesture_id = -1;
+    int wh_gesture_id = -1;
+    void beginWidthHeightGesture (int filter_id);
+    void endWidthHeightGesture();
 
     TooltipWindow tooltipWindow;
 

@@ -28,103 +28,6 @@
 
 
 
-//==============================================================================
-Ambix_wideningAudioProcessor::Ambix_wideningAudioProcessor() :
-    AudioProcessor (BusesProperties()
-        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
-        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
-    ),
-    mod_depth_param(0.0f),
-    mod_t_param((5.f - 0.2f) / 69.8f), // 5 ms
-    _mod_t_param(0.f),
-    rot_offset_param(0.5f),
-    single_sided(true),
-    param_changed(true),
-    Q(10),
-    ring_buffer(AMBI_CHANNELS,1000),
-    _buf_write_pos(0),
-    _buf_size(1000)
-{
-
-}
-
-Ambix_wideningAudioProcessor::~Ambix_wideningAudioProcessor()
-{
-}
-
-//==============================================================================
-const String Ambix_wideningAudioProcessor::getName() const
-{
-    return JucePlugin_Name;
-}
-
-int Ambix_wideningAudioProcessor::getNumParameters()
-{
-    return totalNumParams;
-}
-
-float Ambix_wideningAudioProcessor::getParameter (int index)
-{
-    switch (index)
-	{
-		case ModDepthParam:     return mod_depth_param;
-		case ModTParam:         return mod_t_param;
-        case RotOffsetParam:    return rot_offset_param;
-		case SingleSideParam:
-            if (single_sided)
-                return 1.f;
-            else
-                return 0.f;
-		default:                return 0.0f;
-	}
-}
-
-void Ambix_wideningAudioProcessor::setParameter (int index, float newValue)
-{
-
-    switch (index)
-	{
-		case ModDepthParam:
-            mod_depth_param = newValue;
-            param_changed = true;
-            break;
-		case ModTParam:
-            mod_t_param = newValue;
-            param_changed = true;
-            break;
-        case RotOffsetParam:
-            rot_offset_param = newValue;
-            param_changed = true;
-            break;
-		case SingleSideParam:
-            if (newValue <= 0.5)
-            {
-                single_sided = false;
-            } else {
-                single_sided = true;
-            }
-            param_changed = true;
-            break;
-		default:
-            break;
-	}
-
-    sendChangeMessage();
-}
-
-const String Ambix_wideningAudioProcessor::getParameterName (int index)
-{
-    switch (index)
-	{
-		case ModDepthParam:     return "Mod Depth";
-		case ModTParam:         return "Mod T";
-        case RotOffsetParam:    return "Rotation Offset";
-		case SingleSideParam:   return "Single Sided";
-		default:                return String();
-	}
-
-}
-
 // convert param 0...1 to T = 0.2 ms....70ms
 float paramModT2ms(float param)
 {
@@ -141,39 +44,51 @@ float paramRot2deg(float param)
     return (param*360 - 180);
 }
 
-const String Ambix_wideningAudioProcessor::getParameterText (int index)
+//==============================================================================
+Ambix_wideningAudioProcessor::Ambix_wideningAudioProcessor() :
+    AudioProcessor (BusesProperties()
+        .withInput  ("Input",  AMBI_CH_SET(AMBI_CHANNELS), true)
+        .withOutput ("Output", AMBI_CH_SET(AMBI_CHANNELS), true)
+    ),
+    _mod_t_param(0.f),
+    single_sided(true),
+    param_changed(true),
+    Q(10),
+    ring_buffer(AMBI_CHANNELS,1000),
+    _buf_write_pos(0),
+    _buf_size(1000)
 {
-    String text;
+    // legacy setParameter() stored Single Sided as a bool (<= 0.5 -> off)
+    auto snapSingleSided = [] (float v) -> float { return (v <= 0.5) ? 0.f : 1.f; };
 
-    switch (index)
-	{
-		case ModDepthParam:
-            text << String(mod_depth_param*360).substring(0, 5);
-            text << " deg";
-            break;
-		case ModTParam:
-            text << String(paramModT2ms(mod_t_param)).substring(0, 5);
-            text << " ms";
-            break;
-        case RotOffsetParam:
-            text << String(paramRot2deg(rot_offset_param)).substring(0, 5);
-            text << " deg";
-            break;
-		case SingleSideParam:
-            if (single_sided)
-            {
-                text << "yes";
-            } else {
-                text << "no";
-            }
-            break;
+    addParameter (mod_depth_param = new ambix::Parameter (*this, ModDepthParam, "Mod Depth", 0.0f,
+        [] (float v, int) { String text; text << String(v*360).substring(0, 5); text << " deg"; return text; }));
 
-		default:
-            break;
-	}
+    addParameter (mod_t_param = new ambix::Parameter (*this, ModTParam, "Mod T", (5.f - 0.2f) / 69.8f, // 5 ms
+        [] (float v, int) { String text; text << String(paramModT2ms(v)).substring(0, 5); text << " ms"; return text; }));
 
+    addParameter (rot_offset_param = new ambix::Parameter (*this, RotOffsetParam, "Rotation Offset", 0.5f,
+        [] (float v, int) { String text; text << String(paramRot2deg(v)).substring(0, 5); text << " deg"; return text; }));
 
-	return text;
+    addParameter (single_sided_param = new ambix::Parameter (*this, SingleSideParam, "Single Sided", 1.0f,
+        [] (float v, int) { return String (v > 0.5f ? "yes" : "no"); }, snapSingleSided));
+}
+
+void Ambix_wideningAudioProcessor::parameterValueSet (int, float)
+{
+    // every set, even of an unchanged value, has the audio thread recompute
+    // the coefficients (and the latency)
+    param_changed = true;
+}
+
+Ambix_wideningAudioProcessor::~Ambix_wideningAudioProcessor()
+{
+}
+
+//==============================================================================
+const String Ambix_wideningAudioProcessor::getName() const
+{
+    return JucePlugin_Name;
 }
 
 const String Ambix_wideningAudioProcessor::getInputChannelName (int channelIndex) const
@@ -226,7 +141,7 @@ double Ambix_wideningAudioProcessor::getTailLengthSeconds() const
 
 int Ambix_wideningAudioProcessor::getLatencySamples() const
 {
-    if (single_sided)
+    if (single_sided_param->get() > 0.5f)
         return 0;
     else
         return Q*BESSEL_APPR;
@@ -258,6 +173,11 @@ void Ambix_wideningAudioProcessor::changeProgramName (int index, const String& n
 //==============================================================================
 void Ambix_wideningAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    // preallocate the ring buffer for the longest Mod T, so checkBuffer()
+    // never has to resize it on the audio thread
+    int Q_max = (int)floor(paramModT2s(1.f)*sampleRate+0.5f);
+    ring_buffer.setSize(jmax(getTotalNumInputChannels(), getTotalNumOutputChannels()), Q_max*(BESSEL_APPR*2+1) + samplesPerBlock);
+
     calcParams();
 
     ring_buffer.clear();
@@ -271,14 +191,17 @@ void Ambix_wideningAudioProcessor::releaseResources()
 
 void Ambix_wideningAudioProcessor::checkBuffer()
 {
-    Q = (int)floor(paramModT2s(mod_t_param)*getSampleRate()+0.5f);
+    Q = (int)floor(paramModT2s(mod_t_param->get())*getSampleRate()+0.5f);
 
     // std::cout << "t: " << paramModT2ms(mod_t_param) << "ms; Q: " << Q << " samples; f: " << 1.f/paramModT2s(mod_t_param) << " Hz" << std::endl;
 
     _buf_size = Q*(BESSEL_APPR*2+1) + getBlockSize(); // + 1
 
-    if (ring_buffer.getNumSamples() < _buf_size) {
-        ring_buffer.setSize(AMBI_CHANNELS, _buf_size);
+    // ring_buffer is preallocated in prepareToPlay() for the longest Mod T
+    jassert (ring_buffer.getNumSamples() >= _buf_size);
+
+    if (ring_buffer.getNumSamples() < _buf_size) { // should not happen, last resort
+        ring_buffer.setSize(ring_buffer.getNumChannels(), _buf_size);
         // std::cout << "resized to: "<< _buf_size << " t: " << paramModT2ms(mod_t_param) << "ms; Q: " << Q << " samples; f: " << 1.f/paramModT2s(mod_t_param) << " Hz, Block: " << getBlockSize() << std::endl;
 
         ring_buffer.clear();
@@ -288,7 +211,10 @@ void Ambix_wideningAudioProcessor::calcParams()
 {
     checkBuffer();
 
-    if (param_changed) {
+    if (param_changed.exchange(false)) {
+
+        // audio-thread copy, read by processBlock() as well
+        single_sided = single_sided_param->get() > 0.5f;
 
         // set new latency
         if (single_sided)
@@ -298,8 +224,8 @@ void Ambix_wideningAudioProcessor::calcParams()
 
         // parameters in rad
 
-        double phi_hat = ((double)mod_depth_param)*2*M_PI;
-        double rot_offset = M_PI - ((double)rot_offset_param)*2*M_PI;
+        double phi_hat = ((double)mod_depth_param->get())*2*M_PI;
+        double rot_offset = M_PI - ((double)rot_offset_param->get())*2*M_PI;
 
         // std::cout << "MATRIX:" << std::endl;
 
@@ -353,8 +279,6 @@ void Ambix_wideningAudioProcessor::calcParams()
             // std::cout << output_cos << std::endl;
             // std::cout << output_sin << std::endl;
         }
-
-        param_changed = false;
     }
 
 }
@@ -712,9 +636,9 @@ void Ambix_wideningAudioProcessor::getStateInformation (MemoryBlock& destData)
     XmlElement xml ("MYPLUGINSETTINGS");
 
     // add some attributes to it..
-    for (int i=0; i < getNumParameters(); i++)
+    for (int i=0; i < totalNumParams; i++)
     {
-        xml.setAttribute (String(i), getParameter(i));
+        xml.setAttribute (String(i), ambix::Parameter::at (*this, i)->get());
     }
 
     // then use this helper function to stuff it into the binary blob and return it..
@@ -733,8 +657,8 @@ void Ambix_wideningAudioProcessor::setStateInformation (const void* data, int si
         // make sure that it's actually our type of XML object..
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
-            for (int i=0; i < getNumParameters(); i++) {
-                setParameter(i, (float)xmlState->getDoubleAttribute(String(i)));
+            for (int i=0; i < totalNumParams; i++) {
+                ambix::Parameter::at (*this, i)->restore((float)xmlState->getDoubleAttribute(String(i)));
             }
         }
 
