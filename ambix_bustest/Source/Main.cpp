@@ -30,33 +30,29 @@
                  [--blocks N]         process N blocks before reading (8)
                  [--params]           report every parameter as the edit
                                       controller describes it
-                 [--set ID=VALUE]     before reporting, send a normalised
-                                      value through process() the way a host
-                                      plays automation (repeatable)
+                 [--set ID=VALUE]     send a normalised value through
+                                      process() first, as host automation
+                                      does (repeatable)
                  [--state-in FILE]    restore component state from FILE first
                  [--state-out FILE]   write the component state to FILE last
-                 [--step SPEC]        scripted sequence on one instance (with
-                                      --in-arr/--out-arr and --state-in
-                                      applied first): SPEC is "ID=V,ID=V"
-                                      (changes in that order, one block),
-                                      optionally "wait=MS"; after each step
-                                      report latency, output RMS and
-                                      correlation, every value and text
-                 [--offline]          process the steps in offline mode (a
-                                      host rendering), so plug-ins that skip
-                                      late work in real time are deterministic
-                 [--sweep V1,V2,...]  for every automatable parameter and each
-                                      value, a fresh instance with only that
-                                      parameter automated: output RMS per
-                                      channel for deterministic noise in,
-                                      the parameters that changed, the
+                 [--step SPEC]        scripted step on one instance: SPEC is
+                                      "ID=V,ID=V" (applied in order, one
+                                      block), optionally "wait=MS" and
+                                      "block=N"; after each step report
+                                      latency, output RMS and correlation,
+                                      every value and text (repeatable)
+                 [--offline]          process the steps in offline mode, so
+                                      plug-ins that skip late work in real
+                                      time are deterministic
+                 [--late-state]       with --step: restore --state-in after
+                                      activating rather than before
+                 [--sweep V1,V2,...]  per automatable parameter and value, a
+                                      fresh instance with only that parameter
+                                      set: output RMS, changed parameters,
                                       displayed text and a state hash
 
- The parameter options exist because moving a plugin from the legacy
- setParameter() API to parameter objects changes what JUCE's wrapper exports -
- VST3 parameter IDs, flags, defaults, display strings, the state blob - and
- every one of those is something a saved session depends on. JUCE hosting
- JUCE would paper over a mismatch in several of them.
+ The parameter options check what a saved session depends on (VST3 IDs,
+ flags, defaults, display strings, state), which JUCE hosting JUCE would hide.
 
  A mask is a VST3 SpeakerArrangement: bit per speaker. `(1 << n) - 1` is what
  a host that asks by channel count sends, and is also how kAmbi5th/6th/7th
@@ -104,9 +100,8 @@ namespace
 
 using GetFactoryFn = IPluginFactory* (*) ();
 
-// Where the JSON report goes: the process's original stdout. Everything a
-// plugin prints (config loading, discovery) is sent to stderr instead, so it
-// can't land in the middle of the report.
+// The original stdout; plugin output goes to stderr so it can't corrupt the
+// JSON report.
 FILE* report = stdout;
 
 //==============================================================================
@@ -301,8 +296,7 @@ int countReorderedChannels (IComponent& component, IAudioProcessor& proc,
 }
 
 //==============================================================================
-/*  Just enough IParameterChanges for one point per parameter at offset 0 -
-    what a host sends when automation is a step rather than a ramp. Lives on
+/*  Minimal IParameterChanges: one point per parameter at offset 0. Lives on
     the stack, so reference counting is a formality. */
 struct ValueQueue final : public IParamValueQueue
 {
@@ -341,8 +335,7 @@ struct ParamChanges final : public IParameterChanges
     uint32  PLUGIN_API release() override { return 1; }
 };
 
-/*  Process `blocks` blocks of silence, handing `changes` to the first one.
-    Returns false if the plugin refuses to set up or process. */
+/*  Process `blocks` blocks of silence, handing `changes` to the first one. */
 bool processWithChanges (IComponent& component, IAudioProcessor& proc,
                          IParameterChanges* changes, int blocks)
 {
@@ -396,8 +389,7 @@ bool processWithChanges (IComponent& component, IAudioProcessor& proc,
     return ok;
 }
 
-/*  String128 -> JSON string body. Parameter names here are ASCII; anything
-    else is replaced rather than encoded, which is enough to notice a change. */
+/*  String128 -> JSON string body; non-ASCII is replaced, not encoded. */
 std::string jsonString (const TChar* s)
 {
     std::string out;
@@ -438,9 +430,8 @@ bool writeFile (const std::string& path, const void* data, size_t size)
     return ok;
 }
 
-/*  Each parameter as the controller reports it, plus how it would display a
-    few normalised values. Those values cover both ends, the middle (the
-    rotators' 0°) and two points off any axis. */
+/*  Each parameter as the controller reports it, plus its text for a few
+    probe values (both ends, the middle and two off-axis points). */
 void printParameters (IEditController& controller)
 {
     static const ParamValue probes[] = { 0.0, 0.25, 0.5, 0.55, 0.75, 1.0 };
@@ -480,10 +471,8 @@ void printParameters (IEditController& controller)
 }
 
 //==============================================================================
-/*  The per-parameter sweep. Every run gets a fresh instance, so nothing one
-    run leaves behind (smoothing, phase accumulators, lazily built matrices)
-    can leak into the next one, and each result describes exactly one change
-    from a plugin's starting point. */
+/*  The per-parameter sweep. Every run gets a fresh instance so no state
+    (smoothing, accumulators, cached matrices) leaks between runs. */
 struct Instance
 {
     IComponent*       component    = nullptr;
@@ -553,15 +542,14 @@ struct SweepResult
     bool ok = false;
     std::vector<double> rms;            // per output channel, settled part only
     std::vector<double> proj;           // per output channel: correlation with a
-                                        // fixed +-1 mix of the inputs, so a sign
-                                        // or a swapped direction shows up too
+                                        // fixed +-1 input mix, to catch sign flips
     std::vector<ParamValue> values;     // every parameter, index order
     std::string text;                   // the swept parameter, as displayed
     uint64 stateHash = 0;               // FNV-1a over the saved state
 };
 
-/*  Fresh instance; `changes` (may be null) arrive with the first block; then
-    deterministic noise on every input until any smoothing has settled. */
+/*  Fresh instance; `changes` (may be null) arrive with the first block, then
+    deterministic noise until any smoothing has settled. */
 SweepResult sweepRun (IPluginFactory& factory, const TUID cid,
                       IParameterChanges* changes, ParamID textId)
 {
@@ -617,7 +605,6 @@ SweepResult sweepRun (IPluginFactory& factory, const TUID cid,
 
     for (int b = 0; b < blocks && ok; ++b)
     {
-        // a different, reproducible noise sequence per input channel
         for (int c = 0; c < numIn; ++c)
             for (int s = 0; s < blockSize; ++s)
             {
@@ -700,10 +687,8 @@ void printDoubles (const std::vector<double>& v)
     fprintf (report, "]");
 }
 
-/*  For each automatable, non-bypass parameter and each value: one run with
-    only that parameter changed. Reports output RMS, the parameters that
-    ended up different from a run with no change (side effects and
-    coupling show up here), the displayed text and the state hash. */
+/*  One run per automatable, non-bypass parameter and value, compared with
+    an untouched run so side effects and coupling show up. */
 void printSweep (IPluginFactory& factory, const TUID cid, const std::vector<ParamValue>& probes)
 {
     auto baseline = sweepRun (factory, cid, nullptr, 0);
@@ -761,8 +746,6 @@ void printSweep (IPluginFactory& factory, const TUID cid, const std::vector<Para
                 fprintf (report, ", \"proj\": ");
                 printDoubles (r.proj);
 
-                // every parameter that differs from the untouched run,
-                // the swept one included
                 fprintf (report, ", \"changed\": {");
                 bool firstChanged = true;
 
@@ -786,18 +769,17 @@ void printSweep (IPluginFactory& factory, const TUID cid, const std::vector<Para
 
 //==============================================================================
 /*  Scripted sequences on one instance, for behaviour that depends on order
-    or history: which of two parameters set in the same block wins, a mode
-    chosen by whichever parameter was touched last, a preset followed by a
-    tweak, latency after a switch, a configuration that loads in the
-    background. */
+    or history (same-block conflicts, presets then tweaks, background loads). */
 struct Step
 {
     std::vector<ValueQueue> changes;    // in queue order, all in the step's first block
     int waitMs = 0;                     // sleep before the step (background loading)
+    int blockSize = 0;                  // re-activate with this block size first
 };
 
 /*  "48=0.25,57=1" -> two changes in that order; "wait=2000" -> a pause;
-    both may be combined; "" just processes. */
+    "block=512" -> re-activate with that block size; may be combined; ""
+    just processes. */
 Step parseStep (const std::string& text)
 {
     Step step;
@@ -817,6 +799,8 @@ Step parseStep (const std::string& text)
 
             if (key == "wait")
                 step.waitMs = atoi (value.c_str());
+            else if (key == "block")
+                step.blockSize = atoi (value.c_str());
             else
             {
                 ValueQueue q;
@@ -843,14 +827,14 @@ void sleepMs (int ms)
 
 void printSteps (IPluginFactory& factory, const TUID cid, const std::vector<Step>& steps,
                  bool negotiate, SpeakerArrangement inArr, SpeakerArrangement outArr,
-                 const std::vector<char>& stateBytes, bool offline)
+                 const std::vector<char>& stateBytes, bool offline, bool lateState)
 {
-    // Offline is how a host renders: a plug-in may then wait for its worker
-    // threads (binaural's convolver does), so the result doesn't depend on
-    // how busy the machine is. In real time it skips work that is late.
+    // Offline, a plug-in may wait for its worker threads (binaural does), so
+    // results don't depend on machine load.
     const auto mode = offline ? kOffline : kRealtime;
 
-    constexpr int blockSize = 256, blocksPerStep = 8, measuredBlocks = 4;
+    constexpr int maxBlockSize = 4096, blocksPerStep = 8, measuredBlocks = 4;
+    int blockSize = 256;
 
     Instance inst;
 
@@ -867,12 +851,15 @@ void printSteps (IPluginFactory& factory, const TUID cid, const std::vector<Step
     if (negotiate)
         proc.setBusArrangements (&inArr, 1, &outArr, 1);
 
-    if (! stateBytes.empty())
+    const auto restoreState = [&]
     {
         MemoryStream stream (const_cast<char*> (stateBytes.data()), (TSize) stateBytes.size());
         component.setState (&stream);
         inst.syncController();
-    }
+    };
+
+    if (! stateBytes.empty() && ! lateState)
+        restoreState();
 
     BusInfo in {}, out {};
     component.getBusInfo (kAudio, kInput,  0, in);
@@ -894,11 +881,16 @@ void printSteps (IPluginFactory& factory, const TUID cid, const std::vector<Step
     component.setActive (true);
     proc.setProcessing (true);
 
-    std::vector<std::vector<float>> inStore  ((size_t) numIn,  std::vector<float> ((size_t) blockSize));
-    std::vector<std::vector<float>> outStore ((size_t) numOut, std::vector<float> ((size_t) blockSize));
+    // A plug-in that reloads on state restore and on block-size changes
+    // (binaural) loads only once if the state comes after activation.
+    if (! stateBytes.empty() && lateState)
+        restoreState();
+
+    std::vector<std::vector<float>> inStore  ((size_t) numIn,  std::vector<float> ((size_t) maxBlockSize));
+    std::vector<std::vector<float>> outStore ((size_t) numOut, std::vector<float> ((size_t) maxBlockSize));
     std::vector<float*> inPtr ((size_t) numIn), outPtr ((size_t) numOut);
     std::vector<uint32> seeds ((size_t) numIn);
-    std::vector<float> mix ((size_t) blockSize);
+    std::vector<float> mix ((size_t) maxBlockSize);
 
     for (int c = 0; c < numIn;  ++c) { inPtr [(size_t) c] = inStore [(size_t) c].data(); seeds[(size_t) c] = 7919u * (uint32) c + 1u; }
     for (int c = 0; c < numOut; ++c)   outPtr[(size_t) c] = outStore[(size_t) c].data();
@@ -922,6 +914,16 @@ void printSteps (IPluginFactory& factory, const TUID cid, const std::vector<Step
 
         if (step.waitMs > 0)
             sleepMs (step.waitMs);
+
+        if (step.blockSize > 0 && step.blockSize <= maxBlockSize)
+        {
+            proc.setProcessing (false);
+            component.setActive (false);
+            blockSize = setup.maxSamplesPerBlock = data.numSamples = step.blockSize;
+            proc.setupProcessing (setup);
+            component.setActive (true);
+            proc.setProcessing (true);
+        }
 
         ParamChanges changes;
         changes.queues = step.changes;
@@ -1033,7 +1035,7 @@ int main (int argc, char** argv)
     ParamChanges changes;
     std::vector<ParamValue> sweepProbes;
     std::vector<Step> steps;
-    bool offline = false;
+    bool offline = false, lateState = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -1049,6 +1051,7 @@ int main (int argc, char** argv)
         else if (a == "--state-out" && i + 1 < argc) stateOut = argv[++i];
         else if (a == "--step" && i + 1 < argc)    steps.push_back (parseStep (argv[++i]));
         else if (a == "--offline")                 offline = true;
+        else if (a == "--late-state")              lateState = true;
         else if (a == "--sweep" && i + 1 < argc)
         {
             const std::string list = argv[++i];
@@ -1158,8 +1161,7 @@ int main (int argc, char** argv)
 
     if (wantController)
     {
-        // Wire controller and component together the way a host does; JUCE's
-        // wrapper finds its processor through this connection.
+        // JUCE's wrapper finds its processor through this connection.
         TUID controllerCID {};
 
         if (component->getControllerClassId (controllerCID) != kResultOk
@@ -1179,10 +1181,8 @@ int main (int argc, char** argv)
             controllerCP->connect (componentCP);
         }
 
-        // A host shows the controller the component's state after creating
-        // it, and again whenever it wants the display to catch up. Without
-        // a message loop, that is also how values changed by process()
-        // reach the controller here.
+        // Push component state to the controller, as a host does; without a
+        // message loop this is also how values changed by process() get there.
         const auto syncController = [&]
         {
             MemoryStream stream;
@@ -1207,8 +1207,7 @@ int main (int argc, char** argv)
                 return 2;
             }
 
-            // A host restores the component, then shows the same blob to the
-            // controller so its parameter display catches up.
+            // as a host does: component first, then the same blob to the controller
             MemoryStream forComponent (bytes.data(), (TSize) bytes.size());
             MemoryStream forController (bytes.data(), (TSize) bytes.size());
 
@@ -1247,7 +1246,7 @@ int main (int argc, char** argv)
             fprintf (stderr, "ambix_bustest: cannot read %s\n", stateIn.c_str());
             return 2;
         }
-        printSteps (*module.factory, classInfo.cid, steps, negotiate, inArr, outArr, stateBytes, offline);
+        printSteps (*module.factory, classInfo.cid, steps, negotiate, inArr, outArr, stateBytes, offline, lateState);
     }
 
     fprintf (report, "\n}\n");

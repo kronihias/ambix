@@ -339,7 +339,7 @@ void Ambix_binauralAudioProcessorEditor::filesDropped(StringArray const& files, 
 
     if (droppedFile.getFileExtension() == ".config") {
         Ambix_binauralAudioProcessor* ourProcessor = getProcessor();
-        ourProcessor->LoadConfiguration(droppedFile);
+        ourProcessor->LoadConfigurationAsync(droppedFile);
         ourProcessor->lastDir = droppedFile.getParentDirectory();
     }
 }
@@ -473,7 +473,7 @@ void Ambix_binauralAudioProcessorEditor::menuItemChosenCallback (int result, Amb
 
             File mooseFile (myChooser.getResult());
             //ourProcessor->ScheduleConfiguration(mooseFile);
-            ourProcessor->LoadConfiguration(mooseFile);
+            ourProcessor->LoadConfigurationAsync(mooseFile);
 
             ourProcessor->lastDir = mooseFile.getParentDirectory();
         }
@@ -568,7 +568,7 @@ void Ambix_binauralAudioProcessorEditor::buttonClicked (Button* buttonThatWasCli
         {
 
             File mooseFile (myChooser.getResult());
-            ourProcessor->LoadConfiguration(mooseFile);
+            ourProcessor->LoadConfigurationAsync(mooseFile);
 
             UpdateText();
 

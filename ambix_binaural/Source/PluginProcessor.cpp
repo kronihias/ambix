@@ -273,12 +273,9 @@ void Ambix_binauralAudioProcessor::prepareToPlay (double sampleRate, int samples
         SampleRate = sampleRate;
         BufferSize = samplesPerBlock;
 
+        // also resizes ambi_spk_buffer_ - don't touch it here, the loader
+        // thread may be rebuilding it
         ReloadConfiguration();
-    }
-
-    if (configLoaded)
-    {
-        ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
     }
 }
 

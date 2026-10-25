@@ -28,6 +28,12 @@ SET(AMBIX_DEV_CODESIGN_IDENTITY "-" CACHE STRING "macOS: identity the dev-build 
 SET(BUILD_VISUALIZER TRUE CACHE BOOL "build the cross-platform ambix_visualizer GUI app (companion to ambix_encoder)")
 SET(BUILD_TESTHOST FALSE CACHE BOOL "build the ambix_testhost CLI used by tests/ to host VST3s with asymmetric main buses")
 SET(MAX_AMBI_ORDER 7 CACHE STRING "Maximum ambisonic order for universal (VST3/AU) builds")
+SET(SANITIZE_THREAD FALSE CACHE BOOL "build with ThreadSanitizer (tests/test_tsan.py)")
+
+IF(SANITIZE_THREAD)
+	add_compile_options(-fsanitize=thread -g)
+	add_link_options(-fsanitize=thread)
+ENDIF(SANITIZE_THREAD)
 
 
 IF(UNIX AND NOT APPLE AND NOT ANDROID)

@@ -1133,8 +1133,9 @@ bool MtxConvSlave::ReadOutput(int numsamples, bool forcesync)
         if (inter_offset >= offset_)
         {
             inter_offset -= partitionsize_;
+            // real-time: don't block the audio thread, a late partition glitches
             if (!threadShouldExit())
-                inter_sync.wait();
+                inter_sync.wait(forcesync ? -1 : 0);
         }
     }
 #endif
