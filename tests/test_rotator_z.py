@@ -96,8 +96,7 @@ def test_golden_regression(plugin_rotator_z, noise_ambi, request):
 
 
 # ===========================================================================
-# OSC: /rotation and /head_pose drive the same parameter from the network
-# thread (port 7120). Covers the hand-off from that thread to processBlock.
+# OSC: /rotation and /head_pose set the parameter from the network thread.
 # ===========================================================================
 
 OSC_PORT = 7120
@@ -129,8 +128,7 @@ def send_osc(packet: bytes) -> None:
 ], ids=["rotation", "head_pose"])
 def test_osc_yaw_rotates(plugin_rotator_z, noise_ambi, packet):
     """Yaw 90° over OSC lands on the same rotation as the parameter at 0.75."""
-    # The host never hears about values set over OSC, so it may treat a
-    # repeated 0.5 as no change. Step away first so the reset really lands.
+    # The host doesn't see OSC changes and may drop a repeated 0.5; step away first.
     plugin_rotator_z["Z-axis rot"] = 0.4
     plugin_rotator_z["Z-axis rot"] = 0.5
     np.testing.assert_allclose(run_settled(plugin_rotator_z, noise_ambi), noise_ambi,

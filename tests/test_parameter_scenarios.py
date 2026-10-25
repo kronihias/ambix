@@ -2,8 +2,7 @@
 
 The sweep (test_parameter_sweep.py) changes one parameter on a fresh
 instance. Much of what the plugins do with their parameters only shows up in
-sequences, and these are what a move to parameter objects is most likely to
-get wrong:
+sequences:
 
   * which of two parameters set in the same block wins (rotator and move pick
     Euler or quaternion mode by whichever was touched last; mirror's preset
@@ -316,9 +315,6 @@ def run_scenario(binary, plugin, scenario):
 
     cmd = [binary, "--plugin", path]
     if scenario.get("offline"):
-        # binaural's convolver skips partitions its worker threads deliver
-        # late in real time (it must not wait on them); offline it waits, so
-        # the output can't depend on how busy the machine is
         cmd += ["--offline"]
     if scenario.get("late_state"):
         cmd += ["--late-state"]
@@ -355,8 +351,7 @@ def scenario(request, bustest_bin):
     current = run_scenario(bustest_bin, plugin, spec)
 
     if "sound_from_step" in spec:
-        # a configuration that loads in the background: make sure it did,
-        # or the golden would just pin silence
+        # the configuration loads in the background; don't pin silence
         first = spec["sound_from_step"]
         assert any(r > 1e-4 for r in current["steps"][first]["rms"]), (
             f"{plugin}/{name}: still silent at step {first} — configuration not loaded?")
@@ -412,10 +407,7 @@ def test_scenario(scenario):
 @pytest.mark.parametrize("plugin", ["ambix_binaural", "ambix_decoder"])
 def test_restore_before_or_after_activation(plugin, bustest_bin):
     """Hosts restore a project before or after activating the plugin. Both
-    must end up with the same configuration. Binaural used to start loading
-    on restore, before it knew the sample rate, and drop the reload that
-    activation asked for while that load was running - its IRs then stayed
-    at their file rate (44.1 kHz) instead of the 48 kHz it ran at."""
+    must end up with the configuration loaded at the running sample rate."""
     spec = SCENARIOS[plugin]["gain_with_config"]
     before = run_scenario(bustest_bin, plugin, spec)
     after = run_scenario(bustest_bin, plugin, {**spec, "late_state": True})

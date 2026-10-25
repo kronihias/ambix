@@ -416,8 +416,7 @@ TextEditor* Ambix_rotatorAudioProcessorEditor::qText (int i)
     return boxes[i];
 }
 
-// a q text box that is being typed into keeps its text until it's entered
-// (return / focus lost) or loses focus; it's refreshed then
+// a q text box being typed into keeps its text until it's entered or loses focus
 void Ambix_rotatorAudioProcessorEditor::refreshQText (int i)
 {
     TextEditor& txt = *qText(i);

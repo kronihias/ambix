@@ -183,19 +183,16 @@ public:
 
 private:
 
-    // what the legacy setParameter() did besides storing the value; runs
-    // synchronously on the thread that set the parameter
+    // side effects of a set; runs on the thread that set the parameter
     void parameterValueSet (int index, float newValue) override;
 
     void calcParams();
 
-    // order the In/Out order parameter selects, capped (in universal builds)
-    // to what the input bus carries - as calcParams() caps it
+    // the selected order, capped to the input bus as calcParams() does
     int orderForDisplay (float orderParam);
 
-    // Current values live in the parameter objects (atomic). Translation:
-    // normalized 0..1, default 0.5 = 0 m; reference radius default 0 = 1 m;
-    // rotation default 0.5 = 0 deg / 0 quat.
+    // defaults: translation 0.5 = 0 m, reference radius 0 = 1 m,
+    // rotation 0.5 = 0 deg / 0 quat
     ambix::Parameter* params[totalNumParams] {};
 
     // values the current transformation matrix was computed for
@@ -230,10 +227,8 @@ private:
 
     AudioSampleBuffer output_buffer;
 
-    // Everything that depends only on an order is built once, in the
-    // constructor, for every order 0..AMBI_ORDER, so an order or layout
-    // change only picks one (the audio thread used to parse the t-design,
-    // allocate and invert here).
+    // built once in the constructor for every order 0..AMBI_ORDER, so an
+    // order change on the audio thread only picks one
     std::vector<Eigen::MatrixXd> Sh_matrix_inv_for_order; // pseudo-inverse of undistorted SH basis, per input order
     std::array<SphericalHarmonic, AMBI_ORDER + 1> sph_h_out_for_order;
 

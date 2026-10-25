@@ -77,7 +77,7 @@ Ambix_wideningAudioProcessor::Ambix_wideningAudioProcessor() :
 void Ambix_wideningAudioProcessor::parameterValueSet (int, float)
 {
     // every set, even of an unchanged value, has the audio thread recompute
-    // the coefficients (and the latency), as setParameter() did
+    // the coefficients (and the latency)
     param_changed = true;
 }
 

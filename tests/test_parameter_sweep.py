@@ -1,11 +1,9 @@
 """One parameter at a time: what automating it does, to the audio included.
 
-test_parameters.py pins what a host sees of each parameter. This module pins
-what each parameter *does*, so moving a plugin to parameter objects cannot
-quietly wire a parameter to the wrong place, drop a side effect, or change the
-processing. `ambix_bustest --sweep` gives every run a fresh instance with a
-single parameter automated through process(), then sends deterministic noise
-through every input, and reports:
+test_parameters.py pins what a host sees of each parameter; this pins what
+each parameter *does*. `ambix_bustest --sweep` gives every run a fresh
+instance with one parameter automated through process(), sends deterministic
+noise through every input, and reports:
 
   * per output channel, the RMS and the correlation with a fixed +-1 mix of
     the inputs (the second one is sign-sensitive: +90 and -90 deg differ),

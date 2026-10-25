@@ -184,7 +184,7 @@ const String Ambix_rotatorAudioProcessor::getName() const
     return JucePlugin_Name;
 }
 
-// every value set on a parameter, on the thread that set it (was setParameter())
+// every value set on a parameter, on the thread that set it
 void Ambix_rotatorAudioProcessor::parameterValueSet (int index, float)
 {
     // the parameter set last decides between euler angles and quaternion

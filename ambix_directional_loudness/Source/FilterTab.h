@@ -71,9 +71,8 @@ private:
     // the parameter a slider controls (nullptr for none)
     ambix::Parameter* paramFor (Slider* slider) const;
 
-    // a value from the UI: inside a drag the drag's gesture covers it,
-    // otherwise (text box, double-click reset, combo box, solo button) it
-    // gets a gesture of its own
+    // a value from the UI: covered by the gesture of a running drag, else
+    // (text box, double-click reset, combo box, solo button) given its own
     void setParam (Slider* slider, ambix::Parameter& param, float value);
 
     Slider* dragging = nullptr; // the slider in a drag, if any

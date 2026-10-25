@@ -194,13 +194,12 @@ public:
 
 private:
 
-    // legacy setParameter() body minus the change message: flags the
-    // transformation matrix for recalculation
+    // flags the transformation matrix for recalculation
     void parameterValueSet (int index, float newValue) override;
 
     void calcParams();
 
-    // owned by AudioProcessor; calcParams() reads them once per change
+    // owned by AudioProcessor
     ambix::Parameter* params[PARAMS_PER_FILTER*NUM_FILTERS_VMIC] {};
 
     bool _initialized;

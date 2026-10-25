@@ -1,27 +1,16 @@
 """Parameter and state contract, as a VST3 host sees it.
 
-Moving a plugin from JUCE's legacy setParameter() API to parameter objects
-changes what JUCE's wrapper exports, and saved sessions depend on all of it:
-
-  * automation lanes are keyed on the VST3 parameter ID,
-  * hosts show the title and the display text,
-  * a project stores the component state blob, which the new build has to
-    restore, and which an older build should still be able to read back.
-
-None of that shows up in the audio tests, and JUCE hosting JUCE (pedalboard,
-pluginval) smooths over several of these differences. So this module goes
-through `ambix_bustest --params`, which talks to IComponent / IEditController
-directly, and compares against goldens recorded from the legacy build:
+Saved sessions depend on what JUCE's VST3 wrapper exports: automation lanes
+are keyed on the parameter ID, hosts show title and display text, and the
+state blob must restore here and still load in older builds. JUCE hosting
+JUCE (pedalboard, pluginval) smooths over some of this, so the module uses
+`ambix_bustest --params` (IComponent / IEditController directly) and compares
+against goldens recorded from the legacy build:
 
   tests/golden/params/<plugin>.json   identity, fresh values, displayed text
   tests/golden/state/<plugin>.bin     state saved with every parameter at 0.55
 
-Values are set the way a host plays automation (IParameterChanges handed to
-process()), so the audio-thread path is the one exercised.
-
-Plugins listed in MIGRATED are additionally held to what the legacy API could
-not provide: a default that matches the value a fresh instance starts at, and
-display text for a value other than the current one.
+Values are set as host automation (IParameterChanges via process()).
 
 Regenerate goldens (only when a change is intended and reviewed) with
     pytest tests/test_parameters.py --update-golden
@@ -52,22 +41,18 @@ STATE_GOLDEN_DIR  = os.path.join(GOLDEN_DIR, "state")
 PROBES = ["0", "0.25", "0.5", "0.55", "0.75", "1"]
 STATE_PROBE = "0.55"
 
-# What a host must never see change: an automation lane or a saved mapping
-# is keyed on these.
+# Automation lanes and saved mappings are keyed on these.
 IDENTITY_FIELDS = ["index", "id", "title", "short_title", "units", "step_count",
                    "can_automate", "read_only", "is_bypass", "is_list"]
 
-# Plugins on parameter objects: all of them. AMBIX_MIGRATED (comma-separated)
-# adds to it, for a plugin added to the suite before it is ported.
+# AMBIX_MIGRATED (comma-separated) adds plugins to the parameter-object checks.
 MIGRATED = set(ALL_PLUGINS) | (set(os.environ.get("AMBIX_MIGRATED", "").split(",")) - {""})
 
-# Parameters whose text legitimately depends on another parameter, so it
-# can't be checked against a fresh instance: the encoder's MoveAzimuth and
-# MoveElevation show deg/sec, which depends on MoveSpeed.
+# Text depends on another parameter: encoder MoveAzimuth/MoveElevation show
+# deg/sec, which depends on MoveSpeed.
 TEXT_DEPENDS_ON_OTHERS = {("ambix_encoder", 6), ("ambix_encoder", 9)}
 
-# Values are floats sent through process() and read back; allow for the
-# float -> double round trip, nothing more.
+# The float -> double round trip through process(), nothing more.
 VALUE_TOL = 1e-6
 
 
@@ -162,8 +147,6 @@ def sweep(binary, plugin):
             out = os.path.join(tmp, "state.bin") if probe == STATE_PROBE else None
             report = run_bustest(binary, plugin, {pid: probe for pid in ids}, state_out=out)
 
-            # After setting a value, ask the plugin to display that same
-            # value: the legacy and the new API have to agree on this one.
             displayed[probe] = {
                 str(p["id"]): {"value": p["value"], "text": p["text"][probe]}
                 for p in settable(report["parameters"])
@@ -173,9 +156,8 @@ def sweep(binary, plugin):
                 with open(out, "rb") as f:
                     state = f.read()
 
-        # What a reopened project comes back with. Not always exactly what
-        # was automated: values pass through the plugin's own state format
-        # (the encoder stores rounded floats, maxre derives its order).
+        # Not always what was automated: the encoder stores rounded floats,
+        # maxre derives its order.
         report = run_bustest(binary, plugin, state_in=os.path.join(tmp, "state.bin"))
         restored = {str(p["id"]): p["value"] for p in settable(report["parameters"])}
 
@@ -257,11 +239,8 @@ def test_automated_value_and_text(contract, probe):
         assert got["value"] == pytest.approx(want["value"], abs=VALUE_TOL), (
             f"{plugin}: parameter {pid} automated to {probe} reads back differently")
 
-        # The text is asked for the probe value. The legacy API could only
-        # describe the current value, so where a side effect moved the value
-        # away from the probe in the same block (encoder Az/El via SetRel or
-        # rotation) the golden holds the current value's text instead. Text
-        # at the current value is pinned by the sweep and the scenarios.
+        # Legacy goldens hold the current value's text; skip where a side
+        # effect moved it off the probe (encoder Az/El via SetRel or rotation).
         if want["value"] != pytest.approx(float(probe), abs=VALUE_TOL):
             continue
         assert got["text"] == want["text"], (
@@ -341,10 +320,9 @@ def test_vst3_ids_unique(contract):
     assert bypass == [len(params) - 1], f"{plugin}: bypass parameters at {bypass}"
 
 
-# Parameter 8 of these two hashed to 56, the ID JUCE's wrapper gives its own
-# bypass parameter (one past the last parameter, kept by
-# juce_vst3_legacy_bypass_id.patch). It now has an ID of its own on VST3;
-# bypass stays at 56 so existing bypass automation still finds it.
+# Parameter 8 of these hashed to 56, JUCE's bypass ID (kept by
+# juce_vst3_legacy_bypass_id.patch). It has its own VST3 ID; bypass stays at
+# 56 so existing bypass automation still finds it.
 CLASHED = [("ambix_vmic", "center elevation 2"), ("ambix_directional_loudness", "center elevation 2")]
 LEGACY_BYPASS_ID = 56
 

@@ -27,10 +27,8 @@
 //==============================================================================
 namespace
 {
-    // the legacy tri-state switch: < 0.33 -> 0, [0.33, 0.66) -> 0.5,
-    // > 0.66 -> 1. Exactly 0.66f matches no branch, so legacy kept the value
-    // it had: the snap returns the stored value for it (all other stored
-    // values, 0 / 0.5 / 1, map to themselves as JUCE requires).
+    // the legacy tri-state switch; exactly 0.66f matched no branch and kept
+    // the previous value, so it snaps to the stored one
     float snapTriState (float v, const ambix::Parameter* const* self)
     {
         if (v < 0.33f)
@@ -163,8 +161,7 @@ Ambix_converterAudioProcessor::Ambix_converterAudioProcessor() :
 {
     // constructor
 
-    // order, names and texts as the legacy index-based API had them; every
-    // parameter starts at 0
+    // order, names and texts as the legacy index-based API had them
     auto addTriState = [this] (int index, const char* name, ambix::Parameter::TextFunction text)
     {
         const ambix::Parameter* const* self = &params[index];
@@ -200,10 +197,7 @@ const String Ambix_converterAudioProcessor::getName() const
 
 void Ambix_converterAudioProcessor::parameterValueSet (int, float)
 {
-    // Legacy setParameter() stored the (snapped) value - the parameter object
-    // does that now - swapped the conversion table pointers, and posted a
-    // change message. The tables are derived per block in processBlock(),
-    // the editor polls.
+    // nothing to do: processBlock() derives the tables from the parameters
 }
 
 const String Ambix_converterAudioProcessor::getInputChannelName (int channelIndex) const
@@ -320,8 +314,7 @@ void Ambix_converterAudioProcessor::processBlock (AudioSampleBuffer& buffer, Mid
 
     output_buffer.clear(); // in case of 2d where we might throw away some channels
 
-    // one read per parameter and block; the tables follow from the values
-    // exactly as legacy setChannelSequence() / setNormalizationScheme() did
+    // one read per parameter and block
     const unsigned int* in_ch_seq = acn_ch_map;
     const unsigned int* out_ch_seq = acn_ch_map;
     const unsigned int* in_2d_ch_seq = acn_2d_ch_map;
@@ -446,8 +439,7 @@ void Ambix_converterAudioProcessor::getStateInformation (MemoryBlock& destData)
     // add some attributes to it..
     xml.setAttribute ("box_presets", box_presets_text);
 
-    // same formatting as the legacy members: seq/norm as double, the
-    // switches as bools (the int overload: "0" / "1")
+    // legacy format: seq/norm as double, switches as bool ("0" / "1")
     xml.setAttribute("in_seq_param", (double) params[InSeqParam]->get());
     xml.setAttribute("out_seq_param", (double) params[OutSeqParam]->get());
     xml.setAttribute("in_norm_param", (double) params[InNormParam]->get());
@@ -481,8 +473,7 @@ void Ambix_converterAudioProcessor::setStateInformation (const void* data, int s
 
             box_presets_text = xmlState->getStringAttribute("box_presets", "");
 
-            // legacy restored through setParameterNotifyingHost(): the
-            // side effects, then a host notification - keep both
+            // legacy restore notified the host too - keep that
             params[FlipCsParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("flip_cs_phase"));
             params[FlipParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("flip_param"));
             params[FlopParam]->setValueNotifyingHost((float) xmlState->getDoubleAttribute("flop_param"));

@@ -203,8 +203,7 @@ void SourceTableRow::sliderValueChanged (juce::Slider* s)
 {
     if (! editable) return; // table is read-only in linked mode
 
-    // Inside a drag this only sets the value (the gesture is open); a typed
-    // value gets its own begin / end.
+    // inside a drag the gesture is already open; a typed value gets its own
     if (s == &num_az)
         processor.setParameterFromUi (paramFor (s), (float)((s->getValue() + 180.) / 360.));
     else if (s == &num_el)
@@ -815,8 +814,7 @@ void Ambix_encoderAudioProcessorEditor::sliderValueChanged (juce::Slider* slider
 {
     Ambix_encoderAudioProcessor* ourProcessor = getProcessor();
 
-    // Inside a drag the gesture is already open; a typed value or a
-    // double-click reset gets its own begin / end.
+    // inside a drag the gesture is already open; a typed value or reset gets its own
     if (sliderThatWasMoved == &sld_el)
         ourProcessor->setParameterFromUi (Ambix_encoderAudioProcessor::ElevationParam, (sliderWrap(sld_el) + 180) / 360.f);
     else if (sliderThatWasMoved == &sld_az)
@@ -861,8 +859,7 @@ void Ambix_encoderAudioProcessorEditor::timerCallback()
 
     if (myScopedTryLock.isLocked())
     {
-        // Parameter changes are polled (the audio thread can't post change
-        // messages); changed_ still covers the non-parameter broadcasts.
+        // parameters are polled: the audio thread can't post change messages
         const bool paramsChanged = paramWatcher.changed();
         if (changed_ || paramsChanged)
         {

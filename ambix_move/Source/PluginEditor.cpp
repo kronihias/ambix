@@ -824,8 +824,7 @@ void Ambix_moveAudioProcessorEditor::timerCallback()
     }
 #endif
 
-    // Only touch the controls when a parameter (or the order range) changed:
-    // the host, OSC, a state restore or this editor.
+    // only touch the controls when a parameter or the order range changed
     const bool maxOrderChanged = maxOrder != lastMaxOrder_;
     lastMaxOrder_ = maxOrder;
 

@@ -70,8 +70,7 @@ void SphericalHarmonic::Calc(double phi, double theta)
 
         Chebyshev.Calc(_order, phi);
 
-        // read the members directly - copying them out allocated three
-        // vectors per angle change, on the audio thread for most callers
+        // use the members directly: copies would allocate on the audio thread
         Ymn = Norm.Nmn.cwiseProduct(Legendre.Legendre).cwiseProduct(Chebyshev.Chebyshev);
 
         _phi = phi;

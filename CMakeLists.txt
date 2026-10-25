@@ -157,12 +157,9 @@ apply_juce_patch(
 apply_juce_patch(
     "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_network_advertiser.patch")
 
-# VST3 bypass parameter ID. With the legacy setParameter() API, JUCE's wrapper
-# gives its own bypass parameter the ID numParameters; once a plug-in uses
-# parameter objects it switches to 'byps', which would orphan bypass
-# automation in existing sessions. Opt-in via JUCE_VST3_KEEP_LEGACY_BYPASS_ID
-# (set for every plug-in in Subproject.cmake). tests/test_parameters.py pins
-# the IDs.
+# Keep the legacy VST3 bypass ID (numParameters instead of 'byps') so bypass
+# automation in existing sessions survives the move to parameter objects.
+# Enabled via JUCE_VST3_KEEP_LEGACY_BYPASS_ID in Subproject.cmake.
 apply_juce_patch(
     "${CMAKE_CURRENT_SOURCE_DIR}/JUCE_patches/juce_vst3_legacy_bypass_id.patch")
 

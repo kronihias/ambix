@@ -204,9 +204,8 @@ Ambix_moveAudioProcessor::Ambix_moveAudioProcessor() :
 
     const int numsamples = (int) Carth_coord.rows();
 
-    // For every possible input order, the undistorted SH basis at the
-    // sampling points and its pseudo-inverse - this stays fixed regardless
-    // of listener position.
+    // undistorted SH basis and its pseudo-inverse per input order
+    // (independent of listener position)
     Sh_matrix_inv_for_order.resize (AMBI_ORDER + 1);
 
     for (int order = 0; order <= AMBI_ORDER; ++order)
@@ -261,8 +260,8 @@ Ambix_moveAudioProcessor::Ambix_moveAudioProcessor() :
 Ambix_moveAudioProcessor::~Ambix_moveAudioProcessor()
 {
 #ifdef WITH_OSC
-    // Stop the OSC thread first: its callback would otherwise run into a
-    // processor that is already being taken apart (pure virtual call).
+    // stop OSC first: its callback could otherwise hit a half-destroyed
+    // processor (pure virtual call)
     OSCReceiver::removeListener (this);
     OSCReceiver::disconnect();
 #endif
@@ -530,10 +529,8 @@ void Ambix_moveAudioProcessor::calcParams()
     const float transl_enabled_param = params[TranslEnabledParam]->get();
     const float rot_enabled_param    = params[RotEnabledParam]->get();
 
-    // The orders this computation uses, from the parameters as they are now
-    // (they may be set from another thread meanwhile), capped to the active
-    // channel count from the host. Computed afresh each block rather than
-    // written back, so a concurrent set can't be lost.
+    // orders read afresh each block and capped to the host's channel count;
+    // never written back, so a concurrent set from another thread isn't lost
     int inOrder  = (int) round (params[InOrderParam]->get()  * AMBI_ORDER);
     int outOrder = (int) round (params[OutOrderParam]->get() * AMBI_ORDER);
 
@@ -817,8 +814,7 @@ void Ambix_moveAudioProcessor::getStateInformation (MemoryBlock& destData)
 {
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    // same attributes and order as the legacy index-based API wrote, so
-    // projects stay readable by older versions
+    // legacy attribute layout, so older versions can read projects
     for (int i = 0; i < totalNumParams; ++i)
         xml.setAttribute (String (i), params[i]->get());
 

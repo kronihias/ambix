@@ -45,7 +45,7 @@ private:
     int _n; // n
     double _phi;
 
-    // scratch for Calc - members so a changed angle doesn't hit the heap
+    // Calc scratch, kept as members to avoid allocating per angle change
     Eigen::VectorXd sinus, cosinus;
     
 };

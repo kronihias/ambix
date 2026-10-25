@@ -376,8 +376,7 @@ void Ambix_rotator_zAudioProcessor::getStateInformation (MemoryBlock& destData)
 
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    // same attribute as the legacy index-based API wrote, so projects stay
-    // readable by older versions
+    // same attribute as the legacy API wrote, readable by older versions
     xml.setAttribute ("0", rot_z_param->get());
 
     // then use this helper function to stuff it into the binary blob and return it..

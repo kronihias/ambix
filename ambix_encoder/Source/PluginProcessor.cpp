@@ -452,9 +452,8 @@ void Ambix_encoderAudioProcessor::linkedToUnlinkedSnapshot()
 {
     // Capture the linked-mode auto-spread into each source's per-source params
     // so the user's first frame in unlinked mode shows the same layout.
-    // Written like the legacy code wrote the members: silently (no host
-    // notification), but through the parameter objects so they - and with
-    // them the host's reads and the saved state - hold the snapshot.
+    // silently (no host notification), as legacy did, but through the
+    // parameter objects so host reads and the saved state see the snapshot
     auto setSilently = [this] (int src, int sub, float v)
     {
         paramObjs[(size_t) sourceParamIndex (src, sub)]->restore (v);
@@ -1278,8 +1277,7 @@ void Ambix_encoderAudioProcessor::getStateInformation (MemoryBlock& destData)
 {
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    // Same attributes, in the same order and format, as the legacy
-    // index-based API wrote.
+    // attributes as the legacy index-based API wrote them
     for (int i = 0; i < kTotalParams; ++i)
         xml.setAttribute (String(i), paramObjs[(size_t) i]->get());
 
@@ -1367,8 +1365,7 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
         }
         else
         {
-            // restore(): the legacy setParameter() semantics - side effects
-            // run (incl. Set* driving Az/El), no host notification of its own.
+            // restore(): side effects run (incl. Set* driving Az/El), no host notification
             for (int i = 0; i < kTotalParams; ++i)
             {
                 if (xmlState->hasAttribute (String(i)))
@@ -1423,8 +1420,8 @@ void Ambix_encoderAudioProcessor::setStateInformation (const void* data, int siz
             editor_width  = xmlState->getIntAttribute (wTag, editor_width);
             editor_height = xmlState->getIntAttribute (hTag, editor_height);
         }
-        // No applyParamsToEncoders() here: it raced the audio thread, and
-        // processBlock() recomputes the encoder targets every block anyway.
+        // no applyParamsToEncoders(): it races the audio thread, which
+        // recomputes the encoder targets every block anyway
     }
 }
 

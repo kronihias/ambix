@@ -522,9 +522,8 @@ void Ambix_binauralAudioProcessorEditor::sliderValueChanged (Slider* sliderThatW
     {
         auto* param = ourProcessor->gain_param;
 
-        // drags, wheel, text entry and double-click arrive inside the
-        // slider's drag notifications; anything else (keys) gets a gesture
-        // of its own
+        // drags, wheel, text entry and double-click come within the slider's
+        // drag notifications; anything else (keys) gets a gesture of its own
         if (! gainGesture)
             param->beginChangeGesture();
 

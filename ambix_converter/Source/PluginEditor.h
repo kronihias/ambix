@@ -55,8 +55,7 @@ public:
 
     void changeListenerCallback (ChangeBroadcaster *source) override;
 
-    // polls the parameters (the processor no longer posts change messages
-    // for them)
+    // polls the parameters (no change messages from the audio thread)
     void timerCallback() override;
 
 private:

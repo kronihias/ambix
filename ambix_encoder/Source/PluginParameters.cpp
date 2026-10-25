@@ -36,9 +36,7 @@ namespace
 
 void Ambix_encoderAudioProcessor::addParameters()
 {
-    // Index order, starting values as the constructor sets the shadow copies.
-    // Units stay empty: the legacy getParameterLabel() never overrode the
-    // base class, so no host ever saw them.
+    // no units: the legacy getParameterLabel() never returned any
     for (int i = 0; i < kTotalParams; ++i)
     {
         float initial = 0.f;
@@ -105,13 +103,11 @@ void Ambix_encoderAudioProcessor::setParameterFromUi (int index, float newValue)
     }
 }
 
-// The legacy setParameter() body, minus sendChangeMessage(): the parameter
-// already holds newValue, the shadow copies still hold the previous values.
+// The parameter already holds newValue, the shadows still the previous value.
 void Ambix_encoderAudioProcessor::parameterValueSet (int index, float newValue)
 {
-    // Shadows take what the parameter holds rather than newValue: if two
-    // threads set the same parameter at once, the shadow then still ends up
-    // where the parameter (and so the saved state) did.
+    // take the stored value, not newValue: with concurrent sets the shadow
+    // still ends up where the parameter (and the saved state) did
     const float stored = paramObjs[index]->get();
 
     if (index >= SourceParamsBase && index < kTotalParams)
@@ -213,8 +209,7 @@ void Ambix_encoderAudioProcessor::parameterValueSet (int index, float newValue)
     }
 }
 
-// The legacy getParameterText(), for any value. MoveAzimuth / MoveElevation
-// read the current MoveSpeed, as they always did.
+// The legacy display texts. MoveAzimuth / MoveElevation depend on MoveSpeed.
 juce::String Ambix_encoderAudioProcessor::parameterText (int index, float value) const
 {
     String text;

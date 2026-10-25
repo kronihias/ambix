@@ -6,29 +6,16 @@
 #include <cstdint>
 #include <functional>
 
-// Parameter objects for plug-ins that used JUCE's legacy setParameter() API.
-//
-// The point is to change nothing a host can see while moving off that API:
-//  - the parameter ID is the index as a string, which is what JUCE's wrappers
-//    hashed for a legacy parameter, so VST3/AU automation keeps its target,
-//  - every parameter stays a plain 0..1 float, so step counts and the
-//    normalised mapping of switch-like parameters are untouched,
-//  - every value set on a parameter reaches the plug-in synchronously, on the
-//    thread that set it, in the same place the setParameter() override used
-//    to run. Side effects therefore happen in the same order as before, for
-//    host automation (audio thread), state restore, editors and OSC alike.
-// What does change: the reported default is the value a fresh instance
-// starts at (legacy parameters reported 0), and hosts can ask for the text of
-// any value, not just the current one.
-//
-// tests/test_parameters.py and tests/test_parameter_sweep.py hold a plug-in
-// to this.
+// Parameter objects replacing JUCE's legacy setParameter() API without
+// changing what a host sees: the ID is the index as a string (what JUCE
+// hashed for legacy parameters, so saved automation keeps its target), values
+// stay plain 0..1 floats, and each set reaches the plug-in synchronously on
+// the calling thread. Pinned by tests/test_parameters.py.
 
 namespace ambix
 {
 
-// Same hashing as JUCE's VST3 wrapper (its default when the plug-in client
-// config hasn't been seen in this translation unit).
+// Must match the hashing of JUCE's VST3 wrapper.
 #ifdef JUCE_USE_STUDIO_ONE_COMPATIBLE_PARAMETERS
  constexpr bool kStudioOneCompatibleIds = JUCE_USE_STUDIO_ONE_COMPATIBLE_PARAMETERS;
 #else
@@ -39,14 +26,12 @@ struct ParameterOwner
 {
     virtual ~ParameterOwner() = default;
 
-    // Called for every value set on one of the owner's parameters, from
-    // whatever thread set it - often the audio thread, so it has to be
-    // real-time safe: no locks, no allocation, no message posting.
+    // Called on whatever thread set the value, often the audio thread:
+    // must be real-time safe (no locks, allocation or message posting).
     virtual void parameterValueSet (int index, float newValue) = 0;
 
-    // Bumped after every set. An editor compares it from its own timer
-    // instead of listening to a ChangeBroadcaster that the audio thread
-    // would have to post to.
+    // Bumped after every set; editors poll it so the audio thread never
+    // has to post a change message.
     std::atomic<uint32_t> parameterGeneration { 0 };
 };
 
@@ -55,13 +40,9 @@ class Parameter : public juce::AudioParameterFloat
 public:
     using TextFunction = std::function<juce::String (float value, int maximumStringLength)>;
 
-    // For a parameter whose legacy setParameter() stored a quantised value
-    // (a switch kept as 0 / 0.5 / 1, say): maps any 0..1 value to the one it
-    // stores. Applied before the value is stored, so getValue(), the text and
-    // the side effects all see the snapped value - as getParameter() did -
-    // while the host still sees a continuous parameter (no step count).
-    // It may capture the owner, e.g. to keep the current value for inputs
-    // the legacy code ignored.
+    // Quantises a value before it is stored (e.g. a 0 / 0.5 / 1 switch), so
+    // getValue(), text and side effects see the snapped value while the host
+    // still sees a continuous parameter without a step count.
     using SnapFunction = std::function<float (float)>;
 
     // parameterId: leave empty for the index as a string (see idFor()).
@@ -76,10 +57,9 @@ public:
     {
     }
 
-    // State restore. Always runs the owner's side effects, even for the value
-    // the parameter already holds, and doesn't notify the host - exactly what
-    // calling the legacy setParameter() from setStateInformation() did.
-    // (operator= skips equal values; setValueNotifyingHost() notifies.)
+    // State restore: runs the side effects even for an unchanged value and
+    // doesn't notify the host (operator= skips equal values;
+    // setValueNotifyingHost() notifies).
     void restore (float newValue)
     {
         static_cast<juce::AudioProcessorParameter&> (*this).setValue (newValue);
@@ -87,15 +67,10 @@ public:
 
     int getIndex() const noexcept { return index; }
 
-    // The ID for parameter `parameterIndex` of a plug-in with `numParameters`
-    // parameters: the index as a string, except where that would clash on
-    // VST3. JUCE's VST3 wrapper hashes the string to the VST3 ID, and gives
-    // its own bypass parameter the ID numParameters (legacy behaviour, kept by
-    // juce_vst3_legacy_bypass_id.patch). The single-digit strings hash to
-    // 48..57, so in a plug-in with 48..57 parameters one of them lands on the
-    // bypass and becomes unreachable. That one gets a derived ID - on VST3
-    // only, as AU has no such bypass and keeps its ID - while the bypass keeps
-    // its ID, so existing bypass automation still finds it.
+    // The index as a string, except on VST3 where its hash would equal the
+    // bypass ID (numParameters, see juce_vst3_legacy_bypass_id.patch): the
+    // single digits hash to 48..57, so with 48..57 parameters one would
+    // collide. That one gets a derived ID; the bypass keeps its own.
     static juce::String idFor (const juce::AudioProcessor& processor, int parameterIndex, int numParameters)
     {
         const juce::String plain (parameterIndex);
@@ -113,8 +88,6 @@ public:
         return plain;
     }
 
-    // The parameter at `parameterIndex` of `processor`, or nullptr if that
-    // isn't an ambix::Parameter.
     static Parameter* at (juce::AudioProcessor& processor, int parameterIndex)
     {
         auto& params = processor.getParameters();
@@ -146,8 +119,7 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Parameter)
 };
 
-// For editors: true once per change of the owner's parameters since the last
-// call. Message thread only.
+// For editors, message thread only.
 class ParameterChangeWatcher
 {
 public:

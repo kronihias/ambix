@@ -831,8 +831,7 @@ void Ambix_directional_loudnessAudioProcessorEditor::timerCallback()
     auto* p = getProcessor();
     if (p == nullptr) return;
 
-    // parameters: polled here, the processor no longer posts change
-    // messages for them
+    // parameters are polled
     if (paramWatcher.changed())
         updateFilters(false);
 

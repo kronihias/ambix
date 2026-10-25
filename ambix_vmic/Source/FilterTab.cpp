@@ -245,9 +245,7 @@ void FilterTab::setFilter(float az, float el, bool shape, float width, float hei
     if (dragging != &sld_el)
         sld_el.setValue(el, dontSendNotification);
 
-    // No notification: showing a value is not the user choosing one. (It
-    // used to echo it back, which rewrote a host value other than 0 / 1 and,
-    // now that edits carry gestures, would punch in during automation.)
+    // No notification: showing a value is not the user choosing one.
     box_shape.setSelectedId(shape ? 2 : 1, dontSendNotification);
 
     sld_h.setEnabled(shape);

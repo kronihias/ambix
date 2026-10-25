@@ -91,9 +91,8 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    // What the legacy setParameter() did with a value: store it and run its
-    // side effects. Called synchronously by ambix::Parameter on the thread
-    // that set the value (often the audio thread) - real-time safe.
+    // stores the value and runs its side effects; called on the thread that
+    // set the value (often the audio thread) - keep it real-time safe
     void parameterValueSet (int index, float newValue) override;
 
     ambix::Parameter* getParam (int index) const noexcept
@@ -101,9 +100,8 @@ public:
         return juce::isPositiveAndBelow (index, kTotalParams) ? paramObjs[(size_t) index] : nullptr;
     }
 
-    // Host gestures for editor / UI edits (message thread only). Counted per
-    // parameter, so overlapping UI edits of the same parameter (a slider
-    // drag plus a panner drag, two touches) send one begin / end pair.
+    // Host gestures for UI edits (message thread only), counted per parameter
+    // so overlapping edits (slider + panner drag, two touches) send one pair.
     void beginGesture (int index);
     void endGesture   (int index);
     // A single UI edit: begin, set + notify the host, end.
@@ -173,7 +171,7 @@ public:
 
     bool isLinked() const { return linked_param >= 0.5f; }
 
-    // Raw (normalised) value of a parameter, as the legacy getParameter().
+    // raw (normalised) value
     float getParamValue (int index) const { return getParam (index) != nullptr ? getParam (index)->get() : 0.f; }
 
     // Source-layout import / export. JSON format follows SPARTA's
@@ -312,7 +310,7 @@ private:
 
     // Creates the parameter objects (PluginParameters.cpp).
     void addParameters();
-    // Display text for `value` of parameter `index` (the legacy getParameterText()).
+    // display text for `value` of parameter `index`
     juce::String parameterText (int index, float value) const;
     static int activeSourcesFromNorm (float v);
 
@@ -321,11 +319,8 @@ private:
 
     double SampleRate;
 
-    // Shadow copies of the parameter values, written only by
-    // parameterValueSet() (exactly where the legacy setParameter() stored
-    // them). The side effects need the previous value (the parameter
-    // already holds the new one when valueChanged() fires), and the rest of
-    // the code reads these from any thread, hence atomics.
+    // Shadow copies, written only by parameterValueSet(): the side effects
+    // need the previous value, and any thread reads them, hence atomics.
     // global (linked-mode) params
     std::atomic<float> azimuth_param;
     std::atomic<float> elevation_param;
@@ -403,10 +398,8 @@ private:
 };
 
 //==============================================================================
-// Host gestures for drags on the panners (message thread only). A touch's
-// gesture on a parameter opens the first time that touch moves it and closes
-// on mouse-up, so it follows whatever the drag ends up writing (linked or
-// per-source position, width).
+// Host gestures for panner drags (message thread only): a touch opens one the
+// first time it moves a parameter and closes its gestures on mouse-up.
 class PannerGestures
 {
 public:

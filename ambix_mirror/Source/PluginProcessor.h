@@ -154,8 +154,7 @@ public:
 
 private:
 
-    // what the legacy setParameter() did besides storing the value; runs
-    // synchronously on the thread that set the parameter
+    // side effects of a set; runs synchronously on the thread that set it
     void parameterValueSet (int index, float newValue) override;
 
     void SwitchPreset (float presetValue);

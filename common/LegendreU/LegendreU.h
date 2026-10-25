@@ -28,8 +28,8 @@
 class LegendreU {
     
 public:
-    // Fixed capacity, so recomputing for another order (maxre does it on the
-    // audio thread) never touches the heap. Orders above kMaxOrder are clamped.
+    // Fixed capacity: no heap use when the order changes on the audio thread.
+    // Higher orders are clamped.
     static constexpr int kMaxOrder = 63;
     using Vector = Eigen::Matrix<double, Eigen::Dynamic, 1, 0, kMaxOrder + 1, 1>;
 

@@ -142,8 +142,7 @@ Ambix_warpAudioProcessor::Ambix_warpAudioProcessor() :
         sph_h_out_for_order[(size_t) order].Init(order);
     }
 
-    // size the work matrices once here (independent of out order) so
-    // calcParams() does not allocate
+    // sized once here so calcParams() does not allocate
     Sh_matrix_mod.setZero(numsamples,AMBI_CHANNELS);
     pre_emphasis.setOnes(numsamples);
     Sph_coord_mod.resize(numsamples,2);
@@ -278,10 +277,8 @@ void Ambix_warpAudioProcessor::calcParams()
     const float theta_curve_param = params[ThetaCurveParam]->get();
     const float preemp_param      = params[PreEmpParam]->get();
 
-    // The orders this computation uses, from the parameters as they are now
-    // (they may be set from another thread meanwhile), capped to the active
-    // channel count from the host. Computed afresh each block rather than
-    // written back, so a concurrent set can't be lost.
+    // orders read afresh each block and capped to the host's channel count;
+    // never written back, so a concurrent set from another thread isn't lost
     int inOrder  = (int)round(params[InOrderParam]->get()*AMBI_ORDER);
     int outOrder = (int)round(params[OutOrderParam]->get()*AMBI_ORDER);
 
@@ -539,8 +536,7 @@ void Ambix_warpAudioProcessor::getStateInformation (MemoryBlock& destData)
 
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    // add some attributes to it.. (same attributes and order as the legacy
-    // index-based API wrote, so projects stay readable by older versions)
+    // add some attributes to it.. (legacy layout, so older versions can read projects)
     for (int i=0; i < totalNumParams; i++)
     {
         xml.setAttribute (String(i), params[i]->get());

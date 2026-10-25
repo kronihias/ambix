@@ -104,8 +104,6 @@ void Ambix_mirrorAudioProcessor::SwitchPreset (float presetValue)
 
     int active_preset = (int)(presetValue * NUM_PRESETS);
 
-    // the preset name (Preset's text) is presetName (presetValue)
-
     // first set all zero
     if (active_preset > 1)
     {
@@ -444,8 +442,7 @@ void Ambix_mirrorAudioProcessor::getStateInformation (MemoryBlock& destData)
 
     XmlElement xml ("MYPLUGINSETTINGS");
 
-    // add some attributes to it.. (same attributes and order as the legacy
-    // index-based API wrote, so projects stay readable by older versions)
+    // add some attributes to it.. (legacy names and order, readable by older versions)
     for (int i=0; i < totalNumParams; i++)
     {
         xml.setAttribute (String(i), params[i]->get());
@@ -467,8 +464,8 @@ void Ambix_mirrorAudioProcessor::setStateInformation (const void* data, int size
         // make sure that it's actually our type of XML object..
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
-            // restore() runs the side effects like the legacy setParameter()
-            // did; the preset comes last and so overrides the others
+            // restore() runs the side effects; the preset comes last and so
+            // overrides the others
             for (int i=0; i < totalNumParams; i++) {
                 params[i]->restore ((float)xmlState->getDoubleAttribute(String(i)));
             }

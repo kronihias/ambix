@@ -997,9 +997,8 @@ void Ambix_binauralAudioProcessor::LoadConfiguration(File configFile)
 
     ambi_spk_buffer_.setSize(_AmbiSpeakers.size(), BufferSize);
 
-    // the speakers were built with the gain as it was then - have processBlock
-    // apply the current one (the audio thread doesn't touch _appliedGain
-    // while !configLoaded)
+    // the speakers were built with the gain of that time - have processBlock
+    // apply the current one (it leaves _appliedGain alone while !configLoaded)
     _appliedGain = -1.f;
 
     configLoaded = true;

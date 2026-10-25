@@ -58,7 +58,6 @@ public:
     //==============================================================================
     const String getName() const override;
 
-    // the parameter objects, indexed by the Parameters enum below
     ambix::Parameter& getParam (int index) const { return *params[index]; }
 
     const String getInputChannelName (int channelIndex) const override;
@@ -110,18 +109,10 @@ public:
     String box_presets_text; // for save state...
 
 private:
-    // legacy setParameter() body: nothing left to do here, the conversion
-    // tables are picked from the parameter values in processBlock()
     void parameterValueSet (int index, float newValue) override;
 
-    // The parameter objects (owned by AudioProcessor). Their stored values
-    // are what the legacy members held:
-    //   seq/norm: 0, 0.5 or 1 (channel sequence acn, fuma, sid /
-    //             normalization sn3d, fuma, n3d)
-    //   switches: 0 or 1 (flip condon-shortley phase -> apply (-1)^m to
-    //             output channels, mirror left-right, front-back,
-    //             ceiling-floor, input is 2d (fill with empty channels),
-    //             output is 2d (channels will be thrown away))
+    // owned by AudioProcessor; seq/norm hold 0, 0.5 or 1, switches 0 or 1
+    // (the values the legacy members held)
     ambix::Parameter* params[totalNumParams] {};
 
     AudioSampleBuffer output_buffer;

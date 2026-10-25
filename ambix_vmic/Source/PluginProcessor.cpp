@@ -37,9 +37,8 @@ Ambix_vmicAudioProcessor::Ambix_vmicAudioProcessor() :
     _param_changed(false),
     output_buffer(AMBI_CHANNELS,256)
 {
-    // init parameters - order, names, texts and initial values as the
-    // legacy index-based API had them. Every value is stored as set (no
-    // snapping); the texts format it the way getParameterText() did.
+    // init parameters - order, names, texts and defaults as the legacy API had
+    // them; values are stored unsnapped
     auto degText360 = [] (float v, int) // center_sph was a double array
     {
         String text = String(((double) v - 0.5)*360).substring(0, 5);
@@ -100,9 +99,7 @@ const String Ambix_vmicAudioProcessor::getName() const
 
 void Ambix_vmicAudioProcessor::parameterValueSet (int index, float)
 {
-    // the value itself lives in the parameter object; calcParams() reads it.
-    // Every set recalculates, as legacy setParameter() did - also a restore
-    // of the value the parameter already had.
+    // every set recalculates, also a restore of an unchanged value
     int filter_id = (int)floor(index/PARAMS_PER_FILTER);
 
     // flag after the write so the audio thread picks up the new value
@@ -276,8 +273,7 @@ void Ambix_vmicAudioProcessor::calcParams()
 
     if (_param_changed.exchange(false))
     {
-        // one read of every parameter (atomics), in place of the arrays
-        // legacy setParameter() wrote from the setting thread
+        // one read of every parameter (atomics)
         ArrayParam shape;
         ArrayParam width;
         ArrayParam height;
@@ -464,7 +460,7 @@ void Ambix_vmicAudioProcessor::setStateInformation (const void* data, int sizeIn
         // make sure that it's actually our type of XML object..
         if (xmlState->hasTagName ("MYPLUGINSETTINGS"))
         {
-            // legacy setParameter(): side effects, no host notification
+            // side effects, no host notification
             for (int i=0; i < PARAMS_PER_FILTER*NUM_FILTERS_VMIC; i++) {
                 params[i]->restore((float) xmlState->getDoubleAttribute(String(i)));
             }

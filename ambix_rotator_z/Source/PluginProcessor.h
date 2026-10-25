@@ -93,9 +93,8 @@ public:
 
 private:
 
-    // 0..1 -> -180..+180 deg. A parameter object, so the audio thread reads
-    // an atomic; the ID "0" is what the legacy index-based API exported, so
-    // VST3/AU automation in existing sessions still finds it.
+    // 0..1 -> -180..+180 deg. ID "0" is what the legacy API exported, so
+    // automation in existing sessions still finds it.
     AudioParameterFloat* rot_z_param;
 
     // actual values
