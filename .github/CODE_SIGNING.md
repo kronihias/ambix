@@ -9,7 +9,7 @@ The workflow runs on two triggers:
 - **`release: published`** — when you publish a GitHub release, both jobs run automatically and attach the resulting `.pkg` (macOS) and `.exe` (Windows) installers to the release.
 - **`workflow_dispatch`** — manual trigger from the *Actions* tab. Lets you pick any branch and choose whether to sign. Outputs are uploaded as workflow artifacts (not attached to a release).
 
-Both jobs are independent and run in parallel (`build-macos` on `macos-14`, `build-windows` on `windows-2022`).
+Both jobs are independent and run in parallel (`build-macos` on `macos-15`, `build-windows` on `windows-2022`).
 
 ## macOS code signing & notarization
 

@@ -314,7 +314,7 @@ INCLUDE_DIRECTORIES ( BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/common/LegendreU )
 
 # Eigen3 ships as a git submodule under eigen/ pinned to 3.4.0. Forcing
 # EIGEN3_INCLUDE_DIR up front bypasses any ambient/system installs (including
-# the macos-14 brew bottle whose Macros.h tripped FindEigen3's version probe).
+# the macos-15 brew bottle whose Macros.h tripped FindEigen3's version probe).
 set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/eigen" CACHE PATH "Eigen3 include directory" FORCE)
 find_package(Eigen3 REQUIRED)
 

@@ -20,7 +20,7 @@ permissions:
 jobs:
   # ============================================================================
   build-macos:
-    runs-on: macos-14    # Apple Silicon; cross-compiles arm64 + x86_64 universal
+    runs-on: macos-15    # Apple Silicon; cross-compiles arm64 + x86_64 universal
     timeout-minutes: 90
     env:
       # Effective sign flag: always true for release events; honours dispatch
