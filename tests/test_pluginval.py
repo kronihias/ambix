@@ -31,14 +31,14 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from conftest import ALL_PLUGINS, REPO_ROOT, VST3_DIR, vst3, vst3_load_path
+from conftest import ALL_PLUGINS, BUILD_DIR, REPO_ROOT, VST3_DIR, vst3, vst3_load_path
 
 # scripts/get_pluginval.py owns where the validator lives and how it's fetched.
 sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 from get_pluginval import find_pluginval
 
 
-LOG_DIR = os.path.join(REPO_ROOT, "_build", "pluginval-logs")
+LOG_DIR = os.path.join(BUILD_DIR, "pluginval-logs")
 
 STRICTNESS = os.environ.get("PLUGINVAL_STRICTNESS", "10")
 # Editor tests are skipped by default: ambix_encoder's editor opens an

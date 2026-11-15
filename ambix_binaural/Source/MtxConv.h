@@ -374,7 +374,7 @@ private:
 
     bool                isprocessing_;      // true = Processing is active
 
-    bool                configuration_;     // isconfigured
+    std::atomic<bool>   configuration_;     // isconfigured
 
     CriticalSection     lock_;              // lock critical section
 

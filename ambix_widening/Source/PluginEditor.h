@@ -39,6 +39,8 @@ public:
     void paint (Graphics& g) override;
     void resized() override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void sliderDragStarted (Slider* slider) override;
+    void sliderDragEnded (Slider* slider) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
     void changeListenerCallback (ChangeBroadcaster* source) override;
     void timerCallback() override;
@@ -61,6 +63,15 @@ private:
     TooltipWindow tooltipWindow;
 
     bool _changed;
+
+    ambix::ParameterChangeWatcher paramWatcher;
+    Slider* gestureSlider = nullptr; // slider whose host gesture is open
+    bool depthGesture = false;       // the visualizer's mod-depth drag gesture is open
+    bool refreshPending = false;     // a busy control missed a refresh
+
+    ambix::Parameter* parameterFor (Slider* s) const;
+    static void setInGesture (ambix::Parameter* p, float value);
+    bool isBusy (Slider& s) const;
     int  lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
 
     Ambix_wideningAudioProcessor* getProcessor() const

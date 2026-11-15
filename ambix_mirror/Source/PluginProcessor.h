@@ -21,6 +21,7 @@
 #define __PLUGINPROCESSOR_H_3C9F642__
 
 #include "JuceHeader.h"
+#include "../../common/AmbixParameters.h"
 #include "ambix_buses.h"
 
 #define NUM_PRESETS 8
@@ -77,6 +78,7 @@ inline float ParamToDB(float param)
 /**
 */
 class Ambix_mirrorAudioProcessor  : public AudioProcessor,
+                                    public ambix::ParameterOwner,
                                     public ChangeBroadcaster
 {
 public:
@@ -103,14 +105,6 @@ public:
 
     //==============================================================================
     const String getName() const override;
-
-    int getNumParameters() override;
-
-    float getParameter (int index) override;
-    void setParameter (int index, float newValue) override;
-
-    const String getParameterName (int index) override;
-    const String getParameterText (int index) override;
 
     const String getInputChannelName (int channelIndex) const override;
     const String getOutputChannelName (int channelIndex) const override;
@@ -152,31 +146,24 @@ public:
     void getStateInformation (MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    void SwitchPreset();
+    // the parameter at `index` (one of Parameters)
+    ambix::Parameter& param (int index) const { return *params[index]; }
+
+    // display name of the preset a Preset value selects ("" for none)
+    static const char* presetName (float presetValue);
 
 private:
 
+    // side effects of a set; runs synchronously on the thread that set it
+    void parameterValueSet (int index, float newValue) override;
+
+    void SwitchPreset (float presetValue);
+
     void calcParams();
 
-    // actual values
-    float x_even_param;
-    float x_even_inv_param;
-    float x_odd_param;
-    float x_odd_inv_param;
-    float y_even_param;
-    float y_even_inv_param;
-    float y_odd_param;
-    float y_odd_inv_param;
-    float z_even_param;
-    float z_even_inv_param;
-    float z_odd_param;
-    float z_odd_inv_param;
-    float circular_param;
-    float circular_inv_param;
-
-    float preset_param;
-
-    String preset_name;
+    // values live in the parameter objects (atomic, so the audio thread can
+    // read them while the editor or host sets them)
+    ambix::Parameter* params[totalNumParams] {};
 
     Array<float> gain_factors;
 

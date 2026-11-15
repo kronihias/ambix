@@ -32,7 +32,8 @@ class Ambix_mirrorAudioProcessorEditor  : public AudioProcessorEditor,
                                           public ComboBox::Listener,
                                           public Slider::Listener,
                                           public Button::Listener,
-                                          public ChangeListener
+                                          public ChangeListener,
+                                          public Timer
 {
 public:
     //==============================================================================
@@ -46,11 +47,15 @@ public:
     void resized() override;
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void sliderDragStarted (Slider* slider) override;
+    void sliderDragEnded (Slider* slider) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
 
     void getParamsFromHost();
 
     void changeListenerCallback (ChangeBroadcaster *source) override;
+
+    void timerCallback() override;
 
     // Binary resources:
     static const char* coordinate_system_png;
@@ -63,6 +68,16 @@ private:
     {
         return static_cast <Ambix_mirrorAudioProcessor*> (getAudioProcessor());
     }
+    // parameter index a slider controls, or -1
+    int paramForSlider (Slider* slider) const;
+
+    // A value set from the editor, wrapped in a host gesture of its own
+    // unless one is already open for that parameter (a slider drag).
+    void setParameterFromEditor (int index, float newValue);
+
+    ambix::ParameterChangeWatcher paramWatcher;
+    bool gestureOpen[Ambix_mirrorAudioProcessor::totalNumParams] = {};
+
     TooltipWindow tooltipWindow;
     int lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
 

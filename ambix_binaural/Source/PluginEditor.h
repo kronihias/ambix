@@ -62,6 +62,8 @@ public:
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
 
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void sliderDragStarted (Slider* slider) override;
+    void sliderDragEnded (Slider* slider) override;
 
     static void menuItemChosenCallback (int result, Ambix_binauralAudioProcessorEditor* demoComponent);
 
@@ -116,6 +118,12 @@ private:
     OwnedArray<MyMeterScale> _scales;
 
     int _width;
+
+    ambix::ParameterChangeWatcher paramWatcher;
+    bool gainGesture = false;        // sld_gain's host gesture is open
+    bool gainRefreshPending = false; // sld_gain missed a refresh while busy
+
+    void refreshGainSlider();
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Ambix_binauralAudioProcessorEditor)
 };

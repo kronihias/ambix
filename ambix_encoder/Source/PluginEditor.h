@@ -38,9 +38,12 @@ class SourceTableRow : public juce::Component,
 {
 public:
     SourceTableRow (Ambix_encoderAudioProcessor& p, int sourceIndex);
+    ~SourceTableRow() override;
     void resized() override;
     void paint   (juce::Graphics& g) override;
     void sliderValueChanged (juce::Slider* s) override;
+    void sliderDragStarted  (juce::Slider* s) override;
+    void sliderDragEnded    (juce::Slider* s) override;
     void buttonClicked      (juce::Button* b) override;
 
     void refreshFromProcessor();
@@ -53,6 +56,9 @@ private:
     juce::TextButton   btn_solo, btn_mute;
     juce::Label        lbl;
     bool editable { true };
+    int  dragParam { -1 }; // parameter in a host gesture from a number-box drag
+
+    int paramFor (juce::Slider* s) const;
 };
 
 // Column header for the source table. Clicking the S or M column resets
@@ -86,6 +92,8 @@ public:
     void paint (juce::Graphics& g) override;
     void resized() override;
     void sliderValueChanged (juce::Slider* sliderThatWasMoved) override;
+    void sliderDragStarted (juce::Slider* slider) override;
+    void sliderDragEnded   (juce::Slider* slider) override;
     void buttonClicked (juce::Button* buttonThatWasClicked) override;
     void comboBoxChanged (juce::ComboBox* box) override;
 
@@ -171,7 +179,11 @@ private:
     juce::ResizableCornerComponent resizer { this, &resizeLimits };
     juce::ComponentBoundsConstrainer resizeLimits;
 
-    bool changed_;
+    bool changed_; // non-parameter changes (channel count, OSC/config, view options)
+    ambix::ParameterChangeWatcher paramWatcher; // parameter changes, polled from timerCallback()
+    juce::Array<int> dragGestures; // parameters in a host gesture from a slider drag
+
+    int paramForSlider (juce::Slider* s) const;
     int  lastChanKey_ = -1; // cached (in<<16|out) channel count; refresh order title / source range only on change
     bool _hammerView = false;
 

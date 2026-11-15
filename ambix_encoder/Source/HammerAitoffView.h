@@ -22,7 +22,7 @@ class HammerAitoffView : public juce::Component,
 {
 public:
     HammerAitoffView();
-    ~HammerAitoffView() override = default;
+    ~HammerAitoffView() override;
 
     void setProcessor (Ambix_encoderAudioProcessor* p);
 
@@ -75,6 +75,7 @@ private:
     // index, so storing one puck index per source means multiple fingers
     // can drag separate pucks at the same time on touch displays.
     std::map<int, int> draggingByTouchIndex;
+    PannerGestures gestures;
 
     // Index of the puck currently rendered in "dragging" colour (orange).
     // Tracks the most recently grabbed puck across all touches.

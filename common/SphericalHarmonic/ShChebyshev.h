@@ -44,6 +44,9 @@ private:
     
     int _n; // n
     double _phi;
+
+    // Calc scratch, kept as members to avoid allocating per angle change
+    Eigen::VectorXd sinus, cosinus;
     
 };
 

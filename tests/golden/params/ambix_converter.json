@@ -1,0 +1,415 @@
+{
+ "displayed": {
+  "0": {
+   "48": {
+    "text": "ACN",
+    "value": 0
+   },
+   "49": {
+    "text": "ACN",
+    "value": 0
+   },
+   "50": {
+    "text": "SN3D",
+    "value": 0
+   },
+   "51": {
+    "text": "SN3D",
+    "value": 0
+   },
+   "52": {
+    "text": "Off",
+    "value": 0
+   },
+   "53": {
+    "text": "Off",
+    "value": 0
+   },
+   "54": {
+    "text": "Off",
+    "value": 0
+   },
+   "55": {
+    "text": "Off",
+    "value": 0
+   },
+   "56": {
+    "text": "No",
+    "value": 0
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  },
+  "0.25": {
+   "48": {
+    "text": "ACN",
+    "value": 0
+   },
+   "49": {
+    "text": "ACN",
+    "value": 0
+   },
+   "50": {
+    "text": "SN3D",
+    "value": 0
+   },
+   "51": {
+    "text": "SN3D",
+    "value": 0
+   },
+   "52": {
+    "text": "Off",
+    "value": 0
+   },
+   "53": {
+    "text": "Off",
+    "value": 0
+   },
+   "54": {
+    "text": "Off",
+    "value": 0
+   },
+   "55": {
+    "text": "Off",
+    "value": 0
+   },
+   "56": {
+    "text": "No",
+    "value": 0
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  },
+  "0.5": {
+   "48": {
+    "text": "FuMa",
+    "value": 0.5
+   },
+   "49": {
+    "text": "FuMa",
+    "value": 0.5
+   },
+   "50": {
+    "text": "FuMa",
+    "value": 0.5
+   },
+   "51": {
+    "text": "FuMa",
+    "value": 0.5
+   },
+   "52": {
+    "text": "Off",
+    "value": 0
+   },
+   "53": {
+    "text": "Off",
+    "value": 0
+   },
+   "54": {
+    "text": "Off",
+    "value": 0
+   },
+   "55": {
+    "text": "Off",
+    "value": 0
+   },
+   "56": {
+    "text": "No",
+    "value": 0
+   },
+   "57": {
+    "text": "No",
+    "value": 0
+   }
+  },
+  "0.55": {
+   "48": {
+    "text": "FuMa",
+    "value": 0.5
+   },
+   "49": {
+    "text": "FuMa",
+    "value": 0.5
+   },
+   "50": {
+    "text": "FuMa",
+    "value": 0.5
+   },
+   "51": {
+    "text": "FuMa",
+    "value": 0.5
+   },
+   "52": {
+    "text": "On",
+    "value": 1
+   },
+   "53": {
+    "text": "On",
+    "value": 1
+   },
+   "54": {
+    "text": "On",
+    "value": 1
+   },
+   "55": {
+    "text": "On",
+    "value": 1
+   },
+   "56": {
+    "text": "Yes",
+    "value": 1
+   },
+   "57": {
+    "text": "Yes",
+    "value": 1
+   }
+  },
+  "0.75": {
+   "48": {
+    "text": "SID",
+    "value": 1
+   },
+   "49": {
+    "text": "SID",
+    "value": 1
+   },
+   "50": {
+    "text": "N3D",
+    "value": 1
+   },
+   "51": {
+    "text": "N3D",
+    "value": 1
+   },
+   "52": {
+    "text": "On",
+    "value": 1
+   },
+   "53": {
+    "text": "On",
+    "value": 1
+   },
+   "54": {
+    "text": "On",
+    "value": 1
+   },
+   "55": {
+    "text": "On",
+    "value": 1
+   },
+   "56": {
+    "text": "Yes",
+    "value": 1
+   },
+   "57": {
+    "text": "Yes",
+    "value": 1
+   }
+  },
+  "1": {
+   "48": {
+    "text": "SID",
+    "value": 1
+   },
+   "49": {
+    "text": "SID",
+    "value": 1
+   },
+   "50": {
+    "text": "N3D",
+    "value": 1
+   },
+   "51": {
+    "text": "N3D",
+    "value": 1
+   },
+   "52": {
+    "text": "On",
+    "value": 1
+   },
+   "53": {
+    "text": "On",
+    "value": 1
+   },
+   "54": {
+    "text": "On",
+    "value": 1
+   },
+   "55": {
+    "text": "On",
+    "value": 1
+   },
+   "56": {
+    "text": "Yes",
+    "value": 1
+   },
+   "57": {
+    "text": "Yes",
+    "value": 1
+   }
+  }
+ },
+ "fresh_values": {
+  "10": 0,
+  "48": 0,
+  "49": 0,
+  "50": 0,
+  "51": 0,
+  "52": 0,
+  "53": 0,
+  "54": 0,
+  "55": 0,
+  "56": 0,
+  "57": 0
+ },
+ "parameters": [
+  {
+   "can_automate": true,
+   "id": 48,
+   "index": 0,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "InChanne",
+   "step_count": 0,
+   "title": "InChannelSeq",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 49,
+   "index": 1,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "OutChann",
+   "step_count": 0,
+   "title": "OutChannelSeq",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 50,
+   "index": 2,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "InNormal",
+   "step_count": 0,
+   "title": "InNormalization",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 51,
+   "index": 3,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "OutNorma",
+   "step_count": 0,
+   "title": "OutNormalization",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 52,
+   "index": 4,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "FlipCond",
+   "step_count": 0,
+   "title": "FlipCondonShortleyPhase",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 53,
+   "index": 5,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "MirrorLe",
+   "step_count": 0,
+   "title": "MirrorLeftRight",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 54,
+   "index": 6,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "MirrorFr",
+   "step_count": 0,
+   "title": "MirrorFrontBack",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 55,
+   "index": 7,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "MirrorTo",
+   "step_count": 0,
+   "title": "MirrorTopBottom",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 56,
+   "index": 8,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "InputIs2",
+   "step_count": 0,
+   "title": "InputIs2D",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 57,
+   "index": 9,
+   "is_bypass": false,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "OutputIs",
+   "step_count": 0,
+   "title": "OutputIs2D",
+   "units": ""
+  },
+  {
+   "can_automate": true,
+   "id": 10,
+   "index": 10,
+   "is_bypass": true,
+   "is_list": false,
+   "read_only": false,
+   "short_title": "Bypass",
+   "step_count": 1,
+   "title": "Bypass",
+   "units": ""
+  }
+ ],
+ "restored": {
+  "48": 0.5,
+  "49": 0.5,
+  "50": 0.5,
+  "51": 0.5,
+  "52": 1,
+  "53": 1,
+  "54": 1,
+  "55": 1,
+  "56": 1,
+  "57": 1
+ }
+}

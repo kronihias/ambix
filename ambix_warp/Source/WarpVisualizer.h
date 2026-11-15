@@ -38,6 +38,7 @@ public:
 
     // Callback: (phiNormalized, thetaNormalized) in 0..1 parameter range
     std::function<void (float, float)> onWarpDragged;
+    std::function<void()> onGestureStarted; // mouse down: a drag may follow
     std::function<void()> onGestureEnded;
 
     void setWarpParams (float phi, float phiCurve, float theta, float thetaCurve)
@@ -58,6 +59,7 @@ public:
     {
         dragStartPhiParam = phi_param;
         dragStartThetaParam = theta_param;
+        if (onGestureStarted) onGestureStarted();
     }
 
     void mouseUp (const juce::MouseEvent&) override

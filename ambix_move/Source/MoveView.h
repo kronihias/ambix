@@ -95,6 +95,7 @@ public:
     std::function<void (float yMeters, float zMeters)> onListenerYZDragged;
     std::function<void (float radiusMetersDelta)>      onRadiusWheel;
     std::function<void()>                              onResetListener;
+    std::function<void()>                              onGestureStarted; // a drag on a pane begins
     std::function<void()>                              onGestureEnded;
 
     //========================================================================
@@ -130,6 +131,9 @@ public:
             activeDrag = DragKind::Top;
         else if (frontPaneBounds.contains (e.getPosition()))
             activeDrag = DragKind::Front;
+
+        if (activeDrag != DragKind::None && onGestureStarted)
+            onGestureStarted();
 
         handleDrag (e);
     }

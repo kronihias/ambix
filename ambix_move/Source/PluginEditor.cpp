@@ -14,7 +14,6 @@
  */
 
 #include "PluginProcessor.h"
-#include "../../common/JuceCompat.h"
 #include "PluginEditor.h"
 
 #define Q(x) #x
@@ -127,7 +126,8 @@ namespace
 //==============================================================================
 Ambix_moveAudioProcessorEditor::Ambix_moveAudioProcessorEditor (Ambix_moveAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
-      _changed (true)
+      _changed (true),
+      paramWatcher (*ownerFilter)
 {
     setLookAndFeel (&globalLaF);
     tooltipWindow.setMillisecondsBeforeTipAppears (700);
@@ -315,33 +315,44 @@ Ambix_moveAudioProcessorEditor::Ambix_moveAudioProcessorEditor (Ambix_moveAudioP
     // --- Drag callbacks from view -----------------------------------------
     view.onListenerXYDragged = [this] (float xMeters, float yMeters)
     {
-        auto* p = getProcessor();
-        setParameterNotifyingHost (p, P::XParam, P::xParamFromMeters (xMeters));
-        setParameterNotifyingHost (p, P::YParam, P::xParamFromMeters (yMeters));
+        setParameterFromEditor (P::XParam, P::xParamFromMeters (xMeters));
+        setParameterFromEditor (P::YParam, P::xParamFromMeters (yMeters));
     };
     view.onListenerYZDragged = [this] (float yMeters, float zMeters)
     {
-        auto* p = getProcessor();
-        setParameterNotifyingHost (p, P::YParam, P::xParamFromMeters (yMeters));
-        setParameterNotifyingHost (p, P::ZParam, P::xParamFromMeters (zMeters));
+        setParameterFromEditor (P::YParam, P::xParamFromMeters (yMeters));
+        setParameterFromEditor (P::ZParam, P::xParamFromMeters (zMeters));
     };
     view.onRadiusWheel = [this] (float radiusDeltaM)
     {
         auto* p = getProcessor();
-        const float currentM = P::radiusMetersFromParam (p->getParameter (P::RadiusParam));
+        const float currentM = P::radiusMetersFromParam (p->param (P::RadiusParam).get());
         const float newM     = juce::jlimit (1.f, 5.f, currentM + radiusDeltaM);
-        setParameterNotifyingHost (p, P::RadiusParam, P::radiusParamFromMeters (newM));
+        setParameterFromEditor (P::RadiusParam, P::radiusParamFromMeters (newM));
     };
     view.onResetListener = [this] ()
     {
-        auto* p = getProcessor();
-        setParameterNotifyingHost (p, P::XParam, P::xParamFromMeters (0.f));
-        setParameterNotifyingHost (p, P::YParam, P::xParamFromMeters (0.f));
-        setParameterNotifyingHost (p, P::ZParam, P::xParamFromMeters (0.f));
+        setParametersFromEditor ({ { P::XParam, P::xParamFromMeters (0.f) },
+                                   { P::YParam, P::xParamFromMeters (0.f) },
+                                   { P::ZParam, P::xParamFromMeters (0.f) } });
     };
-    view.onGestureEnded = [this] () { saveUndoState(); };
+    // a drag on either pane moves the listener: X/Y (top) or Y/Z (front)
+    view.onGestureStarted = [this] ()
+    {
+        beginGesture (P::XParam);
+        beginGesture (P::YParam);
+        beginGesture (P::ZParam);
+    };
+    view.onGestureEnded = [this] ()
+    {
+        endGesture (P::XParam);
+        endGesture (P::YParam);
+        endGesture (P::ZParam);
+        saveUndoState();
+    };
 
     // --- Register for processor change notifications ---------------------
+    // (channel count changes only; parameters are polled from the timer)
     getProcessor()->addChangeListener (this);
 
     // --- Window size ------------------------------------------------------
@@ -364,6 +375,11 @@ Ambix_moveAudioProcessorEditor::~Ambix_moveAudioProcessorEditor()
 {
     getProcessor()->removeChangeListener (this);
     stopTimer();
+
+    // don't leave a gesture open in the host
+    for (int i = 0; i < P::totalNumParams; ++i)
+        endGesture (i);
+
     setLookAndFeel (nullptr);
 }
 
@@ -588,68 +604,132 @@ void Ambix_moveAudioProcessorEditor::resized()
 //==============================================================================
 void Ambix_moveAudioProcessorEditor::sliderValueChanged (Slider* s)
 {
-    auto* p = getProcessor();
-
     if (s == &sld_x)
-        setParameterNotifyingHost (p, P::XParam, P::xParamFromMeters ((float) sld_x.getValue()));
+        setParameterFromEditor (P::XParam, P::xParamFromMeters ((float) sld_x.getValue()));
     else if (s == &sld_y)
-        setParameterNotifyingHost (p, P::YParam, P::xParamFromMeters ((float) sld_y.getValue()));
+        setParameterFromEditor (P::YParam, P::xParamFromMeters ((float) sld_y.getValue()));
     else if (s == &sld_z)
-        setParameterNotifyingHost (p, P::ZParam, P::xParamFromMeters ((float) sld_z.getValue()));
+        setParameterFromEditor (P::ZParam, P::xParamFromMeters ((float) sld_z.getValue()));
     else if (s == &sld_radius)
-        setParameterNotifyingHost (p, P::RadiusParam, P::radiusParamFromMeters ((float) sld_radius.getValue()));
+        setParameterFromEditor (P::RadiusParam, P::radiusParamFromMeters ((float) sld_radius.getValue()));
     else if (s == &sld_yaw)
-        setParameterNotifyingHost (p, P::YawParam,   P::paramFromDeg ((float) sliderWrap (sld_yaw)));
+        setParameterFromEditor (P::YawParam, P::paramFromDeg ((float) sliderWrap (sld_yaw)));
     else if (s == &sld_pitch)
-        setParameterNotifyingHost (p, P::PitchParam, P::paramFromDeg ((float) sliderWrap (sld_pitch)));
+        setParameterFromEditor (P::PitchParam, P::paramFromDeg ((float) sliderWrap (sld_pitch)));
     else if (s == &sld_roll)
-        setParameterNotifyingHost (p, P::RollParam,  P::paramFromDeg ((float) sliderWrap (sld_roll)));
+        setParameterFromEditor (P::RollParam, P::paramFromDeg ((float) sliderWrap (sld_roll)));
     else if (s == &sld_in_order)
-        setParameterNotifyingHost (p, P::InOrderParam,
-                                   (float) sld_in_order.getValue() / (float) juce::jmax (1.0, sld_in_order.getMaximum()));
+        setParameterFromEditor (P::InOrderParam, (float) sld_in_order.getValue() / (float) juce::jmax (1.0, sld_in_order.getMaximum()));
     else if (s == &sld_out_order)
-        setParameterNotifyingHost (p, P::OutOrderParam,
-                                   (float) sld_out_order.getValue() / (float) juce::jmax (1.0, sld_out_order.getMaximum()));
+        setParameterFromEditor (P::OutOrderParam, (float) sld_out_order.getValue() / (float) juce::jmax (1.0, sld_out_order.getMaximum()));
 }
 
-void Ambix_moveAudioProcessorEditor::sliderDragStarted (Slider*) {}
-
-void Ambix_moveAudioProcessorEditor::sliderDragEnded (Slider*)
+int Ambix_moveAudioProcessorEditor::paramForSlider (Slider* s) const
 {
+    if (s == &sld_x)         return P::XParam;
+    if (s == &sld_y)         return P::YParam;
+    if (s == &sld_z)         return P::ZParam;
+    if (s == &sld_radius)    return P::RadiusParam;
+    if (s == &sld_yaw)       return P::YawParam;
+    if (s == &sld_pitch)     return P::PitchParam;
+    if (s == &sld_roll)      return P::RollParam;
+    if (s == &sld_in_order)  return P::InOrderParam;
+    if (s == &sld_out_order) return P::OutOrderParam;
+    return -1;
+}
+
+void Ambix_moveAudioProcessorEditor::beginGesture (int index)
+{
+    if (index >= 0 && ! gestureOpen[index])
+    {
+        gestureOpen[index] = true;
+        getProcessor()->param (index).beginChangeGesture();
+    }
+}
+
+void Ambix_moveAudioProcessorEditor::endGesture (int index)
+{
+    if (index >= 0 && gestureOpen[index])
+    {
+        gestureOpen[index] = false;
+        getProcessor()->param (index).endChangeGesture();
+    }
+}
+
+void Ambix_moveAudioProcessorEditor::setParameterFromEditor (int index, float newValue)
+{
+    const bool ownGesture = ! gestureOpen[index];
+
+    if (ownGesture) beginGesture (index);
+    getProcessor()->param (index).setValueNotifyingHost (newValue);
+    if (ownGesture) endGesture (index);
+}
+
+void Ambix_moveAudioProcessorEditor::setParametersFromEditor (const std::vector<std::pair<int, float>>& values)
+{
+    std::vector<int> own;
+
+    for (auto& v : values)
+    {
+        if (! gestureOpen[v.first])
+        {
+            beginGesture (v.first);
+            own.push_back (v.first);
+        }
+    }
+
+    for (auto& v : values)
+        getProcessor()->param (v.first).setValueNotifyingHost (v.second);
+
+    for (auto index : own)
+        endGesture (index);
+}
+
+void Ambix_moveAudioProcessorEditor::sliderDragStarted (Slider* s)
+{
+    beginGesture (paramForSlider (s));
+}
+
+void Ambix_moveAudioProcessorEditor::sliderDragEnded (Slider* s)
+{
+    endGesture (paramForSlider (s));
+
     if (! undoInProgress)
         saveUndoState();
 }
 
 void Ambix_moveAudioProcessorEditor::buttonClicked (Button* b)
 {
+#ifdef WITH_OSC
     auto* p = getProcessor();
+#endif
 
     if (b == &btn_reset)
     {
-        setParameterNotifyingHost (p, P::XParam, P::xParamFromMeters (0.f));
-        setParameterNotifyingHost (p, P::YParam, P::xParamFromMeters (0.f));
-        setParameterNotifyingHost (p, P::ZParam, P::xParamFromMeters (0.f));
+        setParametersFromEditor ({ { P::XParam, P::xParamFromMeters (0.f) },
+                                   { P::YParam, P::xParamFromMeters (0.f) },
+                                   { P::ZParam, P::xParamFromMeters (0.f) } });
         if (! undoInProgress) saveUndoState();
     }
     else if (b == &tgl_ypr)
     {
-        setParameterNotifyingHost (p, P::RotOrderParam, 0.f);
+        setParameterFromEditor (P::RotOrderParam, 0.f);
     }
     else if (b == &tgl_rpy)
     {
-        setParameterNotifyingHost (p, P::RotOrderParam, 1.f);
+        setParameterFromEditor (P::RotOrderParam, 1.f);
     }
     else if (b == &tgl_qinvert)
     {
-        setParameterNotifyingHost (p, P::QinvertParam, (float) tgl_qinvert.getToggleState());
+        setParameterFromEditor (P::QinvertParam, (float) tgl_qinvert.getToggleState());
     }
     else if (b == &tgl_transl_enabled)
     {
-        setParameterNotifyingHost (p, P::TranslEnabledParam, tgl_transl_enabled.getToggleState() ? 1.f : 0.f);
+        setParameterFromEditor (P::TranslEnabledParam, tgl_transl_enabled.getToggleState() ? 1.f : 0.f);
     }
     else if (b == &tgl_rot_enabled)
     {
-        setParameterNotifyingHost (p, P::RotEnabledParam, tgl_rot_enabled.getToggleState() ? 1.f : 0.f);
+        setParameterFromEditor (P::RotEnabledParam, tgl_rot_enabled.getToggleState() ? 1.f : 0.f);
     }
 #ifdef WITH_OSC
     else if (b == &tgl_osc_enable)
@@ -664,8 +744,10 @@ void Ambix_moveAudioProcessorEditor::buttonClicked (Button* b)
             undoInProgress = true;
             --undoIndex;
             auto& snap = undoHistory[(size_t) undoIndex];
+            std::vector<std::pair<int, float>> values;
             for (int i = 0; i < P::totalNumParams; ++i)
-                setParameterNotifyingHost (p, i, snap.params[i]);
+                values.push_back ({ i, snap.params[i] });
+            setParametersFromEditor (values);
             undoInProgress = false;
         }
     }
@@ -676,8 +758,10 @@ void Ambix_moveAudioProcessorEditor::buttonClicked (Button* b)
             undoInProgress = true;
             ++undoIndex;
             auto& snap = undoHistory[(size_t) undoIndex];
+            std::vector<std::pair<int, float>> values;
             for (int i = 0; i < P::totalNumParams; ++i)
-                setParameterNotifyingHost (p, i, snap.params[i]);
+                values.push_back ({ i, snap.params[i] });
+            setParametersFromEditor (values);
             undoInProgress = false;
         }
     }
@@ -685,9 +769,9 @@ void Ambix_moveAudioProcessorEditor::buttonClicked (Button* b)
 
 void Ambix_moveAudioProcessorEditor::textEditorReturnKeyPressed (TextEditor& ed)
 {
+#ifdef WITH_OSC
     auto* p = getProcessor();
 
-#ifdef WITH_OSC
     if (&ed == &txt_osc_port)
     {
         const String newPort = ed.getText();
@@ -703,7 +787,7 @@ void Ambix_moveAudioProcessorEditor::textEditorReturnKeyPressed (TextEditor& ed)
     {
         float v = e.getText().getFloatValue();
         v = juce::jlimit (-1.f, 1.f, v);
-        setParameterNotifyingHost (p, paramIndex, (v + 1.f) * 0.5f);
+        setParameterFromEditor (paramIndex, (v + 1.f) * 0.5f);
     };
 
     if (&ed == &txt_q0)      applyQuat (txt_q0, P::Q0Param);
@@ -720,9 +804,7 @@ void Ambix_moveAudioProcessorEditor::textEditorFocusLost (TextEditor& ed)
 void Ambix_moveAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster*)
 {
     _changed = true;
-    // sendChangeMessage() also fires on every parameter change, so repaint only
-    // when the channel count (ambisonic order) actually changes - otherwise we
-    // would redraw the whole editor on every automation step.
+    // only numChannelsChanged() broadcasts: repaint the order in the title
     const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
                       |  getAudioProcessor()->getTotalNumOutputChannels();
     if (chanKey != lastChanKey_) { lastChanKey_ = chanKey; repaint(); }
@@ -731,18 +813,6 @@ void Ambix_moveAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster*)
 void Ambix_moveAudioProcessorEditor::timerCallback()
 {
     auto* p = getProcessor();
-
-    const float xN  = p->getParameter (P::XParam);
-    const float yN  = p->getParameter (P::YParam);
-    const float zN  = p->getParameter (P::ZParam);
-    const float rN  = p->getParameter (P::RadiusParam);
-    const float ioN = p->getParameter (P::InOrderParam);
-    const float ooN = p->getParameter (P::OutOrderParam);
-
-    const float xM = P::xMetersFromParam (xN);
-    const float yM = P::xMetersFromParam (yN);
-    const float zM = P::xMetersFromParam (zN);
-    const float rM = P::radiusMetersFromParam (rN);
 
     // Update order slider range based on active channel count
     int maxOrder = AMBI_ORDER;
@@ -753,52 +823,89 @@ void Ambix_moveAudioProcessorEditor::timerCallback()
             maxOrder = activeOrder;
     }
 #endif
-    sld_in_order.setRange (0, maxOrder, 1);
-    sld_out_order.setRange (0, maxOrder, 1);
 
-    sld_x.setValue      (xM, dontSendNotification);
-    sld_y.setValue      (yM, dontSendNotification);
-    sld_z.setValue      (zM, dontSendNotification);
-    sld_radius.setValue (rM, dontSendNotification);
-    sld_in_order.setValue  (round (ioN * maxOrder), dontSendNotification);
-    sld_out_order.setValue (round (ooN * maxOrder), dontSendNotification);
+    // only touch the controls when a parameter or the order range changed
+    const bool maxOrderChanged = maxOrder != lastMaxOrder_;
+    lastMaxOrder_ = maxOrder;
 
-    // Rotation
-    const float yawN   = p->getParameter (P::YawParam);
-    const float pitchN = p->getParameter (P::PitchParam);
-    const float rollN  = p->getParameter (P::RollParam);
-    const float rotOrd = p->getParameter (P::RotOrderParam);
-
-    sld_yaw.setValue   (P::degFromParam (yawN),   dontSendNotification);
-    sld_pitch.setValue (P::degFromParam (pitchN), dontSendNotification);
-    sld_roll.setValue  (P::degFromParam (rollN),  dontSendNotification);
-
-    tgl_ypr.setToggleState (rotOrd <  0.5f, dontSendNotification);
-    tgl_rpy.setToggleState (rotOrd >= 0.5f, dontSendNotification);
-
-    if (! txt_q0.hasKeyboardFocus (true))
-        txt_q0.setText (String (p->getParameter (P::Q0Param) * 2. - 1., 4), dontSendNotification);
-    if (! txt_q1.hasKeyboardFocus (true))
-        txt_q1.setText (String (p->getParameter (P::Q1Param) * 2. - 1., 4), dontSendNotification);
-    if (! txt_q2.hasKeyboardFocus (true))
-        txt_q2.setText (String (p->getParameter (P::Q2Param) * 2. - 1., 4), dontSendNotification);
-    if (! txt_q3.hasKeyboardFocus (true))
-        txt_q3.setText (String (p->getParameter (P::Q3Param) * 2. - 1., 4), dontSendNotification);
-
-    tgl_qinvert.setToggleState (p->getParameter (P::QinvertParam) > 0.5f, dontSendNotification);
-    tgl_transl_enabled.setToggleState (p->getParameter (P::TranslEnabledParam) > 0.5f, dontSendNotification);
-    tgl_rot_enabled.setToggleState    (p->getParameter (P::RotEnabledParam)    > 0.5f, dontSendNotification);
-
-    // Visually indicate which rotation input is driving the matrix
-    if (p->isQuaternionActive())
+    if (paramWatcher.changed() || maxOrderChanged)
     {
-        lbl_euler_title.setColour (Label::textColourId, Colours::dimgrey);
-        lbl_quat_title .setColour (Label::textColourId, Colours::yellow);
-    }
-    else
-    {
-        lbl_euler_title.setColour (Label::textColourId, Colours::yellow);
-        lbl_quat_title .setColour (Label::textColourId, Colours::dimgrey);
+        auto value = [p] (int index) { return p->param (index).get(); };
+
+        // a slider the user is dragging is the source of its value
+        auto syncSlider = [] (Slider& sld, double v)
+        {
+            if (! sld.isMouseButtonDown())
+                sld.setValue (v, dontSendNotification);
+        };
+
+        const float xN  = value (P::XParam);
+        const float yN  = value (P::YParam);
+        const float zN  = value (P::ZParam);
+        const float rN  = value (P::RadiusParam);
+        const float ioN = value (P::InOrderParam);
+        const float ooN = value (P::OutOrderParam);
+
+        const float xM = P::xMetersFromParam (xN);
+        const float yM = P::xMetersFromParam (yN);
+        const float zM = P::xMetersFromParam (zN);
+        const float rM = P::radiusMetersFromParam (rN);
+
+        sld_in_order.setRange (0, maxOrder, 1);
+        sld_out_order.setRange (0, maxOrder, 1);
+
+        syncSlider (sld_x,      xM);
+        syncSlider (sld_y,      yM);
+        syncSlider (sld_z,      zM);
+        syncSlider (sld_radius, rM);
+        syncSlider (sld_in_order,  round (ioN * maxOrder));
+        syncSlider (sld_out_order, round (ooN * maxOrder));
+
+        // Rotation
+        const float yawN   = value (P::YawParam);
+        const float pitchN = value (P::PitchParam);
+        const float rollN  = value (P::RollParam);
+        const float rotOrd = value (P::RotOrderParam);
+
+        syncSlider (sld_yaw,   P::degFromParam (yawN));
+        syncSlider (sld_pitch, P::degFromParam (pitchN));
+        syncSlider (sld_roll,  P::degFromParam (rollN));
+
+        tgl_ypr.setToggleState (rotOrd <  0.5f, dontSendNotification);
+        tgl_rpy.setToggleState (rotOrd >= 0.5f, dontSendNotification);
+
+        if (! txt_q0.hasKeyboardFocus (true))
+            txt_q0.setText (String (value (P::Q0Param) * 2. - 1., 4), dontSendNotification);
+        if (! txt_q1.hasKeyboardFocus (true))
+            txt_q1.setText (String (value (P::Q1Param) * 2. - 1., 4), dontSendNotification);
+        if (! txt_q2.hasKeyboardFocus (true))
+            txt_q2.setText (String (value (P::Q2Param) * 2. - 1., 4), dontSendNotification);
+        if (! txt_q3.hasKeyboardFocus (true))
+            txt_q3.setText (String (value (P::Q3Param) * 2. - 1., 4), dontSendNotification);
+
+        tgl_qinvert.setToggleState (value (P::QinvertParam) > 0.5f, dontSendNotification);
+        tgl_transl_enabled.setToggleState (value (P::TranslEnabledParam) > 0.5f, dontSendNotification);
+        tgl_rot_enabled.setToggleState    (value (P::RotEnabledParam)    > 0.5f, dontSendNotification);
+
+        // Visually indicate which rotation input is driving the matrix
+        if (p->isQuaternionActive())
+        {
+            lbl_euler_title.setColour (Label::textColourId, Colours::dimgrey);
+            lbl_quat_title .setColour (Label::textColourId, Colours::yellow);
+        }
+        else
+        {
+            lbl_euler_title.setColour (Label::textColourId, Colours::yellow);
+            lbl_quat_title .setColour (Label::textColourId, Colours::dimgrey);
+        }
+
+        // Update view
+        view.setListener (xM, yM, zM);
+        view.setReferenceRadius (rM);
+
+        float fwd[3] = { 1.f, 0.f, 0.f };
+        p->getLookForward (fwd);
+        view.setLookForward (fwd[0], fwd[1], fwd[2]);
     }
 
 #ifdef WITH_OSC
@@ -808,14 +915,6 @@ void Ambix_moveAudioProcessorEditor::timerCallback()
     txt_osc_port.setEnabled (p->osc_enabled);
     lbl_osc_port.setColour (Label::textColourId, p->osc_enabled ? Colours::white : Colours::dimgrey);
 #endif
-
-    // Update view
-    view.setListener (xM, yM, zM);
-    view.setReferenceRadius (rM);
-
-    float fwd[3] = { 1.f, 0.f, 0.f };
-    p->getLookForward (fwd);
-    view.setLookForward (fwd[0], fwd[1], fwd[2]);
 
     // Undo/redo button states
     btn_undo.setEnabled (undoIndex > 0);
@@ -827,7 +926,7 @@ void Ambix_moveAudioProcessorEditor::saveUndoState()
     auto* p = getProcessor();
     ParamSnapshot snap;
     for (int i = 0; i < P::totalNumParams; ++i)
-        snap.params[i] = p->getParameter (i);
+        snap.params[i] = p->param (i).get();
 
     if (undoIndex >= 0 && undoIndex < (int) undoHistory.size() - 1)
         undoHistory.resize ((size_t) undoIndex + 1);

@@ -31,9 +31,11 @@ import pytest
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VST3_DIR  = os.path.join(REPO_ROOT, "_build", "vst3")
+# AMBIX_BUILD_DIR: test another build tree (e.g. one per worktree).
+BUILD_DIR = os.environ.get("AMBIX_BUILD_DIR", os.path.join(REPO_ROOT, "_build"))
+VST3_DIR  = os.path.join(BUILD_DIR, "vst3")
 _TESTHOST_EXE = "ambix_testhost.exe" if os.name == "nt" else "ambix_testhost"
-TESTHOST_BIN = os.path.join(REPO_ROOT, "_build", "testhost", _TESTHOST_EXE)
+TESTHOST_BIN = os.path.join(BUILD_DIR, "testhost", _TESTHOST_EXE)
 
 GOLDEN_DIR = os.path.join(os.path.dirname(__file__), "golden")
 
@@ -142,9 +144,17 @@ def plugin_mirror():
     return _load("ambix_mirror")
 
 
-@pytest.fixture(scope="session")
+# Module scope: ambix_rotator and ambix_rotator_z both listen for OSC on UDP
+# 7120, so release this one before test_rotator_z's OSC tests.
+@pytest.fixture(scope="module")
 def plugin_rotator():
-    return _load("ambix_rotator")
+    wrapper = _load("ambix_rotator")
+    yield wrapper
+    # pytest may keep fixture values past teardown; drop the instance so the
+    # port closes now.
+    wrapper.__dict__["_plugin"] = None
+    import gc
+    gc.collect()
 
 
 @pytest.fixture(scope="session")

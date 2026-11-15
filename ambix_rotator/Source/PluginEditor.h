@@ -52,9 +52,12 @@ public:
     void paint (Graphics& g) override;
     void resized() override;
     void sliderValueChanged (Slider* sliderThatWasMoved) override;
+    void sliderDragStarted (Slider* slider) override;
+    void sliderDragEnded (Slider* slider) override;
     void buttonClicked (Button* buttonThatWasClicked) override;
     void textEditorFocusLost(TextEditor &) override;
     void textEditorReturnKeyPressed(TextEditor &) override;
+    void textEditorTextChanged(TextEditor &) override;
 
     void changeListenerCallback (ChangeBroadcaster *source) override;
 
@@ -86,6 +89,19 @@ private:
     ToggleButton tgl_qinvert;
 
     bool _changed;
+
+    ambix::ParameterChangeWatcher paramWatcher;
+    Slider* gestureSlider = nullptr; // slider whose host gesture is open
+    bool refreshPending = false;     // a busy slider missed a refresh
+    bool qTyped[4] = {};             // q text box typed into since it was last set
+    bool qPending[4] = {};           // q text box missed a refresh while typed into
+
+    TextEditor* qText (int i);
+    void refreshQText (int i);
+
+    ambix::Parameter* parameterFor (Slider* s) const;
+    void setInGesture (int index, float value);
+    bool isBusy (Slider& s) const;
     int  lastChanKey_ = -1; // cached (in<<16|out) channel count; repaint order title only on change
 
     Ambix_rotatorAudioProcessor* getProcessor() const

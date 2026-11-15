@@ -26,6 +26,7 @@
 //==============================================================================
 Ambix_vmicAudioProcessorEditor::Ambix_vmicAudioProcessorEditor (Ambix_vmicAudioProcessor* ownerFilter)
     : AudioProcessorEditor (ownerFilter),
+    paramWatcher(*ownerFilter),
     panninggraph(ownerFilter),
     tabbedComponent(TabbedButtonBar::TabsAtTop),
     tabbedComponent2(TabbedButtonBar::TabsAtTop)
@@ -76,11 +77,13 @@ Ambix_vmicAudioProcessorEditor::Ambix_vmicAudioProcessorEditor (Ambix_vmicAudioP
 
     setSize (630, 400);
 
-    ownerFilter->addChangeListener(this);
+    ownerFilter->addChangeListener(this); // channel count changes
 
     // ownerFilter->sendChangeMessage(); // get status from dsp
+    paramWatcher.changed(); // changeListenerCallback() primes the editor
     changeListenerCallback(nullptr);
 
+    startTimer(40);
 }
 
 
@@ -130,9 +133,7 @@ void Ambix_vmicAudioProcessorEditor::resized()
 
 void Ambix_vmicAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *source)
 {
-    // sendChangeMessage() also fires on every parameter change, so repaint only
-    // when the channel count (ambisonic order) actually changes - otherwise we
-    // would redraw the whole editor on every automation step.
+    // repaint only when the channel count (ambisonic order) actually changes
     {
         const int chanKey = (getAudioProcessor()->getTotalNumInputChannels() << 16)
                           |  getAudioProcessor()->getTotalNumOutputChannels();
@@ -163,20 +164,44 @@ void Ambix_vmicAudioProcessorEditor::changeListenerCallback (ChangeBroadcaster *
 
     } else {
 
+        updateFilters(true);
+
+    }
+
+}
+
+void Ambix_vmicAudioProcessorEditor::timerCallback()
+{
+    if (paramWatcher.changed())
+        updateFilters(false);
+}
+
+void Ambix_vmicAudioProcessorEditor::updateFilters (bool force)
+{
+    Ambix_vmicAudioProcessor* ourProcessor = getProcessor();
+
+    {
         for (int i=0; i < NUM_FILTERS_VMIC; i++)
         {
 
-            float az = ParamToDeg360( ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::AzimuthParam) );
+            float az = ParamToDeg360( ourProcessor->getParam(i, Ambix_vmicAudioProcessor::AzimuthParam).get() );
 
-            float el = ParamToDeg360( ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ElevationParam) );
+            float el = ParamToDeg360( ourProcessor->getParam(i, Ambix_vmicAudioProcessor::ElevationParam).get() );
 
-            bool sh = ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::ShapeParam) <= 0.5f ? false : true;
+            bool sh = ourProcessor->getParam(i, Ambix_vmicAudioProcessor::ShapeParam).get() <= 0.5f ? false : true;
 
-            float w = ParamToDeg180(ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::WidthParam) );
+            float w = ParamToDeg180(ourProcessor->getParam(i, Ambix_vmicAudioProcessor::WidthParam).get() );
 
-            float h = ParamToDeg180( ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::HeightParam) );
+            float h = ParamToDeg180( ourProcessor->getParam(i, Ambix_vmicAudioProcessor::HeightParam).get() );
 
-            float g = ParamToDB( ourProcessor->getParameter(PARAMS_PER_FILTER*i+Ambix_vmicAudioProcessor::GainParam) );
+            float g = ParamToDB( ourProcessor->getParam(i, Ambix_vmicAudioProcessor::GainParam).get() );
+
+            const float shown[6] = { az, el, sh ? 1.f : 0.f, w, h, g };
+
+            if (! force && std::equal (shown, shown + 6, shownFilter[i]))
+                continue;
+
+            std::copy (shown, shown + 6, shownFilter[i]);
 
             panninggraph.setFilter(i, az, el, sh, w, h, g);
             _filtertabs.getUnchecked(i)->setFilter(az, el, sh, w, h, g);
